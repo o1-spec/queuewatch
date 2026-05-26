@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
-import { AlertTriangle, ArrowRight, Terminal } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Terminal, Eye, EyeOff } from 'lucide-react';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -13,6 +13,7 @@ export default function RegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -44,7 +45,7 @@ export default function RegisterPage() {
 
   return (
     <div className="bg-zinc-950 text-zinc-200 min-h-screen flex items-center justify-center p-6 relative w-full overflow-hidden [background-image:radial-gradient(#18181b_1px,transparent_1px)] [background-size:16px_16px]">
-      <div className="bg-zinc-950 border border-zinc-900 p-6 rounded-lg w-full max-w-sm space-y-5 relative shadow-xl font-mono text-[11px]">
+      <div className="bg-zinc-950 border border-zinc-900 p-6 rounded-lg w-full max-w-sm space-y-5 relative shadow-xl font-mono text-[11px] animate-slide-up">
         
         {/* Header */}
         <div className="flex items-center space-x-2.5 justify-center text-center pb-2 border-b border-zinc-900">
@@ -98,15 +99,25 @@ export default function RegisterPage() {
 
           <div className="space-y-1">
             <label className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider block">secret key passphrase</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={submitting}
-              className="w-full bg-zinc-900/20 border border-zinc-900 rounded px-3 py-2 text-[10px] text-white focus:outline-none focus:border-zinc-800 disabled:opacity-50 font-mono"
-              placeholder="••••••••••••"
-              required
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={submitting}
+                className="w-full bg-zinc-900/20 border border-zinc-900 rounded pl-3 pr-10 py-2 text-[10px] text-white focus:outline-none focus:border-zinc-800 disabled:opacity-50 font-mono"
+                placeholder="••••••••••••"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                disabled={submitting}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-500 hover:text-zinc-300 transition-colors"
+              >
+                {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            </div>
           </div>
 
           <button

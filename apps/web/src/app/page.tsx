@@ -107,7 +107,7 @@ export default function SaaSLandingPage() {
       <section className="relative px-6 lg:px-12 pt-16 pb-20 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
 
         {/* Left Column: Asymmetrical Copy Block */}
-        <div className="lg:col-span-5 space-y-6">
+        <div className="lg:col-span-5 space-y-6 animate-fade-in">
           <div className="inline-flex items-center space-x-2 bg-zinc-900 border border-zinc-800 px-3 py-1 rounded text-zinc-400 text-[10px] font-mono font-bold uppercase tracking-wider">
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
             <span>v1.2.0 • Active Queue Observability</span>
@@ -154,7 +154,7 @@ export default function SaaSLandingPage() {
         </div>
 
         {/* Right Column: Denser Operational UI Dashboard Preview */}
-        <div className="lg:col-span-7 bg-zinc-950 border border-zinc-900 rounded-lg p-5 shadow-2xl space-y-5 select-none text-zinc-400 relative overflow-hidden">
+        <div className="lg:col-span-7 bg-zinc-950 border border-zinc-900 rounded-lg p-5 shadow-2xl space-y-5 select-none text-zinc-400 relative overflow-hidden animate-slide-up">
           <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/90 via-transparent to-transparent pointer-events-none z-10"></div>
 
           <div className="flex items-center justify-between border-b border-zinc-900 pb-3 text-[11px] font-mono font-bold">
@@ -266,7 +266,7 @@ export default function SaaSLandingPage() {
       <section id="console" className="border-t border-zinc-900 bg-zinc-950/40 py-20 px-6 lg:px-12">
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12">
 
-          <div className="lg:col-span-4 space-y-4 lg:pr-6">
+          <div className="lg:col-span-4 space-y-4 lg:pr-6 animate-fade-in">
             <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest font-mono">stdout_feed</span>
             <h3 className="text-2xl font-extrabold text-white tracking-tight leading-tight">
               Realtime execution stream.
@@ -286,7 +286,7 @@ export default function SaaSLandingPage() {
             </div>
           </div>
 
-          <div className="lg:col-span-8 bg-black/80 border border-zinc-900 rounded-lg p-5 font-mono text-[11px] text-zinc-400 h-[280px] overflow-hidden flex flex-col justify-between shadow-2xl">
+          <div className="lg:col-span-8 bg-black/80 border border-zinc-900 rounded-lg p-5 font-mono text-[11px] text-zinc-400 h-[280px] overflow-hidden flex flex-col justify-between shadow-2xl animate-slide-up">
             <div className="flex items-center justify-between border-b border-zinc-900 pb-2.5 mb-2.5 text-[9px] text-zinc-500 font-bold">
               <span>broker_listener_output.log</span>
               <span className="flex items-center space-x-1">
@@ -318,7 +318,7 @@ export default function SaaSLandingPage() {
       {/* 3. INCIDENT INPSECTOR PREVIEW (Sentry-style UI Preview) */}
       <section id="incidents" className="py-20 px-6 lg:px-12 border-t border-zinc-900 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
 
-        <div className="lg:col-span-8 bg-zinc-950 border border-zinc-900 rounded-lg p-5 shadow-2xl space-y-4">
+        <div className="lg:col-span-8 bg-zinc-950 border border-zinc-900 rounded-lg p-5 shadow-2xl space-y-4 animate-slide-up">
           <div className="flex items-center justify-between border-b border-zinc-900 pb-3 text-[11.5px] font-mono">
             <div className="flex items-center space-x-2">
               <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
@@ -379,7 +379,7 @@ async function safeEnqueue(data: unknown) {
           </div>
         </div>
 
-        <div className="lg:col-span-4 space-y-4">
+        <div className="lg:col-span-4 space-y-4 animate-fade-in">
           <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest font-mono">failures_inspector</span>
           <h3 className="text-2xl font-extrabold text-white tracking-tight leading-tight">
             Remediate failures.
@@ -415,7 +415,7 @@ async function safeEnqueue(data: unknown) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-zinc-900 border border-zinc-900 rounded overflow-hidden">
 
             {/* Cell 1 */}
-            <div className="bg-zinc-950 p-6 space-y-3.5">
+            <div className="bg-zinc-950 p-6 space-y-3.5 transition-all duration-350 hover:bg-zinc-900/40 hover:scale-[1.015]">
               <div className="w-8 h-8 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 flex items-center justify-center">
                 <Database className="w-4 h-4" />
               </div>
@@ -426,7 +426,7 @@ async function safeEnqueue(data: unknown) {
             </div>
 
             {/* Cell 2 */}
-            <div className="bg-zinc-950 p-6 space-y-3.5">
+            <div className="bg-zinc-950 p-6 space-y-3.5 transition-all duration-350 hover:bg-zinc-900/40 hover:scale-[1.015]">
               <div className="w-8 h-8 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 flex items-center justify-center">
                 <Inbox className="w-4 h-4" />
               </div>
@@ -437,7 +437,7 @@ async function safeEnqueue(data: unknown) {
             </div>
 
             {/* Cell 3 */}
-            <div className="bg-zinc-950 p-6 space-y-3.5">
+            <div className="bg-zinc-950 p-6 space-y-3.5 transition-all duration-350 hover:bg-zinc-900/40 hover:scale-[1.015]">
               <div className="w-8 h-8 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 flex items-center justify-center">
                 <Activity className="w-4 h-4" />
               </div>
@@ -448,7 +448,7 @@ async function safeEnqueue(data: unknown) {
             </div>
 
             {/* Cell 4 */}
-            <div className="bg-zinc-950 p-6 space-y-3.5">
+            <div className="bg-zinc-950 p-6 space-y-3.5 transition-all duration-350 hover:bg-zinc-900/40 hover:scale-[1.015]">
               <div className="w-8 h-8 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 flex items-center justify-center">
                 <Cpu className="w-4 h-4" />
               </div>
@@ -459,7 +459,7 @@ async function safeEnqueue(data: unknown) {
             </div>
 
             {/* Cell 5 */}
-            <div className="bg-zinc-950 p-6 space-y-3.5">
+            <div className="bg-zinc-950 p-6 space-y-3.5 transition-all duration-350 hover:bg-zinc-900/40 hover:scale-[1.015]">
               <div className="w-8 h-8 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 flex items-center justify-center">
                 <RefreshCw className="w-4 h-4" />
               </div>
@@ -470,7 +470,7 @@ async function safeEnqueue(data: unknown) {
             </div>
 
             {/* Cell 6 */}
-            <div className="bg-zinc-950 p-6 space-y-3.5">
+            <div className="bg-zinc-950 p-6 space-y-3.5 transition-all duration-350 hover:bg-zinc-900/40 hover:scale-[1.015]">
               <div className="w-8 h-8 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 flex items-center justify-center">
                 <ShieldCheck className="w-4 h-4" />
               </div>
