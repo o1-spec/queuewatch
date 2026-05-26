@@ -65,8 +65,8 @@ function LoginForm() {
   };
 
   return (
-    <div className="bg-zinc-950 text-zinc-200 min-h-screen flex items-center justify-center p-6 relative w-full overflow-hidden [background-image:radial-gradient(#18181b_1px,transparent_1px)] [background-size:16px_16px]">
-      <div className="bg-zinc-950 border border-zinc-900 p-6 rounded-lg w-full max-w-sm space-y-5 relative shadow-xl font-mono text-[11px] animate-slide-up">
+    <div className="bg-zinc-950 text-zinc-200 min-h-screen flex items-center justify-center p-4 sm:p-6 relative w-full overflow-hidden [background-image:radial-gradient(#18181b_1px,transparent_1px)] [background-size:16px_16px]">
+      <div className="bg-zinc-950 border border-zinc-900 p-4 sm:p-6 rounded-lg w-full max-w-sm space-y-5 relative shadow-xl font-mono text-[11px] animate-slide-up">
         
         {/* Header */}
         <div className="flex items-center space-x-2.5 justify-center text-center pb-2 border-b border-zinc-900">
@@ -99,7 +99,7 @@ function LoginForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={submitting || demoLoading}
-              className="w-full bg-zinc-900/20 border border-zinc-900 rounded px-3 py-2 text-[10px] text-white focus:outline-none focus:border-zinc-800 disabled:opacity-50"
+              className="w-full bg-zinc-900/20 border border-zinc-900 rounded px-3 py-2 text-base sm:text-[10px] text-white focus:outline-none focus:border-zinc-800 disabled:opacity-50"
               placeholder="sre@company.com"
               required
             />
@@ -113,7 +113,7 @@ function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={submitting || demoLoading}
-                className="w-full bg-zinc-900/20 border border-zinc-900 rounded pl-3 pr-10 py-2 text-[10px] text-white focus:outline-none focus:border-zinc-800 disabled:opacity-50"
+                className="w-full bg-zinc-900/20 border border-zinc-900 rounded pl-3 pr-10 py-2 text-base sm:text-[10px] text-white focus:outline-none focus:border-zinc-800 disabled:opacity-50"
                 placeholder="••••••••••••"
                 required
               />

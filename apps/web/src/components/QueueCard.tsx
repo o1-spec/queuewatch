@@ -54,7 +54,7 @@ export function QueueCard({
               onClick={() => setShowConfirm(false)}
               className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 transition-opacity animate-fade-in"
             ></div>
-            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-zinc-950 border border-zinc-900 p-5 rounded-lg w-full max-w-xs shadow-2xl z-50 font-mono text-[10px] space-y-4 animate-slide-up text-zinc-300">
+            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-zinc-950 border border-zinc-900 p-5 rounded-lg w-[calc(100%-2rem)] max-w-xs shadow-2xl z-50 font-mono text-[10px] space-y-4 animate-slide-up text-zinc-300">
               <div className="flex items-center space-x-2 border-b border-zinc-900 pb-2.5">
                 <span className={`w-1.5 h-1.5 rounded-full ${queue.paused ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'} shrink-0`}></span>
                 <span className="text-[11px] font-bold text-white uppercase">

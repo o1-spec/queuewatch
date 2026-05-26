@@ -89,13 +89,13 @@ export default function SaaSLandingPage() {
           </span>
         </nav>
 
-        <div className="flex items-center space-x-4">
-          <Link href="/login" className="text-xs font-bold font-mono text-zinc-400 hover:text-white transition-colors px-3 py-1.5">
+        <div className="flex items-center space-x-2 sm:space-x-4">
+          <Link href="/login" className="text-xs font-bold font-mono text-zinc-400 hover:text-white transition-colors px-2 sm:px-3 py-1.5">
             login
           </Link>
           <Link
             href="/login?demo=true"
-            className="px-3.5 py-1.5 rounded border border-zinc-100 bg-zinc-100 text-black hover:bg-zinc-200 font-extrabold text-xs transition-all flex items-center space-x-1.5 shadow-md font-mono"
+            className="px-3 py-1.5 rounded border border-zinc-100 bg-zinc-100 text-black hover:bg-zinc-200 font-extrabold text-xs transition-all flex items-center space-x-1.5 shadow-md font-mono"
           >
             <span>guest_demo</span>
             <ArrowRight className="w-3 h-3" />
@@ -188,8 +188,8 @@ export default function SaaSLandingPage() {
           {/* Simulated Dense Queues Table */}
           <div className="space-y-2.5">
             <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider font-mono">registered_queues</div>
-            <div className="border border-zinc-900 rounded overflow-hidden">
-              <table className="w-full text-left text-[11px] border-collapse font-mono">
+            <div className="border border-zinc-900 rounded overflow-hidden overflow-x-auto">
+              <table className="w-full min-w-[420px] text-left text-[11px] border-collapse font-mono">
                 <thead>
                   <tr className="bg-zinc-900/60 border-b border-zinc-900 text-zinc-500 font-bold">
                     <th className="p-2">queue name</th>
@@ -286,7 +286,7 @@ export default function SaaSLandingPage() {
             </div>
           </div>
 
-          <div className="lg:col-span-8 bg-black/80 border border-zinc-900 rounded-lg p-5 font-mono text-[11px] text-zinc-400 h-[280px] overflow-hidden flex flex-col justify-between shadow-2xl animate-slide-up">
+          <div className="lg:col-span-8 bg-black/80 border border-zinc-900 rounded-lg p-4 sm:p-5 font-mono text-[11px] text-zinc-400 h-[260px] sm:h-[280px] overflow-hidden flex flex-col justify-between shadow-2xl animate-slide-up">
             <div className="flex items-center justify-between border-b border-zinc-900 pb-2.5 mb-2.5 text-[9px] text-zinc-500 font-bold">
               <span>broker_listener_output.log</span>
               <span className="flex items-center space-x-1">
@@ -297,17 +297,16 @@ export default function SaaSLandingPage() {
 
             <div className="space-y-1.5 flex-1 overflow-y-auto pr-2 select-text">
               {logs.map((log, index) => (
-                <div key={index} className="flex items-start space-x-2.5 hover:bg-zinc-900/30 p-0.5 rounded transition-colors">
-                  <span className="text-zinc-600 shrink-0 select-none">{log.time}</span>
+                <div key={index} className="flex flex-wrap items-start gap-x-2 gap-y-0.5 hover:bg-zinc-900/30 p-0.5 rounded transition-colors">
+                  <span className="text-zinc-600 shrink-0 select-none hidden sm:inline">{log.time}</span>
                   <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold tracking-tight shrink-0 select-none ${log.status === 'SUCCESS' ? 'bg-emerald-950/45 border border-emerald-900 text-emerald-400' :
                     log.status === 'ACTIVE' ? 'bg-indigo-950/45 border border-indigo-900 text-indigo-400' :
                       log.status === 'RETRY' ? 'bg-amber-950/45 border border-amber-900 text-amber-400' :
                         log.status === 'FAILED' ? 'bg-rose-950/45 border border-rose-900 text-rose-400 animate-pulse' :
                           'bg-zinc-900 border border-zinc-800 text-zinc-200 font-semibold'
                     }`}>{log.status}</span>
-                  <span className="text-zinc-500 shrink-0 font-bold select-none">{log.queue}</span>
                   <span className="text-zinc-300 font-semibold shrink-0">{log.job}</span>
-                  <span className="text-zinc-400 break-all">{log.details}</span>
+                  <span className="text-zinc-400 break-all text-[10px] leading-snug">{log.details}</span>
                 </div>
               ))}
             </div>
@@ -318,19 +317,19 @@ export default function SaaSLandingPage() {
       {/* 3. INCIDENT INPSECTOR PREVIEW (Sentry-style UI Preview) */}
       <section id="incidents" className="py-20 px-6 lg:px-12 border-t border-zinc-900 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
 
-        <div className="lg:col-span-8 bg-zinc-950 border border-zinc-900 rounded-lg p-5 shadow-2xl space-y-4 animate-slide-up">
+        <div className="lg:col-span-8 bg-zinc-950 border border-zinc-900 rounded-lg p-4 sm:p-5 shadow-2xl space-y-4 animate-slide-up">
           <div className="flex items-center justify-between border-b border-zinc-900 pb-3 text-[11.5px] font-mono">
             <div className="flex items-center space-x-2">
               <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
               <strong className="text-white font-extrabold">DLQ INCIDENT DETECTED</strong>
             </div>
-            <span className="text-zinc-500 font-mono">Incident ID: inc_9182a3</span>
+            <span className="text-zinc-500 font-mono hidden sm:block">Incident ID: inc_9182a3</span>
           </div>
 
           <div className="space-y-1 font-mono">
-            <div className="flex items-center space-x-2 text-[11px] text-zinc-500">
+            <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-zinc-500">
               <span>queue: image_processing_queue</span>
-              <span>&bull;</span>
+              <span className="hidden sm:inline">&bull;</span>
               <span>attempts: 5/5 retries failed</span>
             </div>
             <h4 className="text-rose-400 font-bold text-xs select-all">InvalidPayloadError: Schema validation failed. Missing parameter &apos;imageUrl&apos;</h4>

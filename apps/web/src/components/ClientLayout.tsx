@@ -16,7 +16,9 @@ import {
   Loader2,
   ChevronDown,
   Search,
-  Server
+  Server,
+  Menu,
+  X
 } from 'lucide-react';
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
@@ -30,6 +32,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [paletteIndex, setPaletteIndex] = useState(0);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const commandRoutes = [
     { name: 'System Overview Dashboard', path: '/dashboard', desc: 'Observe Redis queue throughput, workers load, and latencies', icon: LayoutDashboard },
@@ -48,6 +51,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     setPaletteIndex(0);
   }, [searchQuery]);
 
+  // Close sidebar on route change
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
+
   useEffect(() => {
     const handleGlobalKeys = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -56,6 +64,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       } else if (e.key === 'Escape') {
         setShowCommandPalette(false);
         setShowLogoutModal(false);
+        setSidebarOpen(false);
       }
     };
     window.addEventListener('keydown', handleGlobalKeys);
@@ -139,145 +148,193 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     }`;
   };
 
-  return (
-    <div className="flex overflow-x-hidden min-h-screen w-full bg-zinc-950 text-zinc-200">
-      {/* Sidebar */}
-      <aside className="w-60 border-r border-zinc-900 bg-zinc-950/40 flex flex-col justify-between shrink-0 h-screen sticky top-0 z-40">
-        <div>
-          {/* Workspace selector SRE style */}
-          <div className="p-4 border-b border-zinc-900">
-            <div className="flex items-center justify-between bg-zinc-900/40 border border-zinc-900 rounded px-2.5 py-1.5 cursor-pointer hover:bg-zinc-900 transition-all">
-              <div className="flex items-center space-x-2 min-w-0">
-                <div className="w-4 h-4 rounded bg-zinc-700 flex items-center justify-center font-bold text-[10px] text-white shrink-0">
-                  Q
-                </div>
-                <span className="text-[11px] font-bold text-white font-mono truncate">{workspace}</span>
+  // ── Shared sidebar content ───────────────────────────────────────────────
+  const SidebarContent = () => (
+    <>
+      <div>
+        {/* Workspace selector SRE style */}
+        <div className="p-4 border-b border-zinc-900">
+          <div className="flex items-center justify-between bg-zinc-900/40 border border-zinc-900 rounded px-2.5 py-1.5 cursor-pointer hover:bg-zinc-900 transition-all">
+            <div className="flex items-center space-x-2 min-w-0">
+              <div className="w-4 h-4 rounded bg-zinc-700 flex items-center justify-center font-bold text-[10px] text-white shrink-0">
+                Q
               </div>
-              <ChevronDown className="w-3 h-3 text-zinc-500 shrink-0" />
+              <span className="text-[11px] font-bold text-white font-mono truncate">{workspace}</span>
             </div>
-
-            {/* Environment selector */}
-            <div className="flex mt-3 gap-1 p-0.5 bg-zinc-900/50 rounded border border-zinc-900/60 font-mono text-[9px]">
-              <button
-                onClick={() => setEnv('production')}
-                className={`flex-1 py-1 text-center rounded font-bold uppercase transition-all ${env === 'production' ? 'bg-zinc-800 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}
-              >
-                production
-              </button>
-              <button
-                onClick={() => setEnv('staging')}
-                className={`flex-1 py-1 text-center rounded font-bold uppercase transition-all ${env === 'staging' ? 'bg-zinc-800 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}
-              >
-                staging
-              </button>
-            </div>
+            <ChevronDown className="w-3 h-3 text-zinc-500 shrink-0" />
           </div>
 
-          {/* Quick Find (Cmd + K) placeholder */}
-          <div className="px-4 py-2 border-b border-zinc-900/60">
-            <button 
-              onClick={() => setShowCommandPalette(true)}
-              className="w-full flex items-center justify-between bg-zinc-900/10 border border-zinc-900 px-2 py-1 rounded text-[10px] font-mono text-zinc-500 hover:bg-zinc-900/40 hover:text-zinc-350 transition-colors focus:outline-none"
+          {/* Environment selector */}
+          <div className="flex mt-3 gap-1 p-0.5 bg-zinc-900/50 rounded border border-zinc-900/60 font-mono text-[9px]">
+            <button
+              onClick={() => setEnv('production')}
+              className={`flex-1 py-1 text-center rounded font-bold uppercase transition-all ${env === 'production' ? 'bg-zinc-800 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}
             >
-              <div className="flex items-center space-x-1.5">
-                <Search className="w-3 h-3" />
-                <span>Quick jump...</span>
-              </div>
-              <span className="bg-zinc-900 px-1 py-0.5 rounded border border-zinc-800 text-[8px]">⌘K</span>
+              production
+            </button>
+            <button
+              onClick={() => setEnv('staging')}
+              className={`flex-1 py-1 text-center rounded font-bold uppercase transition-all ${env === 'staging' ? 'bg-zinc-800 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}
+            >
+              staging
             </button>
           </div>
-
-          {/* Nav links */}
-          <nav className="p-3 space-y-1">
-            <Link href="/dashboard" className={navItemClass('/dashboard')}>
-              <LayoutDashboard className={navIconClass('/dashboard')} />
-              <span>Overview</span>
-            </Link>
-            <Link href="/queues" className={navItemClass('/queues')}>
-              <Layers className={navIconClass('/queues')} />
-              <span>Queues Registry</span>
-            </Link>
-            <Link href="/incidents" className={navItemClass('/incidents')}>
-              <AlertCircle className={navIconClass('/incidents')} />
-              <span>Incident Logs</span>
-            </Link>
-            <Link href="/dead-letter" className={navItemClass('/dead-letter')}>
-              <Inbox className={navIconClass('/dead-letter')} />
-              <span>Dead Letter</span>
-            </Link>
-            <Link href="/settings" className={navItemClass('/settings')}>
-              <Sliders className={navIconClass('/settings')} />
-              <span>Simulation Sandbox</span>
-            </Link>
-          </nav>
         </div>
 
-        {/* User Identity and Session Management */}
-        <div className="border-t border-zinc-900 bg-zinc-950/20 flex flex-col">
-          {user && (
-            <div className="px-4 py-3 border-b border-zinc-900 flex items-center justify-between bg-zinc-950/40">
-              <div className="flex items-center space-x-2 min-w-0">
-                <div className="w-6 h-6 rounded bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0">
-                  <User className="w-3.5 h-3.5 text-zinc-400" />
-                </div>
-                <div className="min-w-0">
-                  <h4 className="text-[10px] font-bold text-white truncate leading-none mb-0.5">{user.name}</h4>
-                  <p className="text-[9px] text-zinc-500 font-mono truncate">{user.email}</p>
-                </div>
-              </div>
-              
-              <button
-                onClick={() => setShowLogoutModal(true)}
-                className="p-1 rounded hover:bg-rose-500/10 text-zinc-500 hover:text-rose-400 transition-colors"
-                title="Logout"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
-          
-          <div className="p-3.5 flex items-center justify-between font-mono text-[9px] text-zinc-500">
+        {/* Quick Find (Cmd + K) */}
+        <div className="px-4 py-2 border-b border-zinc-900/60">
+          <button 
+            onClick={() => setShowCommandPalette(true)}
+            className="w-full flex items-center justify-between bg-zinc-900/10 border border-zinc-900 px-2 py-1 rounded text-[10px] font-mono text-zinc-500 hover:bg-zinc-900/40 hover:text-zinc-350 transition-colors focus:outline-none"
+          >
             <div className="flex items-center space-x-1.5">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-              </span>
-              <span className="font-bold uppercase tracking-wider text-zinc-400">broker connected</span>
+              <Search className="w-3 h-3" />
+              <span>Quick jump...</span>
+            </div>
+            <span className="bg-zinc-900 px-1 py-0.5 rounded border border-zinc-800 text-[8px]">⌘K</span>
+          </button>
+        </div>
+
+        {/* Nav links */}
+        <nav className="p-3 space-y-1">
+          <Link href="/dashboard" className={navItemClass('/dashboard')}>
+            <LayoutDashboard className={navIconClass('/dashboard')} />
+            <span>Overview</span>
+          </Link>
+          <Link href="/queues" className={navItemClass('/queues')}>
+            <Layers className={navIconClass('/queues')} />
+            <span>Queues Registry</span>
+          </Link>
+          <Link href="/incidents" className={navItemClass('/incidents')}>
+            <AlertCircle className={navIconClass('/incidents')} />
+            <span>Incident Logs</span>
+          </Link>
+          <Link href="/dead-letter" className={navItemClass('/dead-letter')}>
+            <Inbox className={navIconClass('/dead-letter')} />
+            <span>Dead Letter</span>
+          </Link>
+          <Link href="/settings" className={navItemClass('/settings')}>
+            <Sliders className={navIconClass('/settings')} />
+            <span>Simulation Sandbox</span>
+          </Link>
+        </nav>
+      </div>
+
+      {/* User Identity and Session Management */}
+      <div className="border-t border-zinc-900 bg-zinc-950/20 flex flex-col">
+        {user && (
+          <div className="px-4 py-3 border-b border-zinc-900 flex items-center justify-between bg-zinc-950/40">
+            <div className="flex items-center space-x-2 min-w-0">
+              <div className="w-6 h-6 rounded bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0">
+                <User className="w-3.5 h-3.5 text-zinc-400" />
+              </div>
+              <div className="min-w-0">
+                <h4 className="text-[10px] font-bold text-white truncate leading-none mb-0.5">{user.name}</h4>
+                <p className="text-[9px] text-zinc-500 font-mono truncate">{user.email}</p>
+              </div>
             </div>
             
-            <span>v1.0.0</span>
+            <button
+              onClick={() => setShowLogoutModal(true)}
+              className="p-1 rounded hover:bg-rose-500/10 text-zinc-500 hover:text-rose-400 transition-colors"
+              title="Logout"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
           </div>
-        </div>
-      </aside>
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen">
-        <header className="h-14 border-b border-zinc-900 px-6 flex items-center justify-between bg-zinc-950/40 backdrop-blur-md sticky top-0 z-30 font-mono">
-          <div className="flex items-center space-x-3 text-[10px]">
-            <span className="text-zinc-500 uppercase font-bold">telemetry node:</span>
-            <span className="bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800 text-zinc-300 font-bold">127.0.0.1:6379</span>
+        )}
+        
+        <div className="p-3.5 flex items-center justify-between font-mono text-[9px] text-zinc-500">
+          <div className="flex items-center space-x-1.5">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+            </span>
+            <span className="font-bold uppercase tracking-wider text-zinc-400">broker connected</span>
           </div>
           
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-1.5 text-[10px] text-zinc-400 bg-zinc-900/40 px-2.5 py-1 rounded border border-zinc-900">
+          <span>v1.0.0</span>
+        </div>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="flex overflow-x-hidden min-h-screen w-full bg-zinc-950 text-zinc-200">
+
+      {/* ── Mobile sidebar backdrop overlay ─────────────────────────────── */}
+      {sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 md:hidden animate-fade-in"
+        />
+      )}
+
+      {/* ── Sidebar — mobile: slide-in drawer, md+: static ──────────────── */}
+      <aside
+        className={`
+          fixed inset-y-0 left-0 z-50 w-64 border-r border-zinc-900 bg-zinc-950 flex flex-col justify-between h-screen
+          transform transition-transform duration-300 ease-in-out
+          md:static md:translate-x-0 md:z-auto md:w-56 lg:w-60 md:shrink-0
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}
+      >
+        {/* Mobile close button */}
+        <button
+          onClick={() => setSidebarOpen(false)}
+          className="absolute top-4 right-3 md:hidden p-1 rounded text-zinc-500 hover:text-white transition-colors"
+          aria-label="Close sidebar"
+        >
+          <X className="w-4 h-4" />
+        </button>
+
+        <SidebarContent />
+      </aside>
+
+      {/* ── Main Content Area ─────────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen">
+        <header className="h-14 border-b border-zinc-900 px-4 md:px-6 flex items-center justify-between bg-zinc-950/40 backdrop-blur-md sticky top-0 z-30 font-mono">
+          
+          {/* Left: hamburger (mobile) + breadcrumb */}
+          <div className="flex items-center space-x-3">
+            {/* Hamburger — only on mobile */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="md:hidden p-1.5 rounded text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors"
+              aria-label="Open sidebar"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center space-x-2 md:space-x-3 text-[10px]">
+              <span className="text-zinc-500 uppercase font-bold hidden sm:block">telemetry node:</span>
+              <span className="bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800 text-zinc-300 font-bold">
+                127.0.0.1:6379
+              </span>
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-3">
+            <div className="hidden sm:flex items-center space-x-1.5 text-[10px] text-zinc-400 bg-zinc-900/40 px-2.5 py-1 rounded border border-zinc-900">
               <Server className="w-3.5 h-3.5 text-zinc-500" />
-              <span>Redis active indices: 4</span>
+              <span>Redis: 4 indices</span>
             </div>
           </div>
         </header>
 
-        <main data-scroll-native className="flex-1 p-6 overflow-y-auto bg-zinc-950">
+        <main data-scroll-native className="flex-1 p-4 md:p-6 overflow-y-auto bg-zinc-950">
           {children}
         </main>
       </div>
 
+      {/* ── Logout confirmation modal ─────────────────────────────────────── */}
       {showLogoutModal && (
         <>
           <div 
             onClick={() => setShowLogoutModal(false)}
             className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 transition-opacity animate-fade-in"
           ></div>
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-zinc-950 border border-zinc-900 p-5 rounded-lg w-full max-w-xs shadow-2xl z-50 font-mono text-[10px] space-y-4 animate-slide-up text-zinc-300">
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-zinc-950 border border-zinc-900 p-5 rounded-lg w-[calc(100%-2rem)] max-w-xs shadow-2xl z-50 font-mono text-[10px] space-y-4 animate-slide-up text-zinc-300">
             <div className="flex items-center space-x-2 border-b border-zinc-900 pb-2.5">
               <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
               <span className="text-[11px] font-bold text-white uppercase">Disconnect Session?</span>
@@ -307,6 +364,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </>
       )}
 
+      {/* ── Command Palette ───────────────────────────────────────────────── */}
       {showCommandPalette && (
         <>
           <div 
@@ -317,7 +375,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 transition-opacity animate-fade-in"
           ></div>
           
-          <div className="fixed top-[20%] left-1/2 -translate-x-1/2 bg-zinc-950 border border-zinc-900 w-full max-w-lg rounded-lg shadow-2xl z-50 overflow-hidden font-mono text-[10px] animate-slide-up">
+          <div className="fixed top-[15%] left-1/2 -translate-x-1/2 bg-zinc-950 border border-zinc-900 w-[calc(100%-2rem)] max-w-lg rounded-lg shadow-2xl z-50 overflow-hidden font-mono text-[10px] animate-slide-up mx-4">
             
             <div className="flex items-center space-x-3 px-4 py-3 border-b border-zinc-900 bg-zinc-950">
               <Search className="w-4 h-4 text-zinc-500 shrink-0" />
@@ -356,7 +414,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-[11px] truncate">{route.name}</span>
                         {isSelected && (
-                          <span className="text-[8px] text-zinc-500 font-bold bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-850">
+                          <span className="text-[8px] text-zinc-500 font-bold bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-850 shrink-0 ml-2">
                             ENTER
                           </span>
                         )}
@@ -378,7 +436,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
             <div className="bg-zinc-950 border-t border-zinc-900/60 px-4 py-2 flex items-center justify-between text-[8px] text-zinc-500 uppercase tracking-widest font-bold">
               <span>Quick Navigator Gateway</span>
-              <span>↑↓ to navigate • ↵ to select • esc to close</span>
+              <span className="hidden sm:block">↑↓ to navigate • ↵ to select • esc to close</span>
             </div>
 
           </div>
