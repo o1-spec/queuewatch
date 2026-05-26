@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: queuewatch-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    # Fast background saving disabled for lightweight demo systems
+    command: redis-server --save "" --appendonly no
