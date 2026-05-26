@@ -22,18 +22,27 @@ export function MetricCard({
   pulseColor = '',
   pulseActive = false,
 }: MetricCardProps) {
+  // Map standard Tailwind colors to muted zinc equivalents for professional infrastructure design
+  const dotColor = pulseColor.includes('emerald') 
+    ? 'bg-emerald-500' 
+    : pulseColor.includes('rose') 
+    ? 'bg-rose-500 animate-pulse' 
+    : pulseColor.includes('indigo') 
+    ? 'bg-blue-500' 
+    : 'bg-zinc-500';
+
   return (
-    <div className={`glass-card p-6 rounded-2xl relative overflow-hidden group ${glowColor}`}>
-      <div className={`absolute top-0 right-0 p-4 ${iconColor}/20 group-hover:${iconColor}/40 transition-colors`}>
-        <Icon className="w-8 h-8" />
+    <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-4 relative overflow-hidden group transition-all hover:border-zinc-800">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider font-mono">{title}</p>
+        <Icon className={`w-3.5 h-3.5 text-zinc-500 group-hover:${iconColor} transition-colors`} />
       </div>
-      <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">{title}</p>
-      <p className="text-3xl font-extrabold text-white mt-2 font-mono tracking-tight">{value}</p>
-      <div className="flex items-center space-x-1.5 text-[11px] font-semibold mt-2 text-slate-400">
+      <p className="text-2xl font-semibold text-white mt-2.5 font-mono tracking-tight leading-none">{value}</p>
+      <div className="flex items-center space-x-1.5 text-[10px] mt-2.5 text-zinc-400 font-mono">
         {pulseActive && (
-          <span className={`w-1.5 h-1.5 rounded-full ${pulseColor} ${pulseColor.includes('emerald') ? 'active-pulse-emerald' : 'animate-pulse'}`}></span>
+          <span className={`w-1.5 h-1.5 rounded-full ${dotColor} shrink-0`}></span>
         )}
-        <span className={pulseActive ? iconColor : ''}>{subtext}</span>
+        <span className="truncate">{subtext}</span>
       </div>
     </div>
   );

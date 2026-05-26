@@ -92,43 +92,43 @@ export default function QueuesExplorer() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-extrabold text-white tracking-tight">Active Queues Registry</h2>
-        <p className="text-xs text-slate-400 mt-1 font-medium">Audit waiting tasks, Completed sizes, and toggle pause/resume configurations</p>
+      <div className="border-b border-zinc-900 pb-4">
+        <h2 className="text-sm font-bold text-white tracking-tight uppercase font-mono">Queue Telemetry Indices Registry</h2>
+        <p className="text-[10px] text-zinc-500 font-mono mt-0.5">Audit waiting tasks, completed capacities, and toggle runtime paused thread pools.</p>
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="glass-card p-6 rounded-2xl h-64 flex flex-col justify-between border border-slate-900/60 animate-pulse">
+            <div key={i} className="bg-zinc-950 border border-zinc-900 p-5 rounded-lg h-56 flex flex-col justify-between animate-pulse">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2.5 h-2.5 rounded-full bg-slate-800"></div>
-                    <div className="h-4 w-32 bg-slate-800 rounded"></div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-zinc-800 animate-ping"></div>
+                    <div className="h-3 w-32 bg-zinc-900 rounded"></div>
                   </div>
-                  <div className="h-8 w-24 bg-slate-800 rounded-lg"></div>
+                  <div className="h-6 w-20 bg-zinc-900 rounded"></div>
                 </div>
-                <div className="grid grid-cols-5 gap-3 mt-6">
+                <div className="grid grid-cols-5 gap-1.5 mt-5">
                   {[1, 2, 3, 4, 5].map((s) => (
-                    <div key={s} className="bg-slate-950/40 p-2 rounded-xl border border-slate-900/80 h-14 flex flex-col justify-between">
-                      <div className="h-2 w-8 bg-slate-800 rounded mx-auto"></div>
-                      <div className="h-3 w-6 bg-slate-800 rounded mx-auto"></div>
+                    <div key={s} className="bg-zinc-900/10 p-2 rounded border border-zinc-900 h-10 flex flex-col justify-between">
+                      <div className="h-1 w-6 bg-zinc-900 rounded mx-auto"></div>
+                      <div className="h-2 w-4 bg-zinc-900 rounded mx-auto"></div>
                     </div>
                   ))}
                 </div>
               </div>
-              <div className="border-t border-slate-900/60 pt-4 flex items-center justify-between mt-4">
-                <div className="h-3 w-20 bg-slate-800 rounded"></div>
-                <div className="h-3 w-28 bg-slate-800 rounded"></div>
+              <div className="border-t border-zinc-900/60 pt-3 flex items-center justify-between mt-4">
+                <div className="h-2.5 w-16 bg-zinc-900 rounded"></div>
+                <div className="h-2.5 w-24 bg-zinc-900 rounded"></div>
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {queues.map((queue) => {
             const queueMetrics = metrics.find(m => m.queueName === queue.name);
             return (

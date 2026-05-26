@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
-import { AlertTriangle, ArrowRight, Terminal, UserPlus, Sparkles } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Terminal } from 'lucide-react';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -43,68 +43,67 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="bg-background text-foreground min-h-screen flex items-center justify-center p-6 relative w-full overflow-hidden">
-      <div className="absolute top-[20%] left-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-500/10 blur-[120px] pointer-events-none"></div>
-      <div className="absolute bottom-[20%] right-[-10%] w-[40%] h-[40%] rounded-full bg-cyan-500/5 blur-[120px] pointer-events-none"></div>
-
-      <div className="glass-panel p-8 rounded-2xl w-full max-w-md border border-slate-900/60 space-y-6 relative shadow-2xl">
-        <div className="flex items-center space-x-3 justify-center text-center">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-lg text-white shadow-indigo-500/30 shadow-md">
+    <div className="bg-zinc-950 text-zinc-200 min-h-screen flex items-center justify-center p-6 relative w-full overflow-hidden [background-image:radial-gradient(#18181b_1px,transparent_1px)] [background-size:16px_16px]">
+      <div className="bg-zinc-950 border border-zinc-900 p-6 rounded-lg w-full max-w-sm space-y-5 relative shadow-xl font-mono text-[11px]">
+        
+        {/* Header */}
+        <div className="flex items-center space-x-2.5 justify-center text-center pb-2 border-b border-zinc-900">
+          <div className="w-5 h-5 rounded bg-zinc-800 flex items-center justify-center font-bold text-[10px] text-white">
             Q
           </div>
           <div>
-            <h2 className="font-extrabold text-sm tracking-wider text-white">QueueWatch</h2>
-            <p className="text-[9px] text-indigo-400 font-bold uppercase tracking-widest leading-none">Telemetry Engine</p>
+            <h2 className="font-extrabold text-xs tracking-wider text-white">QueueWatch</h2>
+            <p className="text-[8px] text-zinc-500 font-bold uppercase tracking-widest leading-none">Telemetry Engine</p>
           </div>
         </div>
 
         <div className="text-center space-y-1">
-          <h3 className="font-extrabold text-white text-md">Register Workspace</h3>
-          <p className="text-xs text-slate-500">Deploy a clean observability panel instance</p>
+          <h3 className="font-bold text-white text-xs">Provision Workspace</h3>
+          <p className="text-[10px] text-zinc-500">Deploy a clean observability panel instance</p>
         </div>
 
         {error && (
-          <div className="p-3.5 bg-rose-950/15 border border-rose-500/20 text-rose-300 text-xs rounded-xl flex items-start space-x-2 animate-pulse">
-            <AlertTriangle className="w-4.5 h-4.5 text-rose-500 shrink-0 mt-0.5" />
+          <div className="p-3 bg-rose-950/20 border border-rose-900/30 text-rose-300 text-[10px] rounded flex items-start space-x-2 animate-pulse">
+            <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider font-mono block">SRE Operator Name</label>
+        <form onSubmit={handleSubmit} className="space-y-3.5">
+          <div className="space-y-1">
+            <label className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider block">sre operator name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={submitting}
-              className="w-full bg-slate-950/40 border border-slate-900 rounded-xl px-4 py-2.5 text-xs text-white font-sans focus:outline-none focus:border-slate-800 disabled:opacity-50"
+              className="w-full bg-zinc-900/20 border border-zinc-900 rounded px-3 py-2 text-[10px] text-white focus:outline-none focus:border-zinc-800 disabled:opacity-50"
               placeholder="Alex Rivera"
               required
             />
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider font-mono block">Work Email</label>
+          <div className="space-y-1">
+            <label className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider block">work email</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={submitting}
-              className="w-full bg-slate-950/40 border border-slate-900 rounded-xl px-4 py-2.5 text-xs text-white font-sans focus:outline-none focus:border-slate-800 disabled:opacity-50"
+              className="w-full bg-zinc-900/20 border border-zinc-900 rounded px-3 py-2 text-[10px] text-white focus:outline-none focus:border-zinc-800 disabled:opacity-50"
               placeholder="sre@company.com"
               required
             />
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider font-mono block">Secret Token Code</label>
+          <div className="space-y-1">
+            <label className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider block">secret key passphrase</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={submitting}
-              className="w-full bg-slate-950/40 border border-slate-900 rounded-xl px-4 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-slate-800 disabled:opacity-50"
+              className="w-full bg-zinc-900/20 border border-zinc-900 rounded px-3 py-2 text-[10px] text-white focus:outline-none focus:border-zinc-800 disabled:opacity-50 font-mono"
               placeholder="••••••••••••"
               required
             />
@@ -113,22 +112,22 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs transition-all shadow-md shadow-indigo-500/20 flex items-center justify-center space-x-2 disabled:opacity-50"
+            className="w-full py-2 rounded bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-800 font-bold transition-all flex items-center justify-center space-x-1.5 disabled:opacity-50"
           >
-            <span>{submitting ? 'Registering Panel...' : 'Provision Telemetry Console'}</span>
-            <ArrowRight className="w-3.5 h-3.5" />
+            <span>{submitting ? 'provisioning workspace...' : 'deploy console instance'}</span>
+            <ArrowRight className="w-3 h-3 text-zinc-400" />
           </button>
         </form>
 
-        <div className="relative flex py-2 items-center">
-          <div className="flex-grow border-t border-slate-900"></div>
-          <span className="flex-shrink mx-4 text-[9px] text-slate-500 font-bold uppercase font-mono tracking-widest">or</span>
-          <div className="flex-grow border-t border-slate-900"></div>
+        <div className="relative flex py-1 items-center">
+          <div className="flex-grow border-t border-zinc-900"></div>
+          <span className="flex-shrink mx-3 text-[8px] text-zinc-600 uppercase font-bold tracking-widest">or</span>
+          <div className="flex-grow border-t border-zinc-900"></div>
         </div>
 
-        <div className="text-center text-[10.5px] text-slate-400">
+        <div className="text-center text-[10px] text-zinc-400">
           <span>Already registered? </span>
-          <Link href="/login" className="text-indigo-400 hover:text-indigo-300 font-bold underline transition-all">
+          <Link href="/login" className="text-zinc-300 hover:text-white font-bold underline transition-all">
             Sign In
           </Link>
         </div>

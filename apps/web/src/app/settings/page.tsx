@@ -162,23 +162,23 @@ export default function OutageControls() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 font-mono text-[10px]">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-900 pb-4">
         <div>
-          <h2 className="text-2xl font-extrabold text-white tracking-tight flex items-center space-x-2.5">
-            <Sliders className="w-6 h-6 text-indigo-400" />
-            <span>Simulation Control Room</span>
+          <h2 className="text-sm font-bold text-white tracking-tight flex items-center space-x-2 uppercase">
+            <Sliders className="w-4 h-4 text-zinc-400 shrink-0" />
+            <span>Simulation Sandbox & Incident Injectors</span>
           </h2>
-          <p className="text-xs text-slate-400 mt-1 font-medium">
-            Inject artificial background traffic, trigger outages, and dispatch custom BullMQ job schemas.
+          <p className="text-[10px] text-zinc-500 mt-0.5">
+            Inject artificial background traffic, trigger worker bottlenecks, and dispatch custom BullMQ job schemas.
           </p>
         </div>
 
         <button
           onClick={recoverAllWorkers}
           disabled={submitting === 'recovery'}
-          className="px-4 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs font-bold transition-all disabled:opacity-50 inline-flex items-center space-x-1.5 shadow-md"
+          className="px-3 py-1.5 rounded bg-emerald-950/20 hover:bg-emerald-950/40 text-emerald-400 border border-emerald-900/30 text-[10px] font-bold transition-all disabled:opacity-50 inline-flex items-center space-x-1.5 shadow"
         >
           {submitting === 'recovery' ? (
             <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -189,93 +189,102 @@ export default function OutageControls() {
         </button>
       </div>
 
+      {/* Engineering Warning Banner */}
+      <div className="bg-amber-950/10 border border-amber-900/30 text-amber-300 rounded p-3 flex items-start space-x-2.5 font-sans leading-relaxed">
+        <Radio className="w-4 h-4 text-amber-500 shrink-0 mt-0.5 animate-pulse" />
+        <div>
+          <strong className="font-bold font-mono text-[9px] uppercase tracking-wider block mb-0.5">warning: sandbox environment only</strong>
+          <span>These incident injection controls generate real background Redis job failures and thread delays. Ensure this node is connected to a local development or sandbox Redis instance prior to enabling outages.</span>
+        </div>
+      </div>
+
       {/* Main Grid split: Simulation Settings vs Manual Dispatch */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         
         {/* Left Side: Outage Simulators */}
-        <div className="space-y-6">
-          <div className="glass-panel p-6 rounded-2xl space-y-6">
-            <div className="border-b border-slate-900 pb-3">
-              <h3 className="font-bold text-white text-md flex items-center space-x-2">
+        <div className="space-y-4">
+          <div className="bg-zinc-950 border border-zinc-900 p-5 rounded-lg space-y-4">
+            <div className="border-b border-zinc-900 pb-2.5">
+              <h3 className="font-bold text-white text-xs flex items-center space-x-2 uppercase">
                 <ServerCrash className="w-4 h-4 text-rose-500" />
                 <span>Outage Injectors</span>
               </h3>
-              <p className="text-xs text-slate-400 mt-0.5">Toggle error states to test retry and dead-letter routing behaviors.</p>
+              <p className="text-[10px] text-zinc-500 mt-0.5">Toggle error states to test retry and dead-letter routing behaviors.</p>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               {/* Traffic generator */}
-              <div className="p-4 bg-slate-950/40 rounded-xl border border-slate-900 flex items-center justify-between">
+              <div className="p-3 bg-zinc-900/10 rounded border border-zinc-900 flex items-center justify-between">
                 <div>
-                  <h4 className="text-xs font-bold text-white">Continuous Background Traffic</h4>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Generates random jobs across all active BullMQ channels.</p>
+                  <h4 className="text-[11px] font-bold text-white">Background Load Generator</h4>
+                  <p className="text-[9px] text-zinc-500 mt-0.5 font-sans">Generates continuous random telemetry workloads across BullMQ queues.</p>
                 </div>
                 <button
                   disabled={submitting !== null}
                   onClick={() => updateConfig('generateTraffic', !simConfig.generateTraffic)}
-                  className={`w-10 h-5.5 rounded-full relative transition-all duration-300 ${simConfig.generateTraffic ? 'bg-indigo-600' : 'bg-slate-800'} disabled:opacity-50`}
+                  className={`w-9 h-5 rounded-full relative transition-all duration-300 ${simConfig.generateTraffic ? 'bg-zinc-700' : 'bg-zinc-900'} disabled:opacity-50 border border-zinc-800`}
                 >
-                  <span className={`w-3.5 h-3.5 rounded-full bg-white absolute top-1 left-1 transition-all duration-300 ${simConfig.generateTraffic ? 'translate-x-4.5' : ''}`}></span>
+                  <span className={`w-3 h-3 rounded-full bg-white absolute top-0.5 left-0.5 transition-all duration-300 ${simConfig.generateTraffic ? 'translate-x-4.5' : ''}`}></span>
                 </button>
               </div>
 
               {/* SMTP Outage */}
-              <div className="p-4 bg-slate-950/40 rounded-xl border border-slate-900 flex items-center justify-between">
+              <div className="p-3 bg-zinc-900/10 rounded border border-zinc-900 flex items-center justify-between">
                 <div>
-                  <h4 className="text-xs font-bold text-white">SendGrid SMTP Outage (429)</h4>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Simulates email worker rate limits, routing straight to retries.</p>
+                  <h4 className="text-[11px] font-bold text-white">SMTP Mail Provider Outage</h4>
+                  <p className="text-[9px] text-zinc-500 mt-0.5 font-sans">Simulates email worker rate limits, routing straight to BullMQ retries.</p>
                 </div>
                 <button
                   disabled={submitting !== null}
                   onClick={() => updateConfig('simulateSmtpFailure', !simConfig.simulateSmtpFailure)}
-                  className={`w-10 h-5.5 rounded-full relative transition-all duration-300 ${simConfig.simulateSmtpFailure ? 'bg-rose-600 shadow-lg shadow-rose-500/20' : 'bg-slate-800'} disabled:opacity-50`}
+                  className={`w-9 h-5 rounded-full relative transition-all duration-300 ${simConfig.simulateSmtpFailure ? 'bg-rose-950 border-rose-900' : 'bg-zinc-900 border-zinc-800'} disabled:opacity-50 border`}
                 >
-                  <span className={`w-3.5 h-3.5 rounded-full bg-white absolute top-1 left-1 transition-all duration-300 ${simConfig.simulateSmtpFailure ? 'translate-x-4.5' : ''}`}></span>
+                  <span className={`w-3 h-3 rounded-full bg-white absolute top-0.5 left-0.5 transition-all duration-300 ${simConfig.simulateSmtpFailure ? 'translate-x-4.5' : ''}`}></span>
                 </button>
               </div>
 
               {/* Stripe Outage */}
-              <div className="p-4 bg-slate-950/40 rounded-xl border border-slate-900 flex items-center justify-between">
+              <div className="p-3 bg-zinc-900/10 rounded border border-zinc-900 flex items-center justify-between">
                 <div>
-                  <h4 className="text-xs font-bold text-white">Stripe API Outage (503)</h4>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Forces Webhook workers to time out under Stripe gateway crashes.</p>
+                  <h4 className="text-[11px] font-bold text-white">Webhook Endpoint Timeout</h4>
+                  <p className="text-[9px] text-zinc-500 mt-0.5 font-sans">Forces Webhook workers to time out under gateway crashes.</p>
                 </div>
                 <button
                   disabled={submitting !== null}
                   onClick={() => updateConfig('simulateWebhookOutage', !simConfig.simulateWebhookOutage)}
-                  className={`w-10 h-5.5 rounded-full relative transition-all duration-300 ${simConfig.simulateWebhookOutage ? 'bg-rose-600 shadow-lg shadow-rose-500/20' : 'bg-slate-800'} disabled:opacity-50`}
+                  className={`w-9 h-5 rounded-full relative transition-all duration-300 ${simConfig.simulateWebhookOutage ? 'bg-rose-950 border-rose-900' : 'bg-zinc-900 border-zinc-800'} disabled:opacity-50 border`}
                 >
-                  <span className={`w-3.5 h-3.5 rounded-full bg-white absolute top-1 left-1 transition-all duration-300 ${simConfig.simulateWebhookOutage ? 'translate-x-4.5' : ''}`}></span>
+                  <span className={`w-3 h-3 rounded-full bg-white absolute top-0.5 left-0.5 transition-all duration-300 ${simConfig.simulateWebhookOutage ? 'translate-x-4.5' : ''}`}></span>
                 </button>
               </div>
 
               {/* Schema Mismatch */}
-              <div className="p-4 bg-slate-950/40 rounded-xl border border-slate-900 flex items-center justify-between">
+              <div className="p-3 bg-zinc-900/10 rounded border border-zinc-900 flex items-center justify-between">
                 <div>
-                  <h4 className="text-xs font-bold text-white">Zod Schema Validation Failure</h4>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Throws InvalidPayloadError exceptions on image worker streams.</p>
+                  <h4 className="text-[11px] font-bold text-white">Schema Validation Exception</h4>
+                  <p className="text-[9px] text-zinc-500 mt-0.5 font-sans">Throws Zod schema validation errors on image-processing threads.</p>
                 </div>
                 <button
                   disabled={submitting !== null}
                   onClick={() => updateConfig('simulateInvalidPayload', !simConfig.simulateInvalidPayload)}
-                  className={`w-10 h-5.5 rounded-full relative transition-all duration-300 ${simConfig.simulateInvalidPayload ? 'bg-rose-600 shadow-lg shadow-rose-500/20' : 'bg-slate-800'} disabled:opacity-50`}
+                  className={`w-9 h-5 rounded-full relative transition-all duration-300 ${simConfig.simulateInvalidPayload ? 'bg-rose-950 border-rose-900' : 'bg-zinc-900 border-zinc-800'} disabled:opacity-50 border`}
                 >
-                  <span className={`w-3.5 h-3.5 rounded-full bg-white absolute top-1 left-1 transition-all duration-300 ${simConfig.simulateInvalidPayload ? 'translate-x-4.5' : ''}`}></span>
+                  <span className={`w-3 h-3 rounded-full bg-white absolute top-0.5 left-0.5 transition-all duration-300 ${simConfig.simulateInvalidPayload ? 'translate-x-4.5' : ''}`}></span>
                 </button>
               </div>
 
               {/* Worker Slowdown */}
-              <div className="p-4 bg-slate-950/40 rounded-xl border border-slate-900 flex items-center justify-between">
+              <div className="p-3 bg-zinc-900/10 rounded border border-zinc-900 flex items-center justify-between">
                 <div>
-                  <h4 className="text-xs font-bold text-white">Worker Thread CPU Slowdown</h4>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Adds an 8,000ms delay block to simulate latency bottlenecks.</p>
+                  <h4 className="text-[11px] font-bold text-white">Worker Executor CPU Bottleneck</h4>
+                  <p className="text-[9px] text-zinc-500 mt-0.5 font-sans">Adds an 8,000ms delay block to simulate latency bottlenecks.</p>
                 </div>
                 <button
                   disabled={submitting !== null}
                   onClick={() => updateConfig('simulateWorkerSlowdown', !simConfig.simulateWorkerSlowdown)}
-                  className={`w-10 h-5.5 rounded-full relative transition-all duration-300 ${simConfig.simulateWorkerSlowdown ? 'bg-amber-500' : 'bg-slate-800'} disabled:opacity-50`}
+                  className={`w-9 h-5 rounded-full relative transition-all duration-300 ${simConfig.simulateWorkerSlowdown ? 'bg-amber-950 border-amber-900' : 'bg-zinc-900 border-zinc-800'} disabled:opacity-50 border`}
                 >
-                  <span className={`w-3.5 h-3.5 rounded-full bg-white absolute top-1 left-1 transition-all duration-300 ${simConfig.simulateWorkerSlowdown ? 'translate-x-4.5' : ''}`}></span>
+                  <span className={`w-3 h-3 rounded-full bg-white absolute top-0.5 left-0.5 transition-all duration-300 ${simConfig.simulateWorkerSlowdown ? 'translate-x-4.5' : ''}`}></span>
                 </button>
               </div>
             </div>
@@ -283,29 +292,29 @@ export default function OutageControls() {
         </div>
 
         {/* Right Side: Manual Dispatch Room */}
-        <div className="space-y-6">
-          <div className="glass-panel p-6 rounded-2xl flex flex-col justify-between min-h-[500px]">
-            <div className="space-y-5">
-              <div className="border-b border-slate-900 pb-3">
-                <h3 className="font-bold text-white text-md flex items-center space-x-2">
-                  <Sparkles className="w-4 h-4 text-indigo-400 animate-pulse" />
+        <div className="space-y-4">
+          <div className="bg-zinc-950 border border-zinc-900 p-5 rounded-lg flex flex-col justify-between min-h-[460px]">
+            <div className="space-y-4">
+              <div className="border-b border-zinc-900 pb-2.5">
+                <h3 className="font-bold text-white text-xs flex items-center space-x-2 uppercase">
+                  <Sparkles className="w-4 h-4 text-zinc-400" />
                   <span>Manual Payload Dispatcher</span>
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">Enqueue a job with customized JSON parameters to watch workers execute.</p>
+                <p className="text-[10px] text-zinc-500 mt-0.5">Enqueue a job with customized JSON parameters to watch workers execute.</p>
               </div>
 
               {/* Queue Selector */}
               <div className="space-y-1.5">
-                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider font-mono block">Target BullMQ Queue Channel</label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <label className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider block">Target Queue Channel</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {QUEUES.map((q) => (
                     <button
                       key={q}
                       onClick={() => handleQueueChange(q as QueueName)}
-                      className={`px-3 py-2 rounded-lg text-[10.5px] font-bold font-mono transition-all border text-center ${
+                      className={`px-2 py-1.5 rounded text-[10px] font-bold font-mono transition-all border text-center ${
                         selectedQueue === q 
-                          ? 'bg-indigo-500/10 hover:bg-indigo-500/15 border-indigo-500/30 text-indigo-300' 
-                          : 'bg-slate-950/40 border-slate-900 text-slate-500 hover:border-slate-800 hover:text-slate-300'
+                          ? 'bg-zinc-900 border-zinc-700 text-white' 
+                          : 'bg-zinc-950 border-zinc-900 text-zinc-500 hover:border-zinc-800 hover:text-zinc-300'
                       }`}
                     >
                       {q.replace('_queue', '')}
@@ -316,27 +325,27 @@ export default function OutageControls() {
 
               {/* Action Name */}
               <div className="space-y-1.5">
-                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider font-mono block">Job Action Name</label>
+                <label className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider block">Job Action Name</label>
                 <input
                   type="text"
                   value={selectedJobAction}
                   onChange={(e) => setSelectedJobAction(e.target.value)}
-                  className="w-full bg-slate-950/40 border border-slate-900 rounded-xl px-4 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-slate-850"
+                  className="w-full bg-zinc-900/25 border border-zinc-900 rounded px-3 py-2 text-[10px] text-white focus:outline-none focus:border-zinc-850"
                   placeholder="e.g. welcome_email"
                 />
               </div>
 
               {/* Custom payload */}
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider font-mono">
-                  <label className="text-slate-500">JSON Parameters Payload Input</label>
+                <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-wider">
+                  <label className="text-zinc-500">JSON Parameters Payload Input</label>
                   <button 
                     onClick={() => {
                       if (selectedQueue === 'image_processing_queue') {
                         setCustomPayload('{\n  "userId": "usr_avatar_9182"\n}'); // missing imageUrl, triggers invalid schema
                       }
                     }}
-                    className="text-indigo-400 hover:text-indigo-300 text-[9px] lowercase flex items-center space-x-1"
+                    className="text-zinc-400 hover:text-white text-[8px] lowercase flex items-center space-x-1"
                   >
                     <span>Trigger invalid schema mock</span>
                   </button>
@@ -344,28 +353,28 @@ export default function OutageControls() {
                 <textarea
                   value={customPayload}
                   onChange={(e) => setCustomPayload(e.target.value)}
-                  className="w-full bg-slate-950/60 border border-slate-900 rounded-xl p-4 text-[10.5px] font-mono text-cyan-400 focus:outline-none focus:border-slate-850 h-44 whitespace-pre select-text resize-none"
+                  className="w-full bg-black/40 border border-zinc-900 rounded p-3 text-[9.5px] font-mono text-zinc-300 focus:outline-none focus:border-zinc-850 h-36 whitespace-pre select-text resize-none"
                   placeholder="{}"
                 />
               </div>
             </div>
 
             {/* Enqueue button */}
-            <div className="border-t border-slate-900/60 pt-4 flex items-center justify-between mt-4">
-              <span className="text-[10px] text-slate-500 font-bold font-mono uppercase inline-flex items-center space-x-1">
-                <Radio className="w-3.5 h-3.5 text-indigo-500 animate-pulse shrink-0" />
-                <span>Redis stream: {selectedQueue}</span>
+            <div className="border-t border-zinc-900/60 pt-3 flex items-center justify-between mt-4">
+              <span className="text-[9px] text-zinc-500 font-bold uppercase flex items-center space-x-1">
+                <Radio className="w-3.5 h-3.5 text-zinc-650 shrink-0" />
+                <span>active connection: {selectedQueue}</span>
               </span>
 
               <button
                 onClick={dispatchManualJob}
                 disabled={dispatchLoading !== null}
-                className="px-4.5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all shadow-md shadow-indigo-500/25 flex items-center space-x-2 disabled:opacity-50"
+                className="px-3.5 py-1.5 rounded bg-zinc-900 hover:bg-zinc-800 text-white font-bold border border-zinc-800 text-[10px] transition-all flex items-center space-x-1.5 disabled:opacity-50 shadow"
               >
                 {dispatchLoading === selectedQueue ? (
                   <>
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Enqueuing...</span>
+                    <span>enqueuing...</span>
                   </>
                 ) : (
                   <>

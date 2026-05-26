@@ -111,94 +111,94 @@ export default function QueueDetailPage({ params }: { params: { name: string } }
   const failedJobs = jobs.filter((j) => j.status === 'failed');
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       {/* Header breadcrumb */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between border-b border-zinc-900 pb-4">
         <div>
-          <div className="flex items-center space-x-2 text-xs font-semibold text-slate-500 uppercase tracking-widest">
-            <Link href="/queues" className="hover:text-indigo-400 transition-colors">Queues Explorer</Link>
-            <span>&bull;</span>
-            <span className="text-slate-300 font-mono">{queueName}</span>
+          <div className="flex items-center space-x-2 text-[10px] font-bold text-zinc-500 uppercase tracking-wider font-mono">
+            <Link href="/queues" className="hover:text-white transition-colors">Queue Registry</Link>
+            <span>/</span>
+            <span className="text-zinc-300">{queueName}</span>
           </div>
-          <h2 className="text-2xl font-extrabold text-white mt-1 tracking-tight font-mono">{queueName} Detail</h2>
+          <h2 className="text-sm font-bold text-white mt-1.5 uppercase font-mono tracking-tight">{queueName} telemetry detail</h2>
         </div>
 
         {worker && (
-          <div className="flex items-center space-x-3 bg-slate-950/40 border border-slate-900 px-4 py-2 rounded-xl text-xs">
-            <span className={`w-2 h-2 rounded-full ${
-              worker.status === 'healthy' ? 'bg-emerald-500 glow-emerald' : 
+          <div className="flex items-center space-x-2 bg-zinc-900/40 border border-zinc-900 px-3 py-1.5 rounded text-[10px] font-mono">
+            <span className={`w-1.5 h-1.5 rounded-full ${
+              worker.status === 'healthy' ? 'bg-emerald-500' : 
               worker.status === 'overloaded' ? 'bg-amber-500 animate-pulse' : 'bg-rose-500 animate-ping'
             }`}></span>
-            <span className="text-slate-500 font-medium">Worker Status:</span>
-            <strong className="text-white uppercase font-mono">{worker.status}</strong>
+            <span className="text-zinc-500">worker status:</span>
+            <strong className="text-white uppercase">{worker.status}</strong>
           </div>
         )}
       </div>
 
       {/* Grid: 4 Metric Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-        <div className="glass-card p-4 rounded-xl">
-          <p className="text-[10px] text-slate-500 font-bold uppercase">Waiting Jobs</p>
-          <p className="text-2xl font-extrabold text-cyan-400 mt-1 font-mono">{metrics?.waitingCount ?? 0}</p>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 font-mono text-[10px]">
+        <div className="bg-zinc-950 border border-zinc-900 p-4 rounded-lg">
+          <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Waiting Jobs</p>
+          <p className="text-xl font-bold text-blue-400 mt-2.5">{metrics?.waitingCount ?? 0}</p>
         </div>
-        <div className="glass-card p-4 rounded-xl">
-          <p className="text-[10px] text-slate-500 font-bold uppercase">Active Jobs</p>
-          <p className="text-2xl font-extrabold text-indigo-400 mt-1 font-mono">{metrics?.activeCount ?? 0}</p>
+        <div className="bg-zinc-950 border border-zinc-900 p-4 rounded-lg">
+          <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Active Run</p>
+          <p className="text-xl font-bold text-indigo-400 mt-2.5">{metrics?.activeCount ?? 0}</p>
         </div>
-        <div className="glass-card p-4 rounded-xl">
-          <p className="text-[10px] text-slate-500 font-bold uppercase">Completed Jobs</p>
-          <p className="text-2xl font-extrabold text-emerald-400 mt-1 font-mono">{metrics?.completedCount ?? 0}</p>
+        <div className="bg-zinc-950 border border-zinc-900 p-4 rounded-lg">
+          <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Done</p>
+          <p className="text-xl font-bold text-emerald-400 mt-2.5">{metrics?.completedCount ?? 0}</p>
         </div>
-        <div className="glass-card p-4 rounded-xl">
-          <p className="text-[10px] text-slate-500 font-bold uppercase">Failed Jobs</p>
-          <p className="text-2xl font-extrabold text-rose-500 mt-1 font-mono">{metrics?.failedCount ?? 0}</p>
+        <div className="bg-zinc-950 border border-zinc-900 p-4 rounded-lg">
+          <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Failed</p>
+          <p className="text-xl font-bold text-rose-500 mt-2.5">{metrics?.failedCount ?? 0}</p>
         </div>
       </div>
 
       {/* Recharts Timelines Area */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-[10px]">
         
         {/* Throughput Area chart */}
-        <div className="glass-panel p-6 rounded-2xl">
-          <h3 className="font-bold text-white text-sm mb-4">Completions Throughput (Completed/Min)</h3>
-          <div className="h-56 w-full text-slate-400">
+        <div className="bg-zinc-950 border border-zinc-900 p-5 rounded-lg">
+          <h3 className="font-bold text-white text-[11px] mb-4 uppercase tracking-wider">Throughput Completions (Completed/Min)</h3>
+          <div className="h-52 w-full text-zinc-500">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={history} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+              <AreaChart data={history} margin={{ top: 10, right: 10, left: -30, bottom: 0 }}>
                 <defs>
                   <linearGradient id="throughputGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#27272a" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="#27272a" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="time" stroke="#475569" fontSize={9} tickLine={false} />
-                <YAxis stroke="#475569" fontSize={9} tickLine={false} />
+                <CartesianGrid stroke="#18181b" strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="time" stroke="#3f3f46" fontSize={8} tickLine={false} />
+                <YAxis stroke="#3f3f46" fontSize={8} tickLine={false} />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: '#090d16', borderColor: '#1e293b', borderRadius: '8px' }}
-                  labelStyle={{ color: '#fff', fontSize: '10px', fontFamily: 'monospace' }}
-                  itemStyle={{ color: '#818cf8', fontSize: '11px' }}
+                  contentStyle={{ backgroundColor: '#09090b', borderColor: '#18181b', borderRadius: '4px' }}
+                  labelStyle={{ color: '#fff', fontSize: '9px', fontFamily: 'monospace' }}
+                  itemStyle={{ color: '#a1a1aa', fontSize: '10px' }}
                 />
-                <Area type="monotone" dataKey="throughput" stroke="#6366f1" strokeWidth={2} fillOpacity={1} fill="url(#throughputGrad)" />
+                <Area type="monotone" dataKey="throughput" stroke="#a1a1aa" strokeWidth={1.5} fillOpacity={1} fill="url(#throughputGrad)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         {/* Latency Bar chart */}
-        <div className="glass-panel p-6 rounded-2xl">
-          <h3 className="font-bold text-white text-sm mb-4">Processing Delay Latency (ms)</h3>
-          <div className="h-56 w-full text-slate-400">
+        <div className="bg-zinc-950 border border-zinc-900 p-5 rounded-lg">
+          <h3 className="font-bold text-white text-[11px] mb-4 uppercase tracking-wider">Worker Processing Duration Delay (ms)</h3>
+          <div className="h-52 w-full text-zinc-500">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={history} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="time" stroke="#475569" fontSize={9} tickLine={false} />
-                <YAxis stroke="#475569" fontSize={9} tickLine={false} />
+              <BarChart data={history} margin={{ top: 10, right: 10, left: -30, bottom: 0 }}>
+                <CartesianGrid stroke="#18181b" strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="time" stroke="#3f3f46" fontSize={8} tickLine={false} />
+                <YAxis stroke="#3f3f46" fontSize={8} tickLine={false} />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: '#090d16', borderColor: '#1e293b', borderRadius: '8px' }}
-                  labelStyle={{ color: '#fff', fontSize: '10px', fontFamily: 'monospace' }}
-                  itemStyle={{ color: '#22d3ee', fontSize: '11px' }}
+                  contentStyle={{ backgroundColor: '#09090b', borderColor: '#18181b', borderRadius: '4px' }}
+                  labelStyle={{ color: '#fff', fontSize: '9px', fontFamily: 'monospace' }}
+                  itemStyle={{ color: '#a1a1aa', fontSize: '10px' }}
                 />
-                <Bar dataKey="latency" fill="#06b6d4" radius={[4, 4, 0, 0]} barSize={16} />
+                <Bar dataKey="latency" fill="#3f3f46" radius={[2, 2, 0, 0]} barSize={12} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -207,43 +207,48 @@ export default function QueueDetailPage({ params }: { params: { name: string } }
       </div>
 
       {/* Failed Jobs Table */}
-      <div className="glass-card p-6 rounded-2xl">
-        <div className="border-b border-slate-900 pb-3 mb-6">
-          <h3 className="font-bold text-white text-md">Failed Jobs Timeline</h3>
-          <p className="text-xs text-slate-400">Jobs that experienced failures. Active retries will re-process them under backoff limits.</p>
+      <div className="bg-zinc-950 border border-zinc-900 p-5 rounded-lg">
+        <div className="border-b border-zinc-900 pb-3 mb-4 flex items-center justify-between">
+          <div>
+            <h3 className="font-bold text-white text-xs font-mono uppercase tracking-tight">Active Failure Registry</h3>
+            <p className="text-[10px] text-zinc-500 font-mono">Job exceptions awaiting exponential retry backoff intervals</p>
+          </div>
+          <span className="bg-rose-950/20 px-2 py-0.5 rounded border border-rose-900/30 text-[9px] text-rose-400 font-mono font-bold">
+            {failedJobs.length} Failed
+          </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+        <div className="overflow-x-auto text-[10px] font-mono">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-slate-900 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
-                <th className="pb-3">Job ID</th>
-                <th className="pb-3">Job Action</th>
-                <th className="pb-3">State</th>
-                <th className="pb-3">Attempts</th>
-                <th className="pb-3">Failure Reason</th>
-                <th className="pb-3 text-right">Action</th>
+              <tr className="border-b border-zinc-900 text-zinc-500 font-bold uppercase tracking-wider text-[9px]">
+                <th className="pb-2">Job ID</th>
+                <th className="pb-2">Job Action</th>
+                <th className="pb-2">State</th>
+                <th className="pb-2">Attempts</th>
+                <th className="pb-2">Failure Reason</th>
+                <th className="pb-2 text-right">Action</th>
               </tr>
             </thead>
             <tbody>
               {failedJobs.map((job) => (
-                <tr key={job.id} className="border-b border-slate-900/60 last:border-0 hover:bg-slate-950/20">
-                  <td className="py-4 font-mono font-bold text-slate-300">{job.id}</td>
-                  <td className="py-4 font-semibold text-white">{job.name}</td>
-                  <td className="py-4">
-                    <span className="px-2 py-0.5 rounded text-[9px] font-bold border text-amber-500 bg-amber-950/20 border-amber-500/20">
+                <tr key={job.id} className="border-b border-zinc-900/40 last:border-0 hover:bg-zinc-900/10">
+                  <td className="py-3 font-bold text-zinc-300 select-all">{job.id}</td>
+                  <td className="py-3 font-semibold text-white">{job.name}</td>
+                  <td className="py-3">
+                    <span className="px-1.5 py-0.5 rounded text-[8px] font-bold border text-rose-400 bg-rose-950/20 border-rose-900/30 uppercase">
                       {job.status}
                     </span>
                   </td>
-                  <td className="py-4 font-mono text-slate-400">{job.attemptsMade} / {job.maxAttempts}</td>
-                  <td className="py-4 text-slate-300 font-mono text-[11px] truncate max-w-xs">{job.failedReason || 'Connection blip'}</td>
-                  <td className="py-4 text-right">
+                  <td className="py-3 text-zinc-400">{job.attemptsMade} / {job.maxAttempts}</td>
+                  <td className="py-3 text-zinc-300 font-mono max-w-xs truncate">{job.failedReason || 'Connection blip'}</td>
+                  <td className="py-3 text-right">
                     <button
                       onClick={() => replayJob(job.id)}
                       disabled={replayLoading === job.id}
-                      className="px-2.5 py-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 text-[10px] font-bold transition-all disabled:opacity-50"
+                      className="px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-800 text-[9px] font-bold transition-all disabled:opacity-50"
                     >
-                      {replayLoading === job.id ? 'Replaying...' : 'Replay Job'}
+                      {replayLoading === job.id ? 'replaying...' : 'replay now'}
                     </button>
                   </td>
                 </tr>
@@ -251,8 +256,8 @@ export default function QueueDetailPage({ params }: { params: { name: string } }
 
               {failedJobs.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-500 font-medium">
-                    No failed jobs currently scheduled in Redis memory.
+                  <td colSpan={6} className="py-8 text-center text-zinc-650 font-bold">
+                    No failed job states registered inside Redis indices.
                   </td>
                 </tr>
               )}

@@ -26,64 +26,64 @@ export function QueueCard({
   const isPending = toggleLoading === queue.name;
 
   return (
-    <div className="glass-card p-6 rounded-2xl flex flex-col justify-between h-64 hover:border-slate-800 transition-all">
+    <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-5 flex flex-col justify-between h-56 hover:border-zinc-800 transition-all">
       <div>
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <span className={`w-2.5 h-2.5 rounded-full ${queue.paused ? 'bg-amber-500 glow-amber' : 'bg-emerald-500 active-pulse-emerald'}`}></span>
-            <h3 className="text-md font-bold font-mono text-white tracking-wide">{queue.name}</h3>
+          <div className="flex items-center space-x-2">
+            <span className={`w-1.5 h-1.5 rounded-full ${queue.paused ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`}></span>
+            <h3 className="text-xs font-bold font-mono text-white tracking-tight">{queue.name}</h3>
           </div>
           
           <button
             onClick={() => onTogglePause(queue.name, queue.paused)}
             disabled={isPending}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+            className={`px-2.5 py-1 rounded text-[10px] font-mono transition-all border ${
               queue.paused
-                ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/20'
-                : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/20'
+                ? 'bg-emerald-950/20 hover:bg-emerald-950/40 text-emerald-400 border-emerald-900'
+                : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800'
             } disabled:opacity-50`}
           >
-            {isPending ? 'Syncing...' : queue.paused ? 'Resume Worker' : 'Pause Worker'}
+            {isPending ? 'syncing...' : queue.paused ? 'resume' : 'pause'}
           </button>
         </div>
 
-        {/* Grid stats */}
-        <div className="grid grid-cols-5 gap-2.5 mt-6 text-center">
-          <div className="bg-slate-950/50 p-2 rounded-xl border border-slate-900/60">
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Waiting</p>
-            <p className="text-sm font-extrabold text-cyan-400 mt-0.5 font-mono">{queue.waiting}</p>
+        {/* Dense Grid stats */}
+        <div className="grid grid-cols-5 gap-1.5 mt-5">
+          <div className="bg-zinc-900/20 px-2 py-1.5 rounded border border-zinc-900 text-center">
+            <p className="text-[8px] text-zinc-500 font-bold uppercase tracking-wider font-mono">Waiting</p>
+            <p className="text-xs font-semibold text-blue-400 mt-1 font-mono">{queue.waiting}</p>
           </div>
-          <div className="bg-slate-950/50 p-2 rounded-xl border border-slate-900/60">
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Active</p>
-            <p className="text-sm font-extrabold text-indigo-400 mt-0.5 font-mono">{queue.active}</p>
+          <div className="bg-zinc-900/20 px-2 py-1.5 rounded border border-zinc-900 text-center">
+            <p className="text-[8px] text-zinc-500 font-bold uppercase tracking-wider font-mono">Active</p>
+            <p className="text-xs font-semibold text-indigo-400 mt-1 font-mono">{queue.active}</p>
           </div>
-          <div className="bg-slate-950/50 p-2 rounded-xl border border-slate-900/60">
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Completed</p>
-            <p className="text-sm font-extrabold text-emerald-400 mt-0.5 font-mono">{queue.completed}</p>
+          <div className="bg-zinc-900/20 px-2 py-1.5 rounded border border-zinc-900 text-center">
+            <p className="text-[8px] text-zinc-500 font-bold uppercase tracking-wider font-mono">Done</p>
+            <p className="text-xs font-semibold text-emerald-400 mt-1 font-mono">{queue.completed}</p>
           </div>
-          <div className="bg-slate-950/50 p-2 rounded-xl border border-slate-900/60">
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Failed</p>
-            <p className="text-sm font-extrabold text-rose-500 mt-0.5 font-mono">{queue.failed}</p>
+          <div className="bg-zinc-900/20 px-2 py-1.5 rounded border border-zinc-900 text-center">
+            <p className="text-[8px] text-zinc-500 font-bold uppercase tracking-wider font-mono">Failed</p>
+            <p className="text-xs font-semibold text-rose-500 mt-1 font-mono">{queue.failed}</p>
           </div>
-          <div className="bg-slate-950/50 p-2 rounded-xl border border-slate-900/60">
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Delayed</p>
-            <p className="text-sm font-extrabold text-amber-500 mt-0.5 font-mono">{queue.delayed}</p>
+          <div className="bg-zinc-900/20 px-2 py-1.5 rounded border border-zinc-900 text-center">
+            <p className="text-[8px] text-zinc-500 font-bold uppercase tracking-wider font-mono">Delayed</p>
+            <p className="text-xs font-semibold text-amber-500 mt-1 font-mono">{queue.delayed}</p>
           </div>
         </div>
       </div>
 
       {/* Detail drill link */}
-      <div className="border-t border-slate-900/60 pt-4 flex items-center justify-between mt-4 text-[11px] text-slate-400">
-        <div className="flex flex-col">
-          <span>Latency: <strong className="text-white font-mono">{metrics?.averageLatency ?? 0}ms</strong></span>
-          <span>Throughput: <strong className="text-white font-mono">{metrics?.throughput ?? 0}/min</strong></span>
+      <div className="border-t border-zinc-900/60 pt-3 flex items-center justify-between mt-4 text-[10px] text-zinc-400 font-mono">
+        <div className="flex space-x-4">
+          <span>delay: <strong className="text-white font-mono">{metrics?.averageLatency ?? 0}ms</strong></span>
+          <span>rate: <strong className="text-white font-mono">{metrics?.throughput ?? 0}/min</strong></span>
         </div>
 
         <Link
           href={`/queues/${queue.name}`}
-          className="text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-colors flex items-center space-x-1"
+          className="text-[10px] font-bold text-zinc-400 hover:text-white transition-colors flex items-center space-x-1"
         >
-          <span>Drill down metrics</span>
+          <span>Telemetry dashboard</span>
           <span>&rarr;</span>
         </Link>
       </div>

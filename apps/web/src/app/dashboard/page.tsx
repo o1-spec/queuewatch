@@ -167,12 +167,13 @@ export default function DashboardOverview() {
   const workerHealthScore = Math.round((workersHealthyCount / workersTotalCount) * 100);
 
   return (
-    <div className="space-y-8">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="space-y-5">
+      {/* Metrics Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           title="Jobs Processed"
           value={stats.totalProcessed.toLocaleString()}
-          subtext="Realtime streaming active"
+          subtext="realtime completions streaming"
           icon={CheckCircle2}
           iconColor="text-emerald-400"
           pulseActive={true}
@@ -180,50 +181,50 @@ export default function DashboardOverview() {
         />
 
         <MetricCard
-          title="Active Run Thread"
+          title="Active Thread Count"
           value={stats.activeJobs}
-          subtext="Active job consumers"
+          subtext="concurrency thread threads active"
           icon={Activity}
-          iconColor="text-indigo-400"
+          iconColor="text-blue-400"
           pulseActive={stats.activeJobs > 0}
-          pulseColor="bg-indigo-500"
+          pulseColor="bg-blue-500"
         />
 
         <MetricCard
           title="Dead Letter Queue"
           value={deadLettersCount}
-          subtext="Requires engineering action"
+          subtext="requires engineering action"
           icon={Skull}
           iconColor="text-rose-500"
-          glowColor={deadLettersCount > 0 ? 'glow-rose bg-gradient-to-br hover:from-rose-950/5' : ''}
           pulseActive={deadLettersCount > 0}
           pulseColor="bg-rose-500"
         />
 
         <MetricCard
-          title="Avg Job Latency"
+          title="Average Job Latency"
           value={`${runningAverageLatency} ms`}
-          subtext="Average thread duration"
+          subtext="worker process delay duration"
           icon={Clock}
-          iconColor="text-cyan-400"
+          iconColor="text-zinc-400"
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-8">
-          <div className="glass-card p-6 rounded-2xl">
-            <div className="flex items-center justify-between mb-6">
+      {/* Main Dual Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 space-y-4">
+          <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-5">
+            <div className="flex items-center justify-between mb-4 border-b border-zinc-900 pb-3">
               <div>
-                <h3 className="font-bold text-lg text-white">Active Queue Observability</h3>
-                <p className="text-xs text-slate-400">Telemetry streams from BullMQ redis indices</p>
+                <h3 className="font-bold text-xs font-mono text-white tracking-tight uppercase">Active Queue Telemetry Indices</h3>
+                <p className="text-[10px] text-zinc-500 font-mono">Telemetry indices enqueued in Redis memory pools</p>
               </div>
-              <a href="/queues" className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition-colors flex items-center space-x-1">
-                <span>Configure queues</span>
+              <a href="/queues" className="text-[10px] font-bold font-mono text-zinc-400 hover:text-white transition-colors flex items-center space-x-1">
+                <span>configure indices</span>
                 <span>&rarr;</span>
               </a>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {metrics.map((queueMetrics) => {
                 const mappedQueue = {
                   name: queueMetrics.queueName,
@@ -246,8 +247,8 @@ export default function DashboardOverview() {
               })}
 
               {metrics.length === 0 && (
-                <div className="col-span-2 text-center py-12 text-slate-500 font-medium text-xs">
-                  Loading active queue structures...
+                <div className="col-span-2 text-center py-10 text-zinc-600 font-mono text-[10px]">
+                  loading telemetry queue metrics...
                 </div>
               )}
             </div>
@@ -259,26 +260,27 @@ export default function DashboardOverview() {
           />
         </div>
 
-        <div className="space-y-8">
-          <div className="glass-card p-6 rounded-2xl">
-            <div className="flex items-center justify-between mb-6">
+        {/* Right Side: Workers & Console Activity Feed */}
+        <div className="space-y-4">
+          <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-5">
+            <div className="flex items-center justify-between mb-4 border-b border-zinc-900 pb-3">
               <div>
-                <h3 className="font-bold text-white text-md">Worker Consumer Nodes</h3>
-                <p className="text-xs text-slate-400">Background BullMQ executor threads</p>
+                <h3 className="font-bold text-white text-xs font-mono uppercase tracking-tight">Connected Workers</h3>
+                <p className="text-[10px] text-zinc-500 font-mono">Redis consumer client connections</p>
               </div>
-              <div className="bg-slate-900/60 px-3 py-1 rounded-full border border-slate-800 text-[11px] text-white font-bold font-mono">
-                {workerHealthScore}% Healthy
+              <div className="bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800 text-[9px] text-white font-bold font-mono">
+                {workerHealthScore}% healthy
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               {workers.map((worker) => (
                 <WorkerCard key={worker.workerId} worker={worker} />
               ))}
 
               {workers.length === 0 && (
-                <div className="text-center py-6 text-xs text-slate-500">
-                  Waiting for active heartbeats...
+                <div className="text-center py-6 text-[10px] text-zinc-600 font-mono">
+                  waiting for worker heartbeat tokens...
                 </div>
               )}
             </div>

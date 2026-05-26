@@ -14,36 +14,48 @@ interface ActivityFeedProps {
 
 export function ActivityFeed({ events }: ActivityFeedProps) {
   return (
-    <div className="glass-card p-6 rounded-2xl flex flex-col h-[400px]">
-      <div className="border-b border-slate-900/60 pb-3 mb-4">
-        <h3 className="font-bold text-white text-md">Realtime Activity Feed</h3>
-        <p className="text-xs text-slate-400">Rolling event stream from BullMQ Redis streams</p>
+    <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-4 flex flex-col h-[380px]">
+      <div className="border-b border-zinc-900 pb-2.5 mb-3 flex items-center justify-between">
+        <div>
+          <h3 className="font-bold text-white text-xs font-mono tracking-tight">Stdout Terminal Streams</h3>
+          <p className="text-[10px] text-zinc-500 font-mono">Realtime worker executions feed</p>
+        </div>
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
       </div>
 
-      <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-        {events.map((evt) => (
-          <div key={evt.id} className="text-xs border-b border-slate-900/40 pb-2.5 flex items-start space-x-2.5">
-            <span className={`px-2 py-0.5 rounded-[4px] text-[9px] font-bold border shrink-0 ${
-              evt.status === 'Completed' ? 'text-emerald-400 bg-emerald-950/20 border-emerald-500/10' :
-              evt.status === 'Active' ? 'text-indigo-400 bg-indigo-950/20 border-indigo-500/10' :
-              evt.status === 'Failed' || evt.status === 'DLQ' ? 'text-rose-400 bg-rose-950/20 border-rose-500/10' :
-              evt.status === 'Retrying' ? 'text-amber-400 bg-amber-950/20 border-amber-500/10' :
-              'text-cyan-400 bg-cyan-950/20 border-cyan-500/10'
-            }`}>
-              {evt.status}
-            </span>
-            <div className="flex-1">
-              <p className="text-[11px] text-slate-300 font-mono break-all leading-tight">{evt.message}</p>
-              <span className="text-[10px] text-slate-500 mt-1 inline-block">
-                {evt.timestamp} &bull; <strong className="text-slate-400">{evt.queue}</strong>
+      <div className="flex-1 overflow-y-auto space-y-2 pr-1 font-mono text-[10px] select-text">
+        {events.map((evt) => {
+          let badgeClass = 'text-zinc-400 bg-zinc-900 border-zinc-800';
+          if (evt.status === 'Completed') {
+            badgeClass = 'text-emerald-400 bg-emerald-950/20 border-emerald-900/30';
+          } else if (evt.status === 'Active') {
+            badgeClass = 'text-blue-400 bg-blue-950/20 border-blue-900/30';
+          } else if (evt.status === 'Failed' || evt.status === 'DLQ') {
+            badgeClass = 'text-rose-400 bg-rose-950/20 border-rose-900/30';
+          } else if (evt.status === 'Retrying') {
+            badgeClass = 'text-amber-400 bg-amber-950/20 border-amber-900/30';
+          }
+
+          return (
+            <div key={evt.id} className="border-b border-zinc-900/30 pb-2 flex items-start space-x-2">
+              <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold border shrink-0 uppercase tracking-tighter ${badgeClass}`}>
+                {evt.status}
               </span>
+              <div className="flex-grow min-w-0">
+                <p className="text-zinc-300 break-all leading-normal whitespace-pre-wrap">{evt.message}</p>
+                <div className="text-[9px] text-zinc-600 mt-1 flex items-center space-x-1.5">
+                  <span>{evt.timestamp}</span>
+                  <span>&bull;</span>
+                  <span className="text-zinc-500 font-bold">{evt.queue}</span>
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {events.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center text-slate-500">
-            <p className="text-xs animate-pulse">Waiting for background tasks to start...</p>
+          <div className="flex flex-col items-center justify-center h-full text-center text-zinc-600 space-y-1">
+            <p className="text-[10px] animate-pulse">listening for stdout telemetry...</p>
           </div>
         )}
       </div>

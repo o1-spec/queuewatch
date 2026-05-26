@@ -57,44 +57,38 @@ export default function DeadLetterExplorer() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-extrabold text-white tracking-tight flex items-center space-x-2.5">
-          <Skull className="w-6 h-6 text-rose-500" />
+      <div className="border-b border-zinc-900 pb-4">
+        <h2 className="text-sm font-bold text-white tracking-tight flex items-center space-x-2 font-mono uppercase">
+          <Skull className="w-4 h-4 text-rose-500 shrink-0 animate-pulse" />
           <span>Dead-Letter Queue Registry</span>
         </h2>
-        <p className="text-xs text-slate-400 mt-1 font-medium">
+        <p className="text-[10px] text-zinc-500 font-mono mt-0.5">
           Manage failed transactions that exceeded BullMQ retry thresholds. Replay back into active loops.
         </p>
       </div>
 
       {loading ? (
-        <div className="glass-card p-6 rounded-2xl animate-pulse space-y-6">
-          <div className="flex items-center justify-between border-b border-slate-900 pb-3">
+        <div className="bg-zinc-950 border border-zinc-900 p-5 rounded-lg animate-pulse space-y-4">
+          <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
             <div className="space-y-2">
-              <div className="h-4 w-48 bg-slate-800 rounded"></div>
-              <div className="h-3 w-72 bg-slate-800 rounded"></div>
+              <div className="h-3 w-48 bg-zinc-900 rounded"></div>
+              <div className="h-2 w-72 bg-zinc-900 rounded"></div>
             </div>
-            <div className="h-6 w-24 bg-slate-800 rounded-full"></div>
+            <div className="h-5 w-20 bg-zinc-900 rounded"></div>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center justify-between border-b border-slate-900/60 pb-4 last:border-0">
-                <div className="flex items-center space-x-4">
-                  <div className="w-4 h-4 bg-slate-800 rounded"></div>
-                  <div className="h-3.5 w-16 bg-slate-800 rounded"></div>
-                  <div className="h-3.5 w-24 bg-slate-800 rounded"></div>
-                  <div className="h-4 w-20 bg-slate-800 rounded"></div>
-                </div>
-                <div className="h-3.5 w-44 bg-slate-800 rounded"></div>
-                <div className="h-7 w-20 bg-slate-800 rounded-lg"></div>
+              <div key={i} className="flex items-center justify-between border-b border-zinc-900/60 pb-3 last:border-0">
+                <div className="h-3 w-64 bg-zinc-900 rounded"></div>
+                <div className="h-5 w-16 bg-zinc-900 rounded"></div>
               </div>
             ))}
           </div>
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Main Table component */}
           <DeadLetterTable
             jobs={dlqJobs}
@@ -103,12 +97,12 @@ export default function DeadLetterExplorer() {
           />
 
           {dlqJobs.length === 0 && (
-            <div className="glass-card p-12 rounded-2xl text-center space-y-2">
-              <div className="inline-flex p-3 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/10">
-                <ShieldCheck className="w-6 h-6" />
+            <div className="bg-zinc-950 border border-zinc-900 p-10 rounded-lg text-center space-y-2 font-mono text-[10px]">
+              <div className="inline-flex p-2.5 rounded bg-zinc-900 text-emerald-400 border border-zinc-900">
+                <ShieldCheck className="w-5 h-5" />
               </div>
-              <h3 className="text-white font-bold text-sm">Dead-Letter Index is Empty</h3>
-              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+              <h3 className="text-white font-bold uppercase tracking-tight">Dead-Letter Index is Empty</h3>
+              <p className="text-zinc-500 max-w-sm mx-auto">
                 No jobs are stuck in dead-letter pools. All failures were successfully recovered or completed.
               </p>
             </div>
