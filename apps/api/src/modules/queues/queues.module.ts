@@ -5,9 +5,10 @@ import { QueuesController } from './queues.controller';
 import { SimulationConfigService } from './simulation-config.service';
 import { TrafficGeneratorService } from './traffic-generator.service';
 import { WebSocketModule } from '../websocket/websocket.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [ConfigModule, WebSocketModule],
+  imports: [ConfigModule, WebSocketModule, AuthModule],
   controllers: [QueuesController],
   providers: [QueuesService, SimulationConfigService, TrafficGeneratorService],
   exports: [QueuesService, SimulationConfigService, TrafficGeneratorService],
