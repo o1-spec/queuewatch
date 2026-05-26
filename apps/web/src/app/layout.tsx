@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import ClientLayout from '../components/ClientLayout';
+import SmoothScroller from '../components/SmoothScroller';
 
 export const metadata: Metadata = {
   title: 'QueueWatch | BullMQ Observability Platform',
@@ -15,6 +16,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="bg-background text-foreground antialiased min-h-screen">
+        <SmoothScroller />
         <ClientLayout>
           {children}
         </ClientLayout>

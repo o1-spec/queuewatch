@@ -266,7 +266,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 p-6 overflow-y-auto bg-zinc-950">
+        <main data-scroll-native className="flex-1 p-6 overflow-y-auto bg-zinc-950">
           {children}
         </main>
       </div>

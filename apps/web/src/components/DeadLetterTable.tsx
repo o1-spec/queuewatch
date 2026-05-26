@@ -139,7 +139,7 @@ export function DeadLetterTable({ jobs, onReplay, replayLoading }: DeadLetterTab
 
           {/* Lateral Drawer Box */}
           <div className="fixed inset-y-0 right-0 w-full sm:w-112 md:w-128 bg-zinc-950 border-l border-zinc-900 shadow-2xl z-50 p-5 flex flex-col justify-between font-mono text-[10px] text-zinc-300 animate-slide-in-right">
-            <div className="space-y-4 overflow-y-auto pr-1 flex-1">
+            <div data-scroll-native className="space-y-4 overflow-y-auto pr-1 flex-1">
               
               {/* Drawer Header */}
               <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
