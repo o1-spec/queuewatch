@@ -6,6 +6,11 @@ import SmoothScroller from '../components/SmoothScroller';
 export const metadata: Metadata = {
   title: 'QueueWatch | BullMQ Observability Platform',
   description: 'AI-powered observability and reliability analytics for BullMQ background systems.',
+  icons: {
+    icon: '/icon.png',
+    shortcut: '/icon.png',
+    apple: '/icon.png',
+  },
 };
 
 export const viewport: Viewport = {
