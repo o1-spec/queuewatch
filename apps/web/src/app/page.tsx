@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   Sparkles
 } from 'lucide-react';
+import LandingLoader from '../components/LandingLoader';
 
 export default function SaaSLandingPage() {
   const [logs, setLogs] = useState<Array<{ time: string; queue: string; job: string; attempt: string; status: 'SUCCESS' | 'ACTIVE' | 'RETRY' | 'FAILED' | 'DLQ'; details: string }>>([
@@ -66,6 +67,9 @@ export default function SaaSLandingPage() {
 
   return (
     <div className="bg-zinc-950 text-zinc-100 min-h-screen relative overflow-x-hidden w-full font-sans antialiased bg-[radial-gradient(#1c1c1e_1px,transparent_1px)] [background-size:24px_24px]">
+
+      {/* Boot loader — shows once per session */}
+      <LandingLoader />
 
       {/* Sticky Realtime Navbar */}
       <header className="border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-md sticky top-0 z-50 px-6 lg:px-12 h-16 flex items-center justify-between">
