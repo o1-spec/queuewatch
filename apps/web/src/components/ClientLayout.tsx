@@ -18,7 +18,10 @@ import {
   Search,
   Server,
   Menu,
-  X
+  X,
+  GitCommit,
+  Bell,
+  ShieldAlert
 } from 'lucide-react';
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
@@ -212,6 +215,22 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           <Link href="/dead-letter" className={navItemClass('/dead-letter')}>
             <Inbox className={navIconClass('/dead-letter')} />
             <span>Dead Letter</span>
+          </Link>
+          <Link href="/deployments" className={navItemClass('/deployments')}>
+            <GitCommit className={navIconClass('/deployments')} />
+            <span>Deployments Correlation</span>
+          </Link>
+          <Link href="/notifications" className={navItemClass('/notifications')}>
+            <Bell className={navIconClass('/notifications')} />
+            <span>Alert Logs Ledger</span>
+          </Link>
+          <Link href="/escalation-rules" className={navItemClass('/escalation-rules')}>
+            <ShieldAlert className={navIconClass('/escalation-rules')} />
+            <span>Escalation Rules</span>
+          </Link>
+          <Link href="/notification-settings" className={navItemClass('/notification-settings')}>
+            <Sliders className={navIconClass('/notification-settings')} />
+            <span>Notification Settings</span>
           </Link>
           <Link href="/logs" className={navItemClass('/logs')}>
             <Terminal className={navIconClass('/logs')} />

@@ -1,9 +1,12 @@
 import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
-import { Incident, QueueName } from '@queuewatch/shared';
+import { Incident, QueueName, IncidentComment } from '@queuewatch/shared';
 import { QueueWebSocketGateway } from '../websocket/websocket.gateway';
 import { AiService } from '../ai/ai.service';
 import { TelemetryService } from '../telemetry/telemetry.service';
 import { DbService } from '../db/db.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { GitHubService } from '../integrations/github.service';
+import { JiraService } from '../integrations/jira.service';
 
 @Injectable()
 export class IncidentsService {
@@ -14,7 +17,10 @@ export class IncidentsService {
     @Inject(forwardRef(() => AiService))
     private aiService: AiService,
     private telemetryService: TelemetryService,
-    private dbService: DbService
+    private dbService: DbService,
+    private notificationsService: NotificationsService,
+    private gitHubService: GitHubService,
+    private jiraService: JiraService
   ) {}
 
   async getIncidents(): Promise<Incident[]> {
@@ -34,11 +40,20 @@ export class IncidentsService {
       id,
       firstDetectedAt: now,
       lastUpdatedAt: now,
+      status: 'open',
     };
 
     await this.dbService.saveIncident(newIncident);
     this.wsGateway.broadcast('incident.created', newIncident);
     this.logger.warn(`[Incident] New incident created: ${newIncident.title} on queue ${newIncident.affectedQueue}`);
+
+    // Trigger alerts safely
+    try {
+      await this.notificationsService.sendIncidentAlert(newIncident);
+    } catch (e) {
+      this.logger.error('Failed to dispatch alert notifications for new incident:', e);
+    }
+
     return newIncident;
   }
 
@@ -60,15 +75,168 @@ export class IncidentsService {
     return updated;
   }
 
+  async acknowledgeIncident(id: string, userId = 'admin', userName = 'Admin Owner'): Promise<Incident> {
+    const incident = await this.dbService.getIncident(id);
+    if (!incident) throw new Error(`Incident ${id} not found`);
+
+    const updated = await this.updateIncident(id, {
+      status: 'acknowledged',
+      acknowledgedAt: Date.now(),
+      assigneeId: userId,
+      responseOwner: userName,
+    });
+
+    this.wsGateway.broadcast('incident.acknowledged', updated);
+    return updated;
+  }
+
+  async assignIncident(id: string, userId: string, userName: string): Promise<Incident> {
+    const updated = await this.updateIncident(id, {
+      assigneeId: userId,
+      responseOwner: userName,
+    });
+    this.wsGateway.broadcast('incident.assigned', updated);
+    return updated;
+  }
+
+  async escalateIncident(id: string): Promise<Incident> {
+    const incident = await this.dbService.getIncident(id);
+    if (!incident) throw new Error(`Incident ${id} not found`);
+
+    const updated = await this.updateIncident(id, {
+      status: 'investigating',
+      escalatedAt: Date.now(),
+    });
+
+    this.wsGateway.broadcast('incident.escalated', updated);
+
+    // Send escalated alerts
+    try {
+      await this.notificationsService.sendIncidentAlert(updated, true);
+    } catch (e) {
+      this.logger.error('Failed to send escalated incident notifications:', e);
+    }
+
+    return updated;
+  }
+
+  async resolveIncident(id: string, summary: string): Promise<Incident> {
+    const incident = await this.dbService.getIncident(id);
+    if (!incident) throw new Error(`Incident ${id} not found`);
+
+    const now = Date.now();
+    const ackTime = incident.acknowledgedAt ? Math.round((incident.acknowledgedAt - incident.firstDetectedAt) / 1000) : 0;
+    const resTime = Math.round((now - incident.firstDetectedAt) / 1000);
+
+    // 1. Generate postmortem summary using AI if available, else build a deterministic summary
+    let resolutionSummary = '';
+    try {
+      resolutionSummary = await this.aiService.generatePostmortem(incident, summary, ackTime, resTime);
+    } catch (e) {
+      this.logger.warn(`AI postmortem failed: ${e.message}. Using fallback builder.`);
+      resolutionSummary = `
+### 📝 Incident Postmortem (System Fallback)
+* **What Happened:** ${incident.title}. ${incident.summary}
+* **Root Cause:** ${incident.suspectedRootCause}
+* **Impact:** ${incident.impact}
+* **Time to Acknowledge:** ${ackTime > 0 ? `${ackTime} seconds` : 'Immediate'}
+* **Time to Resolve:** ${resTime} seconds
+* **Actions Taken:** ${summary || 'Manual service restart and active queue buffers re-evaluated.'}
+* **Prevention Recommendation:** ${incident.recommendation}
+      `.trim();
+    }
+
+    const updated = await this.updateIncident(id, {
+      status: 'resolved',
+      resolvedAt: now,
+      resolutionSummary,
+    });
+
+    this.wsGateway.broadcast('incident.resolved', updated);
+    this.wsGateway.broadcast('postmortem.generated', { incidentId: id, resolutionSummary });
+    return updated;
+  }
+
+  // --- External issue trackers ---
+  async createGitHubIssue(id: string): Promise<Incident> {
+    const incident = await this.dbService.getIncident(id);
+    if (!incident) throw new Error(`Incident ${id} not found`);
+
+    const issueUrl = await this.gitHubService.createIssue(
+      incident.id,
+      `[QueueWatch] ${incident.title}`,
+      incident.summary + '\n\n' + incident.evidence
+    );
+
+    return this.updateIncident(id, {
+      githubIssueUrl: issueUrl,
+    });
+  }
+
+  async createJiraTicket(id: string): Promise<Incident> {
+    const incident = await this.dbService.getIncident(id);
+    if (!incident) throw new Error(`Incident ${id} not found`);
+
+    const ticketUrl = await this.jiraService.createTicket(
+      incident.id,
+      `[QueueWatch] ${incident.title}`,
+      incident.summary + '\n\n' + incident.evidence
+    );
+
+    return this.updateIncident(id, {
+      jiraTicketUrl: ticketUrl,
+    });
+  }
+
+  // --- Comments ---
+  async getComments(incidentId: string): Promise<IncidentComment[]> {
+    return this.dbService.getComments(incidentId);
+  }
+
+  async addComment(incidentId: string, message: string, userId = 'admin', userName = 'Admin Owner'): Promise<IncidentComment> {
+    const comment: IncidentComment = {
+      id: `comment_${Math.random().toString(36).substr(2, 9)}`,
+      incidentId,
+      userId,
+      userName,
+      message,
+      createdAt: Date.now(),
+    };
+
+    await this.dbService.saveComment(comment);
+    this.wsGateway.broadcast('incident.comment.created', comment);
+    return comment;
+  }
+
+  async deleteComment(incidentId: string, commentId: string) {
+    await this.dbService.deleteComment(incidentId, commentId);
+  }
+
+  // --- Diagnostics with Deployments Correlation ---
   async analyzeIncident(id: string): Promise<Incident> {
     const incident = await this.dbService.getIncident(id);
     if (!incident) {
       throw new Error(`Incident ${id} not found`);
     }
 
-    this.logger.log(`[Incident] Running AI diagnostics for incident ${id}...`);
+    this.logger.log(`[Incident] Running V3 AI diagnostics with deployment correlation for incident ${id}...`);
     
-    const diagnosis = await this.aiService.diagnoseIncident(incident);
+    // Correlate recent deployment events within last 30 minutes of first detected incident
+    const allDeps = await this.dbService.getDeploymentEvents();
+    const incidentTime = incident.firstDetectedAt;
+    const windowStart = incidentTime - 30 * 60 * 1000;
+    
+    const correlatedDeps = allDeps.filter(
+      (dep) => dep.deployedAt >= windowStart && dep.deployedAt <= incidentTime
+    );
+
+    let deploymentEvidenceText = '';
+    if (correlatedDeps.length > 0) {
+      deploymentEvidenceText = `\n[Correlation Engine] Found ${correlatedDeps.length} recent deployment(s) in 30-min window:\n` +
+        correlatedDeps.map(d => `- Deployed Service ${d.service} (Version: ${d.version}, Commit: ${d.commitSha}) by ${d.deployedBy} at ${new Date(d.deployedAt).toLocaleTimeString()}`).join('\n');
+    }
+
+    const diagnosis = await this.aiService.diagnoseIncident(incident, deploymentEvidenceText);
 
     const updated = await this.updateIncident(id, {
       summary: diagnosis.summary,
@@ -76,6 +244,7 @@ export class IncidentsService {
       recommendation: diagnosis.recommendation,
       impact: diagnosis.impact,
       severity: diagnosis.severity || incident.severity,
+      evidence: incident.evidence + (deploymentEvidenceText ? `\n${deploymentEvidenceText}` : ''),
     });
 
     this.wsGateway.broadcast('ai.insight.generated', {
@@ -89,6 +258,7 @@ export class IncidentsService {
   }
 
   async evaluateSystemState(metricsList: any[], workerHealthList: any[], dlqCount: number) {
+    // Keep baseline metrics checking
     for (const worker of workerHealthList) {
       const qName = worker.queueName as QueueName;
       
@@ -202,6 +372,68 @@ export class IncidentsService {
           await this.updateIncident(existing.id, { status: 'resolved' });
         }
       }
+    }
+
+    // Run V3 escalation rule evaluation
+    await this.checkEscalations();
+  }
+
+  async checkEscalations() {
+    try {
+      const rules = await this.dbService.getEscalationRules();
+      const openIncidents = (await this.dbService.getIncidents()).filter(
+        i => i.status === 'open' || i.status === 'investigating'
+      );
+      const now = Date.now();
+
+      for (const incident of openIncidents) {
+        for (const rule of rules) {
+          if (!rule.enabled) continue;
+
+          // Match queue
+          if (rule.queueName !== 'all' && rule.queueName !== incident.affectedQueue) continue;
+
+          // Match severity
+          if (rule.severity !== 'all' && rule.severity !== incident.severity) continue;
+
+          // Check if already escalated
+          if (incident.escalatedAt) continue;
+
+          // Check delay minutes
+          const elapsedMinutes = (now - incident.firstDetectedAt) / (60 * 1000);
+          if (elapsedMinutes >= rule.delayMinutes) {
+            this.logger.warn(`Escalating incident ${incident.id} based on rule: ${rule.name}`);
+            
+            // Mark escalated
+            await this.updateIncident(incident.id, {
+              status: 'investigating',
+              escalatedAt: now,
+            });
+
+            // Dispatch alert triggers
+            const alertMessage = `🔥 [ESCALATION] Incident #${incident.id} (${incident.severity.toUpperCase()}) on queue [${incident.affectedQueue}] escalated by rule: ${rule.name}`;
+            
+            if (rule.channels.includes('dashboard')) {
+              await this.dbService.saveNotification({
+                id: `notif_${Math.random().toString(36).substr(2, 9)}`,
+                incidentId: incident.id,
+                message: alertMessage,
+                severity: incident.severity,
+                queueName: incident.affectedQueue,
+                channel: 'dashboard',
+                status: 'sent',
+                timestamp: now,
+              });
+            }
+
+            if (rule.channels.includes('email') || rule.channels.includes('slack_webhook') || rule.channels.includes('discord_webhook')) {
+              await this.notificationsService.sendIncidentAlert(incident, true);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      this.logger.error('Failed to run escalation rules check:', e);
     }
   }
 

@@ -61,7 +61,7 @@ export interface Incident {
   title: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
   affectedQueue: QueueName;
-  status: 'open' | 'investigating' | 'resolved';
+  status: 'open' | 'acknowledged' | 'investigating' | 'resolved' | 'ignored';
   firstDetectedAt: number;
   lastUpdatedAt: number;
   summary: string;
@@ -70,6 +70,15 @@ export interface Incident {
   recommendation: string;
   impact: string;
   relatedErrors: string[];
+  assigneeId?: string;
+  acknowledgedAt?: number;
+  resolvedAt?: number;
+  escalatedAt?: number;
+  priority?: 'low' | 'medium' | 'high' | 'critical';
+  responseOwner?: string;
+  resolutionSummary?: string;
+  githubIssueUrl?: string;
+  jiraTicketUrl?: string;
 }
 
 export interface LogEntry {
@@ -129,6 +138,58 @@ export interface DeadLetterJob {
   timestamp: number;
   replayStatus: 'pending' | 'replayed' | 'resolved';
   relatedIncidentId?: string;
+}
+
+export interface IncidentComment {
+  id: string;
+  incidentId: string;
+  userId: string;
+  userName: string;
+  message: string;
+  createdAt: number;
+}
+
+export interface EscalationRule {
+  id: string;
+  name: string;
+  queueName: string;
+  severity: 'low' | 'medium' | 'high' | 'critical' | 'all';
+  condition: string;
+  delayMinutes: number;
+  channels: string[];
+  enabled: boolean;
+}
+
+export interface DeploymentEvent {
+  id: string;
+  version: string;
+  service: string;
+  commitSha: string;
+  environment: string;
+  deployedBy: string;
+  deployedAt: number;
+  metadata?: any;
+}
+
+export interface NotificationSetting {
+  emailEnabled: boolean;
+  dashboardEnabled: boolean;
+  webhookEnabled: boolean;
+  slackWebhookUrl?: string;
+  discordWebhookUrl?: string;
+  severities: string[];
+  queues: string[];
+}
+
+export interface Notification {
+  id: string;
+  incidentId?: string;
+  message: string;
+  severity?: string;
+  queueName?: string;
+  channel: 'dashboard' | 'email' | 'slack_webhook' | 'discord_webhook';
+  status: 'sent' | 'failed';
+  timestamp: number;
 }
 
 

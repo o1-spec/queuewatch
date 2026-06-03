@@ -168,7 +168,10 @@ Provide your response in JSON format matching the following structure:
   /**
    * Diagnoses an incident using Ollama (if available) or the operational fallback builder.
    */
-  async diagnoseIncident(incident: Incident): Promise<AIDiagnosisResult> {
+  /**
+   * Diagnoses an incident using Ollama (if available) or the operational fallback builder.
+   */
+  async diagnoseIncident(incident: Incident, deploymentEvidenceText?: string): Promise<AIDiagnosisResult> {
     const ollamaUrl = this.configService.get<string>('OLLAMA_BASE_URL') || 'http://localhost:11434';
     const model = this.configService.get<string>('OLLAMA_MODEL') || 'llama3.1';
 
@@ -177,12 +180,12 @@ Provide your response in JSON format matching the following structure:
 Title: ${incident.title}
 Queue: ${incident.affectedQueue}
 Evidence: ${incident.evidence}
-Related Errors: ${JSON.stringify(incident.relatedErrors)}
+${deploymentEvidenceText ? `Deployment Event Details: ${deploymentEvidenceText}\n` : ''}Related Errors: ${JSON.stringify(incident.relatedErrors)}
 
 Provide your response in JSON format matching the following structure:
 {
   "summary": "Brief explanation of what happened",
-  "suspectedRootCause": "Why it likely happened",
+  "suspectedRootCause": "Why it likely happened. If deployment event details are present, mention deployment correlation only when timing strongly suggests a relationship.",
   "impact": "What is the operational impact",
   "recommendation": "Recommended action to fix the issue"
 }`;
@@ -218,6 +221,53 @@ Provide your response in JSON format matching the following structure:
     } catch (err) {
       this.logger.warn(`Ollama analysis failed: ${err.message}. Falling back to SRE diagnostic builder.`);
       return this.compileMockDiagnosis(incident);
+    }
+  }
+
+  async generatePostmortem(incident: Incident, summary: string, ackTime: number, resTime: number): Promise<string> {
+    const ollamaUrl = this.configService.get<string>('OLLAMA_BASE_URL') || 'http://localhost:11434';
+    const model = this.configService.get<string>('OLLAMA_MODEL') || 'llama3.1';
+
+    const systemPrompt = `You are an SRE coordinator. Write a clear, markdown postmortem report based on the provided parameters.`;
+    const userPrompt = `Generate a post-incident postmortem summary report in Markdown.
+Incident: ${incident.title}
+Queue: ${incident.affectedQueue}
+Root Cause: ${incident.suspectedRootCause}
+Impact: ${incident.impact}
+Acknowledge Time: ${ackTime} seconds
+Resolution Time: ${resTime} seconds
+Human Actions Taken: ${summary}
+Prevention Recommendation: ${incident.recommendation}
+
+Structure your markdown report to contain the following headers:
+- ### 📝 Incident Postmortem
+- **What Happened**
+- **Root Cause & Trigger**
+- **User & System Impact**
+- **SRE Metrics Summary** (Acknowledge Time, Resolution Time)
+- **Resolution Actions Taken**
+- **Future Prevention Recommendations**`;
+
+    try {
+      this.logger.log(`Connecting to Ollama for postmortem generation...`);
+      const response = await fetch(`${ollamaUrl}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          prompt: `${systemPrompt}\n\n${userPrompt}`,
+          stream: false,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Ollama status: ${response.status}`);
+      }
+
+      const resBody: any = await response.json();
+      return resBody.response || '';
+    } catch (e) {
+      throw new Error(`Ollama postmortem generation failed: ${e.message}`);
     }
   }
 

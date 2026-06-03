@@ -1,7 +1,11 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
-import { User, Incident, TelemetryEvent, LogEntry, AlertRule, AlertNotification, InvestigationReport, DeadLetterJob } from '@queuewatch/shared';
+import { 
+  User, Incident, TelemetryEvent, LogEntry, AlertRule, AlertNotification, 
+  InvestigationReport, DeadLetterJob, IncidentComment, NotificationSetting, 
+  EscalationRule, DeploymentEvent, Notification 
+} from '@queuewatch/shared';
 
 @Injectable()
 export class DbService implements OnModuleInit, OnModuleDestroy {
@@ -83,6 +87,37 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
       for (const rule of defaultRules) {
         await this.redis.hset('queuewatch:alert_rules', rule.id, JSON.stringify(rule));
+      }
+    }
+
+    // Seed default escalation rules
+    const escRulesCount = await this.redis.hlen('queuewatch:escalation_rules');
+    if (escRulesCount === 0) {
+      const defaultEscRules = [
+        {
+          id: 'esc_rule_critical',
+          name: 'Critical Incident SLA Escalation',
+          queueName: 'all',
+          severity: 'critical',
+          condition: 'Unacknowledged > 10 min',
+          delayMinutes: 10,
+          channels: ['email', 'slack_webhook', 'dashboard'],
+          enabled: true,
+        },
+        {
+          id: 'esc_rule_webhook',
+          name: 'Webhook Queue Failure Escalation',
+          queueName: 'webhook_delivery',
+          severity: 'high',
+          condition: 'Immediate Escalation',
+          delayMinutes: 0,
+          channels: ['email', 'slack_webhook'],
+          enabled: true,
+        }
+      ];
+
+      for (const rule of defaultEscRules) {
+        await this.redis.hset('queuewatch:escalation_rules', rule.id, JSON.stringify(rule));
       }
     }
   }
@@ -209,5 +244,78 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
   async deleteDeadLetterJob(id: string) {
     await this.redis.hdel('queuewatch:dead_letter_jobs', id);
+  }
+
+  // --- Comments ---
+  async getComments(incidentId: string): Promise<IncidentComment[]> {
+    const rawList = await this.redis.hvals(`queuewatch:comments:${incidentId}`);
+    return rawList.map(item => JSON.parse(item)).sort((a, b) => a.createdAt - b.createdAt);
+  }
+
+  async saveComment(comment: IncidentComment) {
+    await this.redis.hset(`queuewatch:comments:${comment.incidentId}`, comment.id, JSON.stringify(comment));
+  }
+
+  async deleteComment(incidentId: string, commentId: string) {
+    await this.redis.hdel(`queuewatch:comments:${incidentId}`, commentId);
+  }
+
+  // --- Notification Settings ---
+  async getNotificationSettings(userId: string): Promise<NotificationSetting> {
+    const raw = await this.redis.get(`queuewatch:notification_settings:${userId}`);
+    if (raw) return JSON.parse(raw);
+    // Return default settings
+    return {
+      emailEnabled: true,
+      dashboardEnabled: true,
+      webhookEnabled: false,
+      severities: ['low', 'medium', 'high', 'critical'],
+      queues: ['email_notifications', 'webhook_delivery', 'image_processing', 'ai_tasks'],
+    };
+  }
+
+  async saveNotificationSettings(userId: string, settings: NotificationSetting) {
+    await this.redis.set(`queuewatch:notification_settings:${userId}`, JSON.stringify(settings));
+  }
+
+  // --- Escalation Rules ---
+  async getEscalationRules(): Promise<EscalationRule[]> {
+    const rawList = await this.redis.hvals('queuewatch:escalation_rules');
+    return rawList.map(item => JSON.parse(item));
+  }
+
+  async getEscalationRule(id: string): Promise<EscalationRule | null> {
+    const raw = await this.redis.hget('queuewatch:escalation_rules', id);
+    return raw ? JSON.parse(raw) : null;
+  }
+
+  async saveEscalationRule(rule: EscalationRule) {
+    await this.redis.hset('queuewatch:escalation_rules', rule.id, JSON.stringify(rule));
+  }
+
+  async deleteEscalationRule(id: string) {
+    await this.redis.hdel('queuewatch:escalation_rules', id);
+  }
+
+  // --- Deployment Events ---
+  async getDeploymentEvents(): Promise<DeploymentEvent[]> {
+    const list = await this.redis.lrange('queuewatch:deployments', 0, -1);
+    return list.map(item => JSON.parse(item));
+  }
+
+  async saveDeploymentEvent(event: DeploymentEvent) {
+    await this.redis.lpush('queuewatch:deployments', JSON.stringify(event));
+    await this.redis.ltrim('queuewatch:deployments', 0, 99); // Keep last 100 deployments
+  }
+
+  // --- V3 Notifications ---
+  async getNotifications(limit = 100): Promise<Notification[]> {
+    const list = await this.redis.lrange('queuewatch:notifications', 0, limit - 1);
+    return list.map(item => JSON.parse(item));
+  }
+
+  async saveNotification(notif: Notification) {
+    await this.redis.lpush('queuewatch:notifications', JSON.stringify(notif));
+    await this.redis.ltrim('queuewatch:notifications', 0, 499); // Keep last 500 notifications
   }
 }

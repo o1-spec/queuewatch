@@ -12,6 +12,9 @@ import { IncidentsModule } from './modules/incidents/incidents.module';
 import { DbModule } from './modules/db/db.module';
 import { AlertsModule } from './modules/alerts/alerts.module';
 import { AgentModule } from './modules/agent/agent.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { DeploymentsModule } from './modules/deployments/deployments.module';
+import { EscalationModule } from './modules/escalation/escalation.module';
 
 @Module({
   imports: [
@@ -31,6 +34,9 @@ import { AgentModule } from './modules/agent/agent.module';
     IncidentsModule,
     AlertsModule,
     AgentModule,
+    NotificationsModule,
+    DeploymentsModule,
+    EscalationModule,
   ],
 })
 export class AppModule {}
