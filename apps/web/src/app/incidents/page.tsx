@@ -35,6 +35,21 @@ export default function IncidentsRegistry() {
   const [copilotChatQuery, setCopilotChatQuery] = useState<Record<string, string>>({});
   const [showActionConfirmation, setShowActionConfirmation] = useState<{ action: () => void; message: string } | null>(null);
 
+  // V5 states & resources
+  const [blastRadii, setBlastRadii] = useState<Record<string, any>>({});
+
+  const loadBlastRadius = async (id: string) => {
+    try {
+      const res = await authFetch(`${API_URL}/api/incidents/${id}/blast-radius`);
+      if (res.ok) {
+        const data = await res.json();
+        setBlastRadii(prev => ({ ...prev, [id]: data }));
+      }
+    } catch (e) {
+      console.error('Failed to load blast radius:', e);
+    }
+  };
+
   // Workflows
   const [showResolveModal, setShowResolveModal] = useState<string | null>(null);
   const [resolutionText, setResolutionText] = useState('');
@@ -188,6 +203,7 @@ export default function IncidentsRegistry() {
     if (tab === 'comments') loadComments(incidentId);
     if (tab === 'deployments') loadDeployments(incidentId);
     if (tab === 'copilot') loadCopilotResponse(incidentId);
+    if (tab === 'blast-radius') loadBlastRadius(incidentId);
   };
 
   const runInvestigation = async (id: string, queueName: string) => {
@@ -559,6 +575,16 @@ export default function IncidentsRegistry() {
                       >
                         <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
                         <span>Reliability Copilot</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleTabChange(inc.id, inc.affectedQueue, 'blast-radius')}
+                        className={`px-3 py-1.5 border-t-2 -mb-px transition-all uppercase flex items-center space-x-1 ${
+                          currentTab === 'blast-radius' ? 'border-indigo-500 text-white bg-zinc-900/40' : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                        }`}
+                      >
+                        <ShieldAlert className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
+                        <span>Blast Radius</span>
                       </button>
                     </div>
 
@@ -1063,6 +1089,75 @@ export default function IncidentsRegistry() {
                                   >
                                     ASK
                                   </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Blast Radius Tab */}
+                      {currentTab === 'blast-radius' && (
+                        <div className="space-y-4 font-mono">
+                          {!blastRadii[inc.id] ? (
+                            <div className="text-zinc-555 animate-pulse py-6">Calculating dependency cascade impact...</div>
+                          ) : (
+                            <div className="space-y-4">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="bg-zinc-900/20 border border-zinc-900 p-4 rounded-lg space-y-2">
+                                  <span className="text-zinc-555 uppercase text-[9px] font-bold block">IMPACT SEVERITY</span>
+                                  <div className="flex items-baseline space-x-1.5">
+                                    <span className={`text-2xl font-bold uppercase ${
+                                      blastRadii[inc.id].estimatedBlastRadius === 'critical' || blastRadii[inc.id].estimatedBlastRadius === 'high'
+                                        ? 'text-rose-500 animate-pulse'
+                                        : 'text-amber-500'
+                                    }`}>
+                                      {blastRadii[inc.id].estimatedBlastRadius}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="bg-zinc-900/20 border border-zinc-900 p-4 rounded-lg space-y-2 md:col-span-2">
+                                  <span className="text-zinc-555 uppercase text-[9px] font-bold block">POTENTIAL IMPACT SUMMARY</span>
+                                  <p className="text-zinc-300 font-sans text-xs leading-relaxed">
+                                    {blastRadii[inc.id].blastDescription}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                {/* Impacted Services */}
+                                <div className="bg-zinc-900/20 border border-zinc-900 p-4 rounded-lg space-y-2.5">
+                                  <span className="text-zinc-555 uppercase text-[9px] font-bold block">IMPACTED DOWNSTREAM SERVICES</span>
+                                  {blastRadii[inc.id].impactedServices && blastRadii[inc.id].impactedServices.length > 0 ? (
+                                    <ul className="space-y-1.5 font-sans text-zinc-350 text-xs">
+                                      {blastRadii[inc.id].impactedServices.map((svc: string, idx: number) => (
+                                        <li key={idx} className="flex items-start space-x-2 text-rose-450">
+                                          <span className="font-bold font-mono text-[10px] shrink-0 mt-0.5">&bull;</span>
+                                          <span>{svc}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <p className="text-zinc-550 text-xs font-sans">No downstream microservices are directly impacted by this outage.</p>
+                                  )}
+                                </div>
+
+                                {/* Impacted Queues */}
+                                <div className="bg-zinc-900/20 border border-zinc-900 p-4 rounded-lg space-y-2.5">
+                                  <span className="text-zinc-555 uppercase text-[9px] font-bold block">IMPACTED QUEUES</span>
+                                  {blastRadii[inc.id].impactedQueues && blastRadii[inc.id].impactedQueues.length > 0 ? (
+                                    <ul className="space-y-1.5 font-sans text-zinc-350 text-xs">
+                                      {blastRadii[inc.id].impactedQueues.map((q: string, idx: number) => (
+                                        <li key={idx} className="flex items-start space-x-2 text-rose-450">
+                                          <span className="font-bold font-mono text-[10px] shrink-0 mt-0.5">&bull;</span>
+                                          <span>{q}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <p className="text-zinc-555 text-xs font-sans">No additional queues impacted.</p>
+                                  )}
                                 </div>
                               </div>
                             </div>

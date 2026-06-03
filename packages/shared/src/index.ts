@@ -231,4 +231,66 @@ export interface CopilotResponse {
   relatedDeployments: string[];
 }
 
+export interface Environment {
+  id: string;
+  name: string;
+  type: 'production' | 'staging' | 'development';
+}
 
+export interface Service {
+  id: string;
+  name: string;
+  description: string;
+  environment: string;
+  owner: string;
+  status: 'healthy' | 'degraded' | 'critical';
+  createdAt: number;
+  queues: string[];
+  workers: string[];
+  deployments: string[];
+  incidents: string[];
+}
+
+export interface DependencyGraph {
+  nodes: { id: string; label: string; type: 'service' | 'queue' | 'worker' }[];
+  edges: { from: string; to: string }[];
+  serviceImpacts: Record<string, string[]>;
+}
+
+export interface ReliabilityScore {
+  id: string;
+  targetId: string;
+  targetType: 'queue' | 'service' | 'environment';
+  score: number;
+  failureRate: number;
+  retryRate: number;
+  backlogGrowth: number;
+  workerHealthScore: number;
+  incidentFrequency: number;
+  mttrMinutes: number;
+  timestamp: number;
+}
+
+export interface Prediction {
+  id: string;
+  title: string;
+  riskScore: number;
+  confidenceScore: number;
+  estimatedImpact: string;
+  recommendedActions: string[];
+  reason: string;
+  targetQueue?: string;
+  targetService?: string;
+  timestamp: number;
+}
+
+export interface GlobalHealth {
+  healthyServicesCount: number;
+  degradedServicesCount: number;
+  criticalServicesCount: number;
+  activeIncidentsCount: number;
+  unresolvedIncidentsCount: number;
+  overallReliabilityScore: number;
+  overallRiskScore: number;
+  timestamp: number;
+}

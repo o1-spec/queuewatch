@@ -25,7 +25,13 @@ import {
   Sparkles,
   BookOpen,
   History,
-  FileText
+  FileText,
+  Network,
+  Cpu,
+  ShieldCheck,
+  TrendingUp,
+  Activity,
+  LineChart
 } from 'lucide-react';
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
@@ -43,6 +49,12 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
   const commandRoutes = [
     { name: 'System Overview Dashboard', path: '/dashboard', desc: 'Observe Redis queue throughput, workers load, and latencies', icon: LayoutDashboard },
+    { name: 'Services Registry Catalog', path: '/services', desc: 'Microservices registry, health indicators, & metadata', icon: Cpu },
+    { name: 'Dependency Topology Map', path: '/dependencies', desc: 'SRE dependency graphs, downstream impact cascades, & blast radius analysis', icon: Network },
+    { name: 'Reliability Center Ledger', path: '/reliability', desc: 'Service reliability scoring (0-100) & performance trends', icon: ShieldCheck },
+    { name: 'Predictive Warnings Center', path: '/predictions', desc: 'Deterministic incident predictions & queue backlog projections', icon: TrendingUp },
+    { name: 'Global Health Center', path: '/health', desc: 'Platform health status command center and quick-stats overview', icon: Activity },
+    { name: 'SRE Performance Analytics', path: '/analytics', desc: 'Quarterly MTTR reports, stability rate trends, & incident stats', icon: LineChart },
     { name: 'Queues Registry Catalog', path: '/queues', desc: 'List active Redis BullMQ channels, pause/resume workers', icon: Layers },
     { name: 'Incident Exceptions Workspace', path: '/incidents', desc: 'Inspect failing job parameters and Zod validations', icon: AlertCircle },
     { name: 'Dead-Letter Queue Pool', path: '/dead-letter', desc: 'Trace max retry crashes, audit payload stacktraces', icon: Inbox },
@@ -212,6 +224,31 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             <LayoutDashboard className={navIconClass('/dashboard')} />
             <span>Overview</span>
           </Link>
+          <Link href="/services" className={navItemClass('/services')}>
+            <Cpu className={navIconClass('/services')} />
+            <span>Services Registry</span>
+          </Link>
+          <Link href="/dependencies" className={navItemClass('/dependencies')}>
+            <Network className={navIconClass('/dependencies')} />
+            <span>Dependency Graph</span>
+          </Link>
+          <Link href="/reliability" className={navItemClass('/reliability')}>
+            <ShieldCheck className={navIconClass('/reliability')} />
+            <span>Reliability Center</span>
+          </Link>
+          <Link href="/predictions" className={navItemClass('/predictions')}>
+            <TrendingUp className={navIconClass('/predictions')} />
+            <span>Predictive Warnings</span>
+          </Link>
+          <Link href="/health" className={navItemClass('/health')}>
+            <Activity className={navIconClass('/health')} />
+            <span>Health Center</span>
+          </Link>
+          <Link href="/analytics" className={navItemClass('/analytics')}>
+            <LineChart className={navIconClass('/analytics')} />
+            <span>SRE Analytics</span>
+          </Link>
+          <div className="h-px bg-zinc-900 my-2" />
           <Link href="/queues" className={navItemClass('/queues')}>
             <Layers className={navIconClass('/queues')} />
             <span>Queues Registry</span>

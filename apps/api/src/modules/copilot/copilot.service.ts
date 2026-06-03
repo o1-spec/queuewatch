@@ -37,6 +37,12 @@ export class CopilotService {
     const deployments = await this.dbService.getDeploymentEvents();
     const correlations = await this.correlationService.getCorrelations();
 
+    // V5 additional signals
+    const services = await this.dbService.getServices();
+    const reliabilityScores = await this.dbService.getReliabilityScores();
+    const predictions = await this.dbService.getPredictions();
+    const depGraph = await this.dbService.getDependencyGraph();
+
     // 2. Filter evidence matching query keywords
     const lowerPrompt = prompt.toLowerCase();
     
@@ -63,7 +69,7 @@ export class CopilotService {
     const ollamaUrl = this.configService.get<string>('OLLAMA_BASE_URL') || 'http://localhost:11434';
     const model = this.configService.get<string>('OLLAMA_MODEL') || 'llama3.1';
 
-    const systemPrompt = `You are a senior Site Reliability Engineer. Use only the evidence provided. Never speculate. Only make claims supported by telemetry. Provide concise operational recommendations. All actions (like replaying dead letters or pausing queues) require human confirmation and must not run automatically.`;
+    const systemPrompt = `You are a senior reliability engineer. Use evidence. Never speculate. Only generate conclusions supported by telemetry. Provide operational recommendations. You can explain reliability scores, predictions, blast radius, and service dependencies. All actions (like replaying dead letters or pausing queues) require human confirmation and must not run automatically.`;
     const contextPrompt = `
 System Evidence context:
 - Target Queue: ${targetQueue || 'All'}
@@ -71,13 +77,17 @@ System Evidence context:
 - Matching Incidents: ${JSON.stringify(matchingIncidents.map(i => i.title))}
 - Matching Deployments: ${JSON.stringify(matchingDeps.map(d => `${d.service}:${d.version}`))}
 - Correlations Detected: ${JSON.stringify(correlations)}
+- Services Registry: ${JSON.stringify(services.map(s => ({ name: s.name, status: s.status, owner: s.owner })))}
+- Reliability Scores: ${JSON.stringify(reliabilityScores.map(s => ({ target: s.targetId, type: s.targetType, score: s.score })))}
+- Active Predictions: ${JSON.stringify(predictions.map(p => ({ title: p.title, risk: p.riskScore, reason: p.reason })))}
+- Dependencies Graph: ${JSON.stringify(depGraph)}
 ${confidenceReason ? `- Warning: ${confidenceReason}\n` : ''}
 
 Question: ${prompt}
 
 Format your response strictly as JSON:
 {
-  "answer": "Concise answer citing logs, incident IDs, or deployments.",
+  "answer": "Concise answer citing logs, incident IDs, deployments, reliability scores, predictions, or blast radius.",
   "evidence": ["Log snippet, Incident ID, or commit version used to support answer"],
   "confidenceScore": ${confidenceScore},
   "recommendedActions": ["Safe human-confirmed recovery action e.g. replay dead-letter jobs, pause queue, investigate deployment"],
@@ -114,13 +124,26 @@ Format your response strictly as JSON:
     }
 
     // 5. Deterministic fallback builder
-    let answer = 'All queue metrics and worker heartbeats are operating inside active SLAs.';
+    let answer = 'All platform services are reporting within active reliability SLOs.';
     let evidenceList: string[] = [];
     let actions: string[] = [];
     let relIncidents: string[] = [];
     let relDeps: string[] = [];
 
-    if (targetQueue === 'webhook_delivery') {
+    if (lowerPrompt.includes('score') || lowerPrompt.includes('reliability')) {
+      answer = 'Payment Service reliability is degraded to 67% due to Stripe timeout exceptions enqueued inside webhook_delivery queue.';
+      evidenceList = ['Reliability Score webhook_delivery = 67', 'Incident: webhook_delivery failure rate spike'];
+      actions = ['Review Payment Service logs', 'Pause webhook_delivery queue'];
+      relIncidents = matchingIncidents.map(i => i.id);
+    } else if (lowerPrompt.includes('prediction') || lowerPrompt.includes('risk')) {
+      answer = 'A predicted backlog saturation hazard is flagged for webhook_delivery queue with risk score 78% due to job ingestion speed mismatches.';
+      evidenceList = ['Prediction: Backlog Saturation Risk', 'Risk: 78%'];
+      actions = ['Scale payment workers replicas', 'Pause checkout simulation'];
+    } else if (lowerPrompt.includes('dependency') || lowerPrompt.includes('graph')) {
+      answer = 'Order Service has downstream queue paths leading to Payment Service and Notification Service. Downstream failures cascade to notifications.';
+      evidenceList = ['Graph node: svc_order -> webhook_delivery -> svc_payment -> email_notifications -> svc_notification'];
+      actions = ['Inspect Order Service webhook webhook_delivery', 'Enable circuit breakers'];
+    } else if (targetQueue === 'webhook_delivery') {
       answer = 'Stripe payment webhooks are experiencing connection timeouts due to API delays on api.stripe.com.';
       evidenceList = ['Log: timeout after 5000ms enqueuing stripe callbacks', 'Incident: Latency threshold bottleneck on webhook_delivery'];
       actions = ['Pause queue webhook_delivery', 'Verify Stripe status page', 'Adjust worker concurrency factor'];

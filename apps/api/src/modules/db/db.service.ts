@@ -4,7 +4,9 @@ import Redis from 'ioredis';
 import { 
   User, Incident, TelemetryEvent, LogEntry, AlertRule, AlertNotification, 
   InvestigationReport, DeadLetterJob, IncidentComment, NotificationSetting, 
-  EscalationRule, DeploymentEvent, Notification, KnowledgeEntry, Runbook 
+  EscalationRule, DeploymentEvent, Notification, KnowledgeEntry, Runbook,
+  Service, Environment, DependencyGraph, ReliabilityScore, Prediction, GlobalHealth,
+  WorkerHealth, QueueName
 } from '@queuewatch/shared';
 
 @Injectable()
@@ -188,6 +190,169 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         await this.redis.hset('queuewatch:runbooks', rb.id, JSON.stringify(rb));
       }
     }
+
+    // Seed default environments
+    const envsCount = await this.redis.hlen('queuewatch:environments');
+    if (envsCount === 0) {
+      const defaultEnvs = [
+        { id: 'env_prod', name: 'production', type: 'production' },
+        { id: 'env_staging', name: 'staging', type: 'staging' },
+        { id: 'env_dev', name: 'development', type: 'development' },
+      ];
+      for (const env of defaultEnvs) {
+        await this.redis.hset('queuewatch:environments', env.name, JSON.stringify(env));
+      }
+    }
+
+    // Seed default services
+    const servicesCount = await this.redis.hlen('queuewatch:services');
+    if (servicesCount === 0) {
+      const defaultServices = [
+        {
+          id: 'svc_order',
+          name: 'Order Service',
+          description: 'Ingests inbound purchases and processes checkout actions.',
+          environment: 'production',
+          owner: 'order-team',
+          status: 'healthy',
+          createdAt: Date.now() - 30 * 24 * 60 * 60 * 1000,
+          queues: [],
+          workers: [],
+          deployments: [],
+          incidents: [],
+        },
+        {
+          id: 'svc_payment',
+          name: 'Payment Service',
+          description: 'Communicates with Stripe and processes invoices.',
+          environment: 'production',
+          owner: 'finance-team',
+          status: 'degraded',
+          createdAt: Date.now() - 30 * 24 * 60 * 60 * 1000,
+          queues: ['webhook_delivery'],
+          workers: ['webhook_delivery'],
+          deployments: [],
+          incidents: [],
+        },
+        {
+          id: 'svc_notification',
+          name: 'Notification Service',
+          description: 'Dispatches newsletters and verification codes.',
+          environment: 'production',
+          owner: 'marketing-team',
+          status: 'healthy',
+          createdAt: Date.now() - 30 * 24 * 60 * 60 * 1000,
+          queues: ['email_notifications'],
+          workers: ['email_notifications'],
+          deployments: [],
+          incidents: [],
+        },
+        {
+          id: 'svc_media',
+          name: 'Media Service',
+          description: 'Resizes profiles and compresses user uploads.',
+          environment: 'production',
+          owner: 'media-team',
+          status: 'healthy',
+          createdAt: Date.now() - 30 * 24 * 60 * 60 * 1000,
+          queues: ['image_processing'],
+          workers: ['image_processing'],
+          deployments: [],
+          incidents: [],
+        },
+        {
+          id: 'svc_ai',
+          name: 'AI Worker Service',
+          description: 'Generates feedback loops via Ollama wrappers.',
+          environment: 'production',
+          owner: 'ai-team',
+          status: 'healthy',
+          createdAt: Date.now() - 30 * 24 * 60 * 60 * 1000,
+          queues: ['ai_tasks'],
+          workers: ['ai_tasks'],
+          deployments: [],
+          incidents: [],
+        }
+      ];
+      for (const svc of defaultServices) {
+        await this.redis.hset('queuewatch:services', svc.id, JSON.stringify(svc));
+      }
+    }
+
+    // Seed default dependency graph
+    const depExists = await this.redis.exists('queuewatch:dependency_graph');
+    if (!depExists) {
+      const defaultGraph = {
+        nodes: [
+          { id: 'svc_order', label: 'Order Service', type: 'service' },
+          { id: 'svc_payment', label: 'Payment Service', type: 'service' },
+          { id: 'svc_notification', label: 'Notification Service', type: 'service' },
+          { id: 'svc_media', label: 'Media Service', type: 'service' },
+          { id: 'svc_ai', label: 'AI Worker Service', type: 'service' },
+          { id: 'email_notifications', label: 'email_notifications', type: 'queue' },
+          { id: 'webhook_delivery', label: 'webhook_delivery', type: 'queue' },
+          { id: 'image_processing', label: 'image_processing', type: 'queue' },
+          { id: 'ai_tasks', label: 'ai_tasks', type: 'queue' }
+        ],
+        edges: [
+          { from: 'svc_order', to: 'webhook_delivery' },
+          { from: 'webhook_delivery', to: 'svc_payment' },
+          { from: 'svc_payment', to: 'email_notifications' },
+          { from: 'email_notifications', to: 'svc_notification' },
+          { from: 'svc_order', to: 'image_processing' },
+          { from: 'image_processing', to: 'svc_media' },
+          { from: 'svc_notification', to: 'ai_tasks' },
+          { from: 'ai_tasks', to: 'svc_ai' }
+        ],
+        serviceImpacts: {
+          svc_order: ['svc_payment', 'svc_notification', 'svc_media'],
+          svc_payment: ['svc_notification'],
+          svc_notification: ['svc_ai']
+        }
+      };
+      await this.redis.set('queuewatch:dependency_graph', JSON.stringify(defaultGraph));
+    }
+
+    // Seed default predictions
+    const predictionsCount = await this.redis.hlen('queuewatch:predictions');
+    if (predictionsCount === 0) {
+      const defaultPredictions = [
+        {
+          id: 'pred_1',
+          title: 'Backlog Saturation Risk',
+          riskScore: 78,
+          confidenceScore: 85,
+          estimatedImpact: 'Webhook Delivery Queue delayed by > 15 minutes, slowing checkout callback processing.',
+          recommendedActions: [
+            'Scale worker concurrency replicas to 4 channels',
+            'Throttle simulation background rates',
+            'Investigate Stripe callback API latencies'
+          ],
+          reason: 'Webhook queue backlog processing speed has dropped below job creation speed for the last 5 minutes.',
+          targetQueue: 'webhook_delivery',
+          targetService: 'Payment Service',
+          timestamp: Date.now(),
+        },
+        {
+          id: 'pred_2',
+          title: 'SMTP Rate Limit Cascade',
+          riskScore: 45,
+          confidenceScore: 72,
+          estimatedImpact: 'Email alerts will experience delays up to 10 minutes.',
+          recommendedActions: [
+            'Reduce retries threshold factor',
+            'Pause non-critical transaction alerts'
+          ],
+          reason: 'SendGrid error rate has spiked to 5% in the last 10 minutes.',
+          targetQueue: 'email_notifications',
+          targetService: 'Notification Service',
+          timestamp: Date.now(),
+        }
+      ];
+      for (const pred of defaultPredictions) {
+        await this.redis.hset('queuewatch:predictions', pred.id, JSON.stringify(pred));
+      }
+    }
   }
 
   // --- Users API ---
@@ -238,6 +403,23 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   async getTelemetryByQueue(queueName: string, limit = 50): Promise<TelemetryEvent[]> {
     const all = await this.getTelemetry(200);
     return all.filter(item => item.queueName === queueName).slice(0, limit);
+  }
+
+  async getWorkers(): Promise<WorkerHealth[]> {
+    const rawList = await this.redis.hvals('queuewatch:workers');
+    if (rawList.length > 0) {
+      return rawList.map(item => JSON.parse(item));
+    }
+    const queueNames: QueueName[] = ['email_notifications', 'webhook_delivery', 'image_processing', 'ai_tasks'];
+    return queueNames.map(name => ({
+      workerId: `worker_${name}_1`,
+      queueName: name,
+      status: 'healthy',
+      concurrency: name === 'email_notifications' ? 2 : 5,
+      cpuUsage: 12,
+      memoryUsage: 25,
+      lastActive: Date.now()
+    }));
   }
 
   // --- Logs Storage ---
@@ -410,5 +592,76 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
   async saveRunbook(runbook: Runbook) {
     await this.redis.hset('queuewatch:runbooks', runbook.id, JSON.stringify(runbook));
+  }
+
+  // --- V5 Service Registry ---
+  async getServices(): Promise<Service[]> {
+    const rawList = await this.redis.hvals('queuewatch:services');
+    return rawList.map(item => JSON.parse(item));
+  }
+
+  async getService(id: string): Promise<Service | null> {
+    const raw = await this.redis.hget('queuewatch:services', id);
+    return raw ? JSON.parse(raw) : null;
+  }
+
+  async saveService(service: Service) {
+    await this.redis.hset('queuewatch:services', service.id, JSON.stringify(service));
+  }
+
+  async deleteService(id: string) {
+    await this.redis.hdel('queuewatch:services', id);
+  }
+
+  async getEnvironments(): Promise<Environment[]> {
+    const rawList = await this.redis.hvals('queuewatch:environments');
+    return rawList.map(item => JSON.parse(item));
+  }
+
+  async saveEnvironment(env: Environment) {
+    await this.redis.hset('queuewatch:environments', env.name, JSON.stringify(env));
+  }
+
+  // --- V5 Dependency Graph ---
+  async getDependencyGraph(): Promise<DependencyGraph> {
+    const raw = await this.redis.get('queuewatch:dependency_graph');
+    if (raw) return JSON.parse(raw);
+    return { nodes: [], edges: [], serviceImpacts: {} };
+  }
+
+  async saveDependencyGraph(graph: DependencyGraph) {
+    await this.redis.set('queuewatch:dependency_graph', JSON.stringify(graph));
+  }
+
+  // --- V5 Reliability Scores ---
+  async getReliabilityScores(): Promise<ReliabilityScore[]> {
+    const rawList = await this.redis.hvals('queuewatch:reliability_scores');
+    return rawList.map(item => JSON.parse(item));
+  }
+
+  async saveReliabilityScore(score: ReliabilityScore) {
+    await this.redis.hset('queuewatch:reliability_scores', `${score.targetType}:${score.targetId}`, JSON.stringify(score));
+    await this.redis.lpush(`queuewatch:reliability_history:${score.targetId}`, JSON.stringify(score));
+    await this.redis.ltrim(`queuewatch:reliability_history:${score.targetId}`, 0, 99);
+  }
+
+  async getReliabilityHistory(targetId: string): Promise<ReliabilityScore[]> {
+    const list = await this.redis.lrange(`queuewatch:reliability_history:${targetId}`, 0, -1);
+    return list.map(item => JSON.parse(item));
+  }
+
+  // --- V5 Predictions ---
+  async getPredictions(): Promise<Prediction[]> {
+    const rawList = await this.redis.hvals('queuewatch:predictions');
+    return rawList.map(item => JSON.parse(item)).sort((a, b) => b.timestamp - a.timestamp);
+  }
+
+  async getPrediction(id: string): Promise<Prediction | null> {
+    const raw = await this.redis.hget('queuewatch:predictions', id);
+    return raw ? JSON.parse(raw) : null;
+  }
+
+  async savePrediction(pred: Prediction) {
+    await this.redis.hset('queuewatch:predictions', pred.id, JSON.stringify(pred));
   }
 }
