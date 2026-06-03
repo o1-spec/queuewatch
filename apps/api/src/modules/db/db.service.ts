@@ -4,7 +4,7 @@ import Redis from 'ioredis';
 import { 
   User, Incident, TelemetryEvent, LogEntry, AlertRule, AlertNotification, 
   InvestigationReport, DeadLetterJob, IncidentComment, NotificationSetting, 
-  EscalationRule, DeploymentEvent, Notification 
+  EscalationRule, DeploymentEvent, Notification, KnowledgeEntry, Runbook 
 } from '@queuewatch/shared';
 
 @Injectable()
@@ -118,6 +118,74 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
       for (const rule of defaultEscRules) {
         await this.redis.hset('queuewatch:escalation_rules', rule.id, JSON.stringify(rule));
+      }
+    }
+
+    // Seed default knowledge base entries
+    const knowCount = await this.redis.hlen('queuewatch:knowledge_base');
+    if (knowCount === 0) {
+      const defaultKnowledge = [
+        {
+          id: 'know_smtp_ratelimit',
+          title: 'Outbound SMTP Rate Limiting',
+          incidentId: 'inc_smtp_legacy',
+          pattern: 'SMTP 429 Rate Limit Exceeded',
+          rootCause: 'Third party email provider (SendGrid/Mailgun) returned rate limit errors.',
+          resolution: 'Configure concurrency limiting on the email_notifications queue worker and adjust exponential retry backoff parameters.',
+          preventionRecommendation: 'Apply rate limits globally across email tasks.',
+          createdAt: Date.now() - 3 * 24 * 60 * 60 * 1000,
+        },
+        {
+          id: 'know_worker_leak',
+          title: 'Worker Process Memory Leak',
+          incidentId: 'inc_leak_legacy',
+          pattern: 'Heap Out Of Memory Delays',
+          rootCause: 'Image resizing library holding canvas references in closure leaks memory.',
+          resolution: 'Nullify canvas instances explicitly in completion handlers or upgrade node-sharp package.',
+          preventionRecommendation: 'Monitor worker memory metrics closely and apply heap limit restarts.',
+          createdAt: Date.now() - 5 * 24 * 60 * 60 * 1000,
+        }
+      ];
+
+      for (const entry of defaultKnowledge) {
+        await this.redis.hset('queuewatch:knowledge_base', entry.id, JSON.stringify(entry));
+      }
+    }
+
+    // Seed default runbooks
+    const runbooksCount = await this.redis.hlen('queuewatch:runbooks');
+    if (runbooksCount === 0) {
+      const defaultRunbooks = [
+        {
+          id: 'run_smtp_ratelimit',
+          incidentType: 'SMTP Rate Limiting',
+          title: 'SMTP Outbound Rate Limiting Runbook',
+          steps: [
+            'Verify SendGrid/Mailgun status page for external outages.',
+            'Access simulation control panel and throttle queue traffic.',
+            'Scale email_notifications worker concurrency settings to 1 or 2.',
+            'Execute dead-letter replay jobs for pending emails.'
+          ],
+          linkedIncidentIds: [],
+          createdAt: Date.now() - 2 * 24 * 60 * 60 * 1000,
+        },
+        {
+          id: 'run_dlq_growth',
+          incidentType: 'Dead-Letter growth',
+          title: 'Dead-Letter Queue Recovery Runbook',
+          steps: [
+            'Retrieve last 5 failed jobs from dead-letter queue metrics.',
+            'Inspect payload properties to see if validation errors exist.',
+            'If payloads are correct, replay dead-letter jobs.',
+            'If code error exists, roll back recent deployment version.'
+          ],
+          linkedIncidentIds: [],
+          createdAt: Date.now() - 4 * 24 * 60 * 60 * 1000,
+        }
+      ];
+
+      for (const rb of defaultRunbooks) {
+        await this.redis.hset('queuewatch:runbooks', rb.id, JSON.stringify(rb));
       }
     }
   }
@@ -317,5 +385,30 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   async saveNotification(notif: Notification) {
     await this.redis.lpush('queuewatch:notifications', JSON.stringify(notif));
     await this.redis.ltrim('queuewatch:notifications', 0, 499); // Keep last 500 notifications
+  }
+
+  // --- V4 Knowledge Base ---
+  async getKnowledgeEntries(): Promise<KnowledgeEntry[]> {
+    const rawList = await this.redis.hvals('queuewatch:knowledge_base');
+    return rawList.map(item => JSON.parse(item)).sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  async saveKnowledgeEntry(entry: KnowledgeEntry) {
+    await this.redis.hset('queuewatch:knowledge_base', entry.id, JSON.stringify(entry));
+  }
+
+  // --- V4 Runbooks ---
+  async getRunbooks(): Promise<Runbook[]> {
+    const rawList = await this.redis.hvals('queuewatch:runbooks');
+    return rawList.map(item => JSON.parse(item)).sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  async getRunbook(id: string): Promise<Runbook | null> {
+    const raw = await this.redis.hget('queuewatch:runbooks', id);
+    return raw ? JSON.parse(raw) : null;
+  }
+
+  async saveRunbook(runbook: Runbook) {
+    await this.redis.hset('queuewatch:runbooks', runbook.id, JSON.stringify(runbook));
   }
 }

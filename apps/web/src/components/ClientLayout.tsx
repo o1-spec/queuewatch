@@ -21,7 +21,11 @@ import {
   X,
   GitCommit,
   Bell,
-  ShieldAlert
+  ShieldAlert,
+  Sparkles,
+  BookOpen,
+  History,
+  FileText
 } from 'lucide-react';
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
@@ -42,6 +46,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     { name: 'Queues Registry Catalog', path: '/queues', desc: 'List active Redis BullMQ channels, pause/resume workers', icon: Layers },
     { name: 'Incident Exceptions Workspace', path: '/incidents', desc: 'Inspect failing job parameters and Zod validations', icon: AlertCircle },
     { name: 'Dead-Letter Queue Pool', path: '/dead-letter', desc: 'Trace max retry crashes, audit payload stacktraces', icon: Inbox },
+    { name: 'Reliability Copilot Chat', path: '/copilot', desc: 'Ask operational questions and trace grounded SRE telemetry', icon: Sparkles },
+    { name: 'Recurring failure patterns', path: '/recurring-incidents', desc: 'Audit repeat error patterns and preventions', icon: History },
+    { name: 'Recovery runbooks manual', path: '/runbooks', desc: 'Step-by-step resolution guides', icon: FileText },
+    { name: 'SRE Knowledge Base', path: '/knowledge-base', desc: 'Search historical resolved incident learnings', icon: BookOpen },
     { name: 'Simulation Control Sandbox', path: '/settings', desc: 'Inject synthetic traffic and simulate SMTP/Stripe bottlenecks', icon: Sliders },
   ];
 
@@ -215,6 +223,22 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           <Link href="/dead-letter" className={navItemClass('/dead-letter')}>
             <Inbox className={navIconClass('/dead-letter')} />
             <span>Dead Letter</span>
+          </Link>
+          <Link href="/copilot" className={navItemClass('/copilot')}>
+            <Sparkles className={navIconClass('/copilot')} />
+            <span>Reliability Copilot</span>
+          </Link>
+          <Link href="/recurring-incidents" className={navItemClass('/recurring-incidents')}>
+            <History className={navIconClass('/recurring-incidents')} />
+            <span>Recurring Failures</span>
+          </Link>
+          <Link href="/runbooks" className={navItemClass('/runbooks')}>
+            <FileText className={navIconClass('/runbooks')} />
+            <span>Recovery Runbooks</span>
+          </Link>
+          <Link href="/knowledge-base" className={navItemClass('/knowledge-base')}>
+            <BookOpen className={navIconClass('/knowledge-base')} />
+            <span>Knowledge Base</span>
           </Link>
           <Link href="/deployments" className={navItemClass('/deployments')}>
             <GitCommit className={navIconClass('/deployments')} />

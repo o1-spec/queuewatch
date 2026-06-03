@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import useSocket from '../../hooks/useSocket';
+import Link from 'next/link';
 import { QueueMetrics, WorkerHealth, QueueName, Incident } from '@queuewatch/shared';
-import { CheckCircle2, Activity, Skull, Clock, AlertTriangle, Play, Sparkles, Server } from 'lucide-react';
+import { CheckCircle2, Activity, Skull, Clock, AlertTriangle, Play, Sparkles, Server, GitCommit, BellRing } from 'lucide-react';
 import { MetricCard } from '../../components/MetricCard';
 import { QueueCard } from '../../components/QueueCard';
 import { WorkerCard } from '../../components/WorkerCard';
@@ -22,17 +23,25 @@ export default function DashboardOverview() {
   const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
   const [deadLettersCount, setDeadLettersCount] = useState(0);
   const [toggleLoading, setToggleLoading] = useState<string | null>(null);
+
+  // V4 states for Reliability Insights Widget
+  const [recurringCount, setRecurringCount] = useState(0);
+  const [deploymentsCount, setDeploymentsCount] = useState(0);
+  const [notificationsCount, setNotificationsCount] = useState(0);
   
   const [aiReport, setAiReport] = useState<AIAnalysisReport | null>(null);
   const [aiLoading, setAiLoading] = useState(true);
 
   const loadData = async () => {
     try {
-      const [queuesRes, dlqRes, incidentsRes, workersRes] = await Promise.all([
+      const [queuesRes, dlqRes, incidentsRes, workersRes, recurringRes, deploymentsRes, notificationsRes] = await Promise.all([
         authFetch(`${API_URL}/api/queues`),
         authFetch(`${API_URL}/api/queues/dead_letter_queue/jobs`),
         authFetch(`${API_URL}/api/incidents`),
         authFetch(`${API_URL}/api/workers`),
+        authFetch(`${API_URL}/api/copilot/recurring-incidents`),
+        authFetch(`${API_URL}/api/deployments`),
+        authFetch(`${API_URL}/api/notifications`),
       ]);
       
       if (queuesRes.ok) {
@@ -64,6 +73,21 @@ export default function DashboardOverview() {
       if (workersRes.ok) {
         const workersData = await workersRes.json();
         setWorkers(workersData);
+      }
+
+      if (recurringRes && recurringRes.ok) {
+        const data = await recurringRes.json();
+        setRecurringCount(data.length || 0);
+      }
+
+      if (deploymentsRes && deploymentsRes.ok) {
+        const data = await deploymentsRes.json();
+        setDeploymentsCount(data.length || 0);
+      }
+
+      if (notificationsRes && notificationsRes.ok) {
+        const data = await notificationsRes.json();
+        setNotificationsCount(data.length || 0);
       }
     } catch (err) {
       console.error('Failed to load initial REST telemetry:', err);
@@ -259,6 +283,45 @@ export default function DashboardOverview() {
           icon={Clock}
           iconColor="text-zinc-400"
         />
+      </div>
+
+      {/* Reliability Insights Widget */}
+      <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-5 space-y-3">
+        <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
+          <div>
+            <h3 className="font-bold text-xs font-mono text-white tracking-tight uppercase flex items-center space-x-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Reliability Insights & Signal Correlation</span>
+            </h3>
+            <p className="text-[10px] text-zinc-555 font-mono">Cross-signal correlation timelines and chronic failure patterns</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Link href="/deployments" className="bg-zinc-905 border border-zinc-900 p-4 rounded hover:border-zinc-800 transition-all flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-zinc-555 uppercase text-[9px] font-bold block">Active Deployments</span>
+              <span className="text-xl font-bold text-white">{deploymentsCount} releases</span>
+            </div>
+            <GitCommit className="w-6 h-6 text-indigo-400 shrink-0" />
+          </Link>
+
+          <Link href="/recurring-incidents" className="bg-zinc-905 border border-zinc-900 p-4 rounded hover:border-zinc-800 transition-all flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-zinc-555 uppercase text-[9px] font-bold block">Recurring failure spikes</span>
+              <span className="text-xl font-bold text-white">{recurringCount} signature groups</span>
+            </div>
+            <AlertTriangle className="w-6 h-6 text-amber-500 shrink-0" />
+          </Link>
+
+          <Link href="/notifications" className="bg-zinc-905 border border-zinc-900 p-4 rounded hover:border-zinc-800 transition-all flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-zinc-555 uppercase text-[9px] font-bold block">Memory & SLA Alerts</span>
+              <span className="text-xl font-bold text-white">{notificationsCount} dispatched</span>
+            </div>
+            <BellRing className="w-6 h-6 text-rose-450 shrink-0" />
+          </Link>
+        </div>
       </div>
 
       {/* Main Dual Grid */}

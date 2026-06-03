@@ -29,10 +29,35 @@ export default function IncidentsRegistry() {
   const [deployments, setDeployments] = useState<Record<string, any[]>>({});
   const [replayLoading, setReplayLoading] = useState<string | null>(null);
 
+  // V4 states & resources
+  const [copilotResponses, setCopilotResponses] = useState<Record<string, any>>({});
+  const [copilotLoading, setCopilotLoading] = useState<Record<string, boolean>>({});
+  const [copilotChatQuery, setCopilotChatQuery] = useState<Record<string, string>>({});
+  const [showActionConfirmation, setShowActionConfirmation] = useState<{ action: () => void; message: string } | null>(null);
+
   // Workflows
   const [showResolveModal, setShowResolveModal] = useState<string | null>(null);
   const [resolutionText, setResolutionText] = useState('');
   const [newCommentText, setNewCommentText] = useState<Record<string, string>>({});
+
+  const loadCopilotResponse = async (incidentId: string, customPrompt?: string) => {
+    setCopilotLoading(prev => ({ ...prev, [incidentId]: true }));
+    try {
+      const res = await authFetch(`${API_URL}/api/copilot/incident/${incidentId}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: customPrompt || 'Analyze this incident and recommend recovery steps.' }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCopilotResponses(prev => ({ ...prev, [incidentId]: data }));
+      }
+    } catch (e) {
+      console.error('Failed to load copilot response:', e);
+    } finally {
+      setCopilotLoading(prev => ({ ...prev, [incidentId]: false }));
+    }
+  };
 
   const loadIncidents = async () => {
     try {
@@ -162,6 +187,7 @@ export default function IncidentsRegistry() {
     if (tab === 'dlq') loadIncidentDlq(incidentId, queueName);
     if (tab === 'comments') loadComments(incidentId);
     if (tab === 'deployments') loadDeployments(incidentId);
+    if (tab === 'copilot') loadCopilotResponse(incidentId);
   };
 
   const runInvestigation = async (id: string, queueName: string) => {
@@ -524,6 +550,16 @@ export default function IncidentsRegistry() {
                         <ShieldAlert className="w-3.5 h-3.5" />
                         <span>DLQ Jobs</span>
                       </button>
+
+                      <button
+                        onClick={() => handleTabChange(inc.id, inc.affectedQueue, 'copilot')}
+                        className={`px-3 py-1.5 border-t-2 -mb-px transition-all uppercase flex items-center space-x-1 ${
+                          currentTab === 'copilot' ? 'border-indigo-500 text-white bg-zinc-900/40' : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                        }`}
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+                        <span>Reliability Copilot</span>
+                      </button>
                     </div>
 
                     {/* Tab Contents */}
@@ -855,6 +891,184 @@ export default function IncidentsRegistry() {
                         </div>
                       )}
 
+                      {/* Reliability Copilot Tab */}
+                      {currentTab === 'copilot' && (
+                        <div className="space-y-4 font-mono">
+                          {copilotLoading[inc.id] ? (
+                            <div className="text-zinc-500 animate-pulse py-6">Consulting Reliability Copilot...</div>
+                          ) : !copilotResponses[inc.id] ? (
+                            <div className="bg-zinc-950 border border-zinc-900 p-8 rounded text-center space-y-3">
+                              <Sparkles className="w-6 h-6 text-indigo-400 mx-auto animate-pulse" />
+                              <h3 className="text-white font-bold uppercase">Reliability Copilot Offline</h3>
+                              <p className="text-zinc-550 text-xs font-sans max-w-md mx-auto">
+                                Failed to retrieve copilot diagnostics.
+                              </p>
+                              <button
+                                onClick={() => loadCopilotResponse(inc.id)}
+                                className="px-3 py-1.5 rounded bg-indigo-900/40 hover:bg-indigo-950 border border-indigo-900 text-indigo-200 text-[10px] font-bold"
+                              >
+                                RETRY COPILOT CONSULT
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="space-y-4">
+                              {/* Confidence Score Panel */}
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="bg-zinc-900/20 border border-zinc-900 p-4 rounded-lg space-y-2">
+                                  <span className="text-zinc-555 uppercase text-[9px] font-bold block">CONFIDENCE SCORE</span>
+                                  <div className="flex items-baseline space-x-1.5">
+                                    <span className={`text-2xl font-bold ${copilotResponses[inc.id].confidenceScore <= 40 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                      {copilotResponses[inc.id].confidenceScore}%
+                                    </span>
+                                    <span className="text-zinc-500 text-[9px] uppercase">
+                                      {copilotResponses[inc.id].confidenceScore <= 40 ? 'Low Confidence' : 'High Confidence'}
+                                    </span>
+                                  </div>
+                                  
+                                  {copilotResponses[inc.id].confidenceScore <= 40 && (
+                                    <div className="mt-2 text-rose-450 border border-rose-950 bg-rose-950/15 p-2 rounded text-[9px] font-bold leading-normal">
+                                      <div>CONFIDENCE: LOW</div>
+                                      <div>REASON: No related logs or deployment events found.</div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="bg-zinc-900/20 border border-zinc-900 p-4 rounded-lg space-y-2 md:col-span-2">
+                                  <span className="text-zinc-555 uppercase text-[9px] font-bold block">COPILOT ANALYSIS</span>
+                                  <p className="text-zinc-300 font-sans text-xs whitespace-pre-wrap leading-relaxed">
+                                    {copilotResponses[inc.id].answer}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Grounded Evidence Checklist */}
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                <div className="bg-zinc-900/20 border border-zinc-900 p-4 rounded-lg space-y-3">
+                                  <span className="text-zinc-555 uppercase text-[9px] font-bold block">GROUNDED TELEMETRY EVIDENCE</span>
+                                  {copilotResponses[inc.id].evidence && copilotResponses[inc.id].evidence.length > 0 ? (
+                                    <ul className="space-y-1.5 font-mono text-zinc-350 text-xs">
+                                      {copilotResponses[inc.id].evidence.map((ev: string, idx: number) => (
+                                        <li key={idx} className="flex items-start space-x-2 bg-black/20 p-2 border border-zinc-900 rounded">
+                                          <span className="text-indigo-400 font-bold shrink-0 mt-0.5">&bull;</span>
+                                          <span>{ev}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <p className="text-zinc-550 text-xs font-sans">No primary telemetry evidence was linked to this claim.</p>
+                                  )}
+                                </div>
+
+                                {/* Suggested Recovery Actions */}
+                                <div className="bg-zinc-900/20 border border-zinc-900 p-4 rounded-lg space-y-3">
+                                  <span className="text-zinc-555 uppercase text-[9px] font-bold block">RECOMMENDED RECOVERY ACTIONS</span>
+                                  {copilotResponses[inc.id].recommendedActions && copilotResponses[inc.id].recommendedActions.length > 0 ? (
+                                    <div className="space-y-3">
+                                      <ul className="space-y-1.5 font-sans text-zinc-350 text-xs">
+                                        {copilotResponses[inc.id].recommendedActions.map((act: string, idx: number) => (
+                                          <li key={idx} className="flex items-start space-x-2">
+                                            <span className="text-amber-500 font-bold font-mono text-[10px] shrink-0 mt-0.5">&rarr;</span>
+                                            <span>{act}</span>
+                                          </li>
+                                        ))}
+                                      </ul>
+
+                                      <div className="border-t border-zinc-900 pt-3 flex flex-wrap gap-2">
+                                        {/* Recovery triggers - Claim, Replay DLQ, Pause Queue */}
+                                        <button
+                                          onClick={() => {
+                                            setShowActionConfirmation({
+                                              message: "This action will claim ownership and assign you to investigate this incident.",
+                                              action: () => handleAssign(inc.id, 'admin', 'Admin Owner')
+                                            });
+                                          }}
+                                          className="px-2.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 text-[9.5px] font-bold"
+                                        >
+                                          CLAIM INCIDENT
+                                        </button>
+
+                                        <button
+                                          onClick={() => {
+                                            setShowActionConfirmation({
+                                              message: "This action will replay all dead-letter queue jobs for this incident queue.",
+                                              action: () => {
+                                                // Replay all jobs by looping or using incident DLQ if any
+                                                const dlqJobs = incidentDlq[inc.id] || [];
+                                                if (dlqJobs.length === 0) {
+                                                  alert("No DLQ jobs loaded yet in tab. Try loading DLQ Jobs tab first.");
+                                                  return;
+                                                }
+                                                dlqJobs.forEach((job: any) => {
+                                                  handleReplayDlq(inc.id, inc.affectedQueue, job.id);
+                                                });
+                                              }
+                                            });
+                                          }}
+                                          className="px-2.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 text-emerald-450 border border-zinc-800 text-[9.5px] font-bold"
+                                        >
+                                          REPLAY ALL DLQ JOBS
+                                        </button>
+
+                                        <button
+                                          onClick={() => {
+                                            setShowActionConfirmation({
+                                              message: `This action will pause all background consumers processing queue '${inc.affectedQueue}'.`,
+                                              action: async () => {
+                                                try {
+                                                  await authFetch(`${API_URL}/api/queues/${inc.affectedQueue}/pause`, { method: 'POST' });
+                                                  alert(`Queue ${inc.affectedQueue} paused.`);
+                                                } catch (e) {
+                                                  console.error(e);
+                                                }
+                                              }
+                                            });
+                                          }}
+                                          className="px-2.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 text-rose-450 border border-zinc-800 text-[9.5px] font-bold"
+                                        >
+                                          PAUSE QUEUE CONSUMERS
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <p className="text-zinc-550 text-xs font-sans">No recovery actions recommended.</p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Copilot Chat Input */}
+                              <div className="border-t border-zinc-900 pt-4 space-y-3">
+                                <span className="text-zinc-555 uppercase text-[9px] font-bold block">ASK COPILOT FOLLOW-UP QUESTION</span>
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    placeholder="e.g., Why did this occur after the webhook release?"
+                                    value={copilotChatQuery[inc.id] || ''}
+                                    onChange={(e) => setCopilotChatQuery(prev => ({ ...prev, [inc.id]: e.target.value }))}
+                                    className="flex-1 bg-black/40 border border-zinc-900 rounded px-2.5 py-1.5 text-white focus:outline-none focus:border-zinc-800 text-xs font-sans"
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && copilotChatQuery[inc.id]) {
+                                        loadCopilotResponse(inc.id, copilotChatQuery[inc.id]);
+                                        setCopilotChatQuery(prev => ({ ...prev, [inc.id]: '' }));
+                                      }
+                                    }}
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      if (copilotChatQuery[inc.id]) {
+                                        loadCopilotResponse(inc.id, copilotChatQuery[inc.id]);
+                                        setCopilotChatQuery(prev => ({ ...prev, [inc.id]: '' }));
+                                      }
+                                    }}
+                                    className="px-3 py-1.5 rounded bg-zinc-900 hover:bg-zinc-800 text-white font-bold border border-zinc-800"
+                                  >
+                                    ASK
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center space-x-4 text-[9px] text-zinc-500 font-bold border-t border-zinc-900/40 pt-2.5">
@@ -915,6 +1129,44 @@ export default function IncidentsRegistry() {
                 className="px-3 py-1.5 rounded bg-emerald-900 hover:bg-emerald-950 text-white border border-emerald-800 font-bold"
               >
                 CONFIRM RESOLUTION
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+      {/* SAFE RECOVERY ACTION CONFIRMATION MODAL */}
+      {showActionConfirmation && (
+        <>
+          <div onClick={() => setShowActionConfirmation(null)} className="fixed inset-0 bg-black/75 backdrop-blur-xs z-50 transition-opacity"></div>
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-zinc-950 border border-rose-900 p-6 rounded-lg shadow-2xl z-50 font-mono text-[10px] text-zinc-350 space-y-4">
+            <div className="border-b border-rose-950 pb-3 flex items-center space-x-2 text-rose-400">
+              <ShieldAlert className="w-5 h-5 shrink-0 animate-bounce" />
+              <span className="text-[11px] font-bold uppercase tracking-wider">Manual Action Warning</span>
+            </div>
+            
+            <div className="p-3 bg-rose-950/10 border border-rose-900/30 rounded text-rose-350 text-xs font-sans leading-relaxed">
+              <strong>This action requires manual engineer execution.</strong>
+            </div>
+
+            <p className="text-[10px] text-zinc-450 font-sans leading-relaxed">
+              {showActionConfirmation.message}
+            </p>
+
+            <div className="flex justify-end space-x-2 pt-2">
+              <button
+                onClick={() => setShowActionConfirmation(null)}
+                className="px-3 py-1.5 rounded bg-zinc-900 hover:bg-zinc-855 border border-zinc-800 text-zinc-400 font-bold"
+              >
+                ABORT
+              </button>
+              <button
+                onClick={() => {
+                  showActionConfirmation.action();
+                  setShowActionConfirmation(null);
+                }}
+                className="px-3 py-1.5 rounded bg-rose-900 hover:bg-rose-950 text-white border border-rose-800 font-bold"
+              >
+                EXECUTE MANUALLY
               </button>
             </div>
           </div>

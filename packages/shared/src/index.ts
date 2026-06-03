@@ -192,4 +192,43 @@ export interface Notification {
   timestamp: number;
 }
 
+export interface KnowledgeEntry {
+  id: string;
+  title: string;
+  incidentId: string;
+  pattern: string;
+  rootCause: string;
+  resolution: string;
+  preventionRecommendation: string;
+  createdAt: number;
+}
+
+export interface Runbook {
+  id: string;
+  incidentType: string;
+  title: string;
+  steps: string[];
+  linkedIncidentIds: string[];
+  createdAt: number;
+}
+
+export interface RecurringIncident {
+  id: string;
+  pattern: string;
+  frequency: number;
+  lastOccurrence: number;
+  rootCause: string;
+  recommendedPrevention: string;
+  incidentIds: string[];
+}
+
+export interface CopilotResponse {
+  answer: string;
+  evidence: string[];
+  confidenceScore: number;
+  recommendedActions: string[];
+  relatedIncidents: string[];
+  relatedDeployments: string[];
+}
+
 

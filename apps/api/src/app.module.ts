@@ -15,6 +15,7 @@ import { AgentModule } from './modules/agent/agent.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { DeploymentsModule } from './modules/deployments/deployments.module';
 import { EscalationModule } from './modules/escalation/escalation.module';
+import { CopilotModule } from './modules/copilot/copilot.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { EscalationModule } from './modules/escalation/escalation.module';
     NotificationsModule,
     DeploymentsModule,
     EscalationModule,
+    CopilotModule,
   ],
 })
 export class AppModule {}

@@ -152,6 +152,23 @@ export class IncidentsService {
       resolutionSummary,
     });
 
+    // V4: Automatically generate Knowledge Base entry on resolution
+    try {
+      await this.dbService.saveKnowledgeEntry({
+        id: `know_${Math.random().toString(36).substr(2, 9)}`,
+        title: `Resolution: ${incident.title}`,
+        incidentId: incident.id,
+        pattern: incident.title,
+        rootCause: incident.suspectedRootCause || 'Unverified thread resource exception.',
+        resolution: summary || 'Manual service restart.',
+        preventionRecommendation: incident.recommendation || 'No custom recommendation.',
+        createdAt: now,
+      });
+      this.logger.log(`Automatically registered Knowledge Base entry for incident ${id}.`);
+    } catch (e) {
+      this.logger.error(`Failed to register knowledge base entry: ${e.message}`);
+    }
+
     this.wsGateway.broadcast('incident.resolved', updated);
     this.wsGateway.broadcast('postmortem.generated', { incidentId: id, resolutionSummary });
     return updated;
