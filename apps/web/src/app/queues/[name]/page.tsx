@@ -52,7 +52,7 @@ export default function QueueDetailPage({ params }: { params: { name: string } }
 
   // Hook real-time websocket metrics
   useSocket({
-    'queue.metrics.updated': (data: QueueMetrics[]) => {
+    'metrics.updated': (data: QueueMetrics[]) => {
       const match = data.find((m) => m.queueName === queueName);
       if (match) {
         setMetrics(match);

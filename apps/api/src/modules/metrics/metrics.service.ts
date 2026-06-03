@@ -1,6 +1,9 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger, Inject, forwardRef } from '@nestjs/common';
 import { QueuesService } from '../queues/queues.service';
 import { QueueWebSocketGateway } from '../websocket/websocket.gateway';
+import { IncidentsService } from '../incidents/incidents.service';
+import { AlertsService } from '../alerts/alerts.service';
+import { QueueName } from '@queuewatch/shared';
 
 @Injectable()
 export class MetricsService implements OnModuleInit, OnModuleDestroy {
@@ -14,9 +17,12 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @Inject(forwardRef(() => QueuesService))
     private queuesService: QueuesService,
-    private wsGateway: QueueWebSocketGateway
+    private wsGateway: QueueWebSocketGateway,
+    @Inject(forwardRef(() => IncidentsService))
+    private incidentsService: IncidentsService,
+    private alertsService: AlertsService
   ) {
-    const queueNames = ['email_queue', 'image_processing_queue', 'webhook_delivery_queue', 'ai_task_queue'];
+    const queueNames = ['email_notifications', 'webhook_delivery', 'image_processing', 'ai_tasks'];
     for (const name of queueNames) {
       this.latencyWindow.set(name, [750, 900, 1100]); // Seed starting samples
       this.completedTick.set(name, 0);
@@ -53,6 +59,46 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
       const activeQueues = this.queuesService.getAllQueues();
       const metricsList: any[] = [];
 
+      // Get DLQ count
+      let dlqCount = 0;
+      const dlq = this.queuesService.getQueue('dead_letter_queue');
+      if (dlq) {
+        dlqCount = await dlq.getWaitingCount();
+      }
+
+      // Mocked worker reports for evaluation (WorkersService broadcasts real ones)
+      const config = this.queuesService.simConfig.getConfig();
+      const queueNames = ['email_notifications', 'webhook_delivery', 'image_processing', 'ai_tasks'];
+      const workerHealthList = queueNames.map((name) => {
+        let status: 'healthy' | 'overloaded' | 'down' = 'healthy';
+        let cpuUsage = 5 + Math.random() * 15;
+        let memoryUsage = 20 + Math.random() * 25;
+
+        if (config.simulateWorkerSlowdown) {
+          status = 'overloaded';
+          cpuUsage = 85 + Math.random() * 10;
+          memoryUsage = 70 + Math.random() * 15;
+        } else if (
+          (config.simulateSmtpFailure && name === 'email_notifications') ||
+          (config.simulateWebhookOutage && name === 'webhook_delivery') ||
+          config.simulateTimeoutFailure
+        ) {
+          status = 'down';
+          cpuUsage = 2 + Math.random() * 3;
+          memoryUsage = 15 + Math.random() * 5;
+        }
+
+        return {
+          workerId: `worker_${name}_1`,
+          queueName: name as QueueName,
+          status,
+          concurrency: name === 'email_notifications' ? 2 : 5,
+          cpuUsage: Math.round(cpuUsage),
+          memoryUsage: Math.round(memoryUsage),
+          lastActive: Date.now(),
+        };
+      });
+
       for (const [name, queue] of activeQueues) {
         if (name === 'dead_letter_queue') continue;
 
@@ -77,6 +123,18 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
         const throughput = tickCount * 30; // convert jobs/2s to jobs/min
         this.completedTick.set(name, 0); // reset tick
 
+        const totalJobs = completed + failed;
+        const failureRate = totalJobs > 0 ? (failed / totalJobs) * 100 : 0;
+        const retryRate = failed > 0 ? (failed / totalJobs) * 50 : 0;
+
+        // Worker health score calculation
+        const matchingWorker = workerHealthList.find(w => w.queueName === name);
+        let workerHealthScore = 100;
+        if (matchingWorker) {
+          if (matchingWorker.status === 'down') workerHealthScore = 0;
+          else if (matchingWorker.status === 'overloaded') workerHealthScore = 50;
+        }
+
         metricsList.push({
           queueName: name,
           waitingCount: waiting,
@@ -86,15 +144,26 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
           delayedCount: delayed,
           paused: isPaused,
           throughput: this.queuesService.simConfig.getConfig().generateTraffic && throughput === 0
-            ? Math.round(15 + Math.random() * 15) // Seed a small workload visual if traffic is active but tick was empty
+            ? Math.round(15 + Math.random() * 15)
             : throughput,
           averageLatency: averageLatency || Math.round(800 + Math.random() * 300),
+          failureRate: Math.round(failureRate),
+          retryRate: Math.round(retryRate),
+          backlogGrowth: waiting > 10 ? Math.round(waiting * 0.15) : 0,
+          deadLetterCount: dlqCount,
+          workerHealthScore,
           timestamp: Date.now(),
         });
       }
 
-      // Stream to Socket.IO connected clients
-      this.wsGateway.broadcast('queue.metrics.updated', metricsList);
+      // Stream metrics update using V1 websocket event: metrics.updated
+      this.wsGateway.broadcast('metrics.updated', metricsList);
+
+      // Invoke incident detector
+      await this.incidentsService.evaluateSystemState(metricsList, workerHealthList, dlqCount);
+
+      // Evaluate alert rules
+      await this.alertsService.evaluateRules(metricsList);
     } catch (err) {
       this.logger.error('Failed to run metrics aggregation:', err.message);
     }

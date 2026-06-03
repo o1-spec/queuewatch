@@ -17,10 +17,27 @@ export default function DeadLetterExplorer() {
 
   const loadDLQ = async () => {
     try {
-      const res = await authFetch(`${API_URL}/api/queues/dead_letter_queue/jobs?limit=100`);
+      const res = await authFetch(`${API_URL}/api/dead-letter`);
       if (res.ok) {
         const data = await res.json();
-        setDlqJobs(data);
+        const mapped = data.map((j: any) => ({
+          id: j.id,
+          name: j.jobName || j.name || 'Job',
+          queueName: j.queueName,
+          status: j.replayStatus || 'pending',
+          attemptsMade: j.attemptsMade,
+          maxAttempts: j.maxAttempts,
+          failedReason: j.failedReason || 'Max attempts reached',
+          timestamp: j.timestamp,
+          data: {
+            originalQueue: j.queueName,
+            originalJobName: j.jobName || j.name || 'Job',
+            originalData: j.payload || {},
+            failedAt: j.timestamp,
+            errorStack: Array.isArray(j.stackTrace) ? j.stackTrace.join('\n') : (j.stackTrace || j.failedReason || ''),
+          }
+        }));
+        setDlqJobs(mapped);
       }
     } catch (e) {
       console.error('Failed to load Dead-Letter Queue:', e);
@@ -42,7 +59,7 @@ export default function DeadLetterExplorer() {
   const handleReplay = async (jobId: string) => {
     setReplayLoading(jobId);
     try {
-      const res = await authFetch(`${API_URL}/api/queues/jobs/${jobId}/replay`, {
+      const res = await authFetch(`${API_URL}/api/dead-letter/${jobId}/replay`, {
         method: 'POST',
       });
       if (res.ok) {

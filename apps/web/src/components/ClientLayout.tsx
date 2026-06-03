@@ -213,6 +213,18 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             <Inbox className={navIconClass('/dead-letter')} />
             <span>Dead Letter</span>
           </Link>
+          <Link href="/logs" className={navItemClass('/logs')}>
+            <Terminal className={navIconClass('/logs')} />
+            <span>Logs Explorer</span>
+          </Link>
+          <Link href="/alerts" className={navItemClass('/alerts')}>
+            <Sliders className={navIconClass('/alerts')} />
+            <span>Alert Rules</span>
+          </Link>
+          <Link href="/sdk" className={navItemClass('/sdk')}>
+            <Sliders className={navIconClass('/sdk')} />
+            <span>SDK Integration</span>
+          </Link>
           <Link href="/settings" className={navItemClass('/settings')}>
             <Sliders className={navIconClass('/settings')} />
             <span>Simulation Sandbox</span>

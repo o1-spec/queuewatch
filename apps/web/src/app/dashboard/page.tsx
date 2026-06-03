@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import useSocket from '../../hooks/useSocket';
-import { QueueMetrics, WorkerHealth, QueueName } from '@queuewatch/shared';
-import { CheckCircle2, Activity, Skull, Clock } from 'lucide-react';
+import { QueueMetrics, WorkerHealth, QueueName, Incident } from '@queuewatch/shared';
+import { CheckCircle2, Activity, Skull, Clock, AlertTriangle, Play, Sparkles, Server } from 'lucide-react';
 import { MetricCard } from '../../components/MetricCard';
 import { QueueCard } from '../../components/QueueCard';
 import { WorkerCard } from '../../components/WorkerCard';
@@ -12,20 +12,13 @@ import { AIInsightPanel, AIAnalysisReport } from '../../components/AIInsightPane
 
 import { useAuth } from '../../context/AuthContext';
 
-interface DashboardStats {
-  totalProcessed: number;
-  activeJobs: number;
-  failedJobs: number;
-  averageLatency: number;
-  dlqCount: number;
-}
-
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function DashboardOverview() {
   const { authFetch } = useAuth();
   const [metrics, setMetrics] = useState<QueueMetrics[]>([]);
   const [workers, setWorkers] = useState<WorkerHealth[]>([]);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
   const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
   const [deadLettersCount, setDeadLettersCount] = useState(0);
   const [toggleLoading, setToggleLoading] = useState<string | null>(null);
@@ -35,14 +28,16 @@ export default function DashboardOverview() {
 
   const loadData = async () => {
     try {
-      const [queuesRes, dlqRes] = await Promise.all([
+      const [queuesRes, dlqRes, incidentsRes, workersRes] = await Promise.all([
         authFetch(`${API_URL}/api/queues`),
         authFetch(`${API_URL}/api/queues/dead_letter_queue/jobs`),
+        authFetch(`${API_URL}/api/incidents`),
+        authFetch(`${API_URL}/api/workers`),
       ]);
       
       if (queuesRes.ok) {
         const queuesData = await queuesRes.json();
-        const mapped: QueueMetrics[] = queuesData.map((q: any) => ({
+        setMetrics(queuesData.map((q: any) => ({
           queueName: q.name,
           waitingCount: q.waiting,
           activeCount: q.active,
@@ -51,15 +46,24 @@ export default function DashboardOverview() {
           delayedCount: q.delayed,
           paused: q.paused,
           throughput: q.completed > 0 ? Math.round(q.completed / 2) : 0,
-          averageLatency: q.name === 'ai_task_queue' ? 1800 : 450,
+          averageLatency: 450,
           timestamp: Date.now(),
-        }));
-        setMetrics(mapped);
+        })));
       }
 
       if (dlqRes.ok) {
         const dlqData = await dlqRes.json();
         setDeadLettersCount(dlqData.length);
+      }
+
+      if (incidentsRes.ok) {
+        const incidentsData = await incidentsRes.json();
+        setIncidents(incidentsData);
+      }
+
+      if (workersRes.ok) {
+        const workersData = await workersRes.json();
+        setWorkers(workersData);
       }
     } catch (err) {
       console.error('Failed to load initial REST telemetry:', err);
@@ -86,31 +90,35 @@ export default function DashboardOverview() {
   }, []);
 
   const socketListeners = {
-    'queue.metrics.updated': (data: QueueMetrics[]) => {
+    'metrics.updated': (data: QueueMetrics[]) => {
       setMetrics(data);
     },
     'worker.health.updated': (data: WorkerHealth[]) => {
       setWorkers(data);
       loadAiReport();
     },
-    'job.created': (data: any) => {
-      pushLiveEvent(data.queueName, 'Created', `Job ${data.jobId} enqueued inside Redis`);
+    'incident.created': (data: Incident) => {
+      setIncidents((prev) => [data, ...prev.filter(i => i.id !== data.id)]);
+      pushLiveEvent(data.affectedQueue, 'DLQ', `NEW INCIDENT: ${data.title}`);
     },
-    'job.active': (data: any) => {
-      pushLiveEvent(data.queueName, 'Active', `Worker started processing job ${data.jobId}`);
+    'incident.updated': (data: Incident) => {
+      setIncidents((prev) => prev.map(i => i.id === data.id ? data : i));
     },
-    'job.completed': (data: any) => {
-      pushLiveEvent(data.queueName, 'Completed', `Job ${data.jobId} successfully finished in ${data.latency}ms`);
-    },
-    'job.failed': (data: any) => {
-      pushLiveEvent(data.queueName, 'Retrying', `Job ${data.jobId} failed (${data.attemptsMade}/${data.maxAttempts}): ${data.errorMessage}`);
-      loadAiReport();
-    },
-    'job.deadlettered': (data: any) => {
-      pushLiveEvent(data.queueName, 'DLQ', `Job ${data.jobId} permanently failed! Routed to Dead-Letter Queue.`);
-      setDeadLettersCount((prev) => prev + 1);
-      loadAiReport();
-    },
+    'telemetry.event': (data: any) => {
+      if (data.type === 'job.created') {
+        pushLiveEvent(data.queueName, 'Created', `Job ${data.jobId} enqueued inside Redis`);
+      } else if (data.type === 'job.active') {
+        pushLiveEvent(data.queueName, 'Active', `Worker started processing job ${data.jobId}`);
+      } else if (data.type === 'job.completed') {
+        pushLiveEvent(data.queueName, 'Completed', `Job ${data.jobId} successfully finished in ${data.duration}ms`);
+      } else if (data.type === 'job.failed') {
+        pushLiveEvent(data.queueName, 'Retrying', `Job ${data.jobId} failed (${data.attemptsMade}/${data.maxAttempts}): ${data.errorMessage}`);
+      } else if (data.type === 'job.deadlettered') {
+        pushLiveEvent(data.queueName, 'DLQ', `Job ${data.jobId} permanently failed! Routed to Dead-Letter Queue.`);
+        setDeadLettersCount((prev) => prev + 1);
+        loadAiReport();
+      }
+    }
   };
 
   useSocket(socketListeners);
@@ -148,62 +156,106 @@ export default function DashboardOverview() {
     }
   };
 
-  const stats: DashboardStats = metrics.reduce(
-    (acc, q) => {
-      acc.totalProcessed += q.completedCount;
-      acc.activeJobs += q.activeCount;
-      acc.failedJobs += q.failedCount;
-      acc.averageLatency += q.averageLatency;
-      return acc;
-    },
-    { totalProcessed: 0, activeJobs: 0, failedJobs: 0, averageLatency: 0, dlqCount: 0 }
-  );
+  // Aggregated Stats
+  const activeIncidents = incidents.filter(i => i.status === 'open');
+  const failureRates = metrics.map(q => (q as any).failureRate || 0);
+  const maxFailureRate = failureRates.length > 0 ? Math.max(...failureRates) : 0;
 
-  const totalQueues = metrics.length || 1;
-  const runningAverageLatency = Math.round(stats.averageLatency / totalQueues) || 0;
+  const retryRates = metrics.map(q => (q as any).retryRate || 0);
+  const maxRetryRate = retryRates.length > 0 ? Math.max(...retryRates) : 0;
+
+  const backlogGrowths = metrics.map(q => (q as any).backlogGrowth || 0);
+  const maxBacklogGrowth = backlogGrowths.length > 0 ? Math.max(...backlogGrowths) : 0;
+
+  const averageLatencies = metrics.map(q => q.averageLatency || 0);
+  const runningAverageLatency = averageLatencies.length > 0
+    ? Math.round(averageLatencies.reduce((a, b) => a + b, 0) / averageLatencies.length)
+    : 0;
 
   const workersHealthyCount = workers.filter((w) => w.status === 'healthy').length;
   const workersTotalCount = workers.length || 1;
   const workerHealthScore = Math.round((workersHealthyCount / workersTotalCount) * 100);
 
   return (
-    <div className="space-y-5">
-      {/* Metrics Row */}
+    <div className="space-y-5 font-mono text-[10px]">
+      
+      {/* 1. INCIDENT-FIRST EMERGENCY OVERVIEW */}
+      {activeIncidents.length > 0 && (
+        <div className="bg-red-950/15 border border-rose-950 rounded-lg p-5 space-y-4">
+          <div className="flex items-center space-x-2 border-b border-rose-950 pb-2.5">
+            <AlertTriangle className="w-4 h-4 text-rose-500 animate-pulse" />
+            <h2 className="font-extrabold text-white text-xs uppercase tracking-wider">Active System Incidents ({activeIncidents.length})</h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {activeIncidents.map((inc) => (
+              <div key={inc.id} className="bg-black/40 border border-rose-950/40 p-4 rounded space-y-2.5">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="px-2 py-0.5 rounded bg-rose-950/50 text-rose-400 border border-rose-900/60 font-bold uppercase tracking-wider text-[8px]">
+                      {inc.severity}
+                    </span>
+                    <h3 className="font-extrabold text-white text-sm mt-1">{inc.title}</h3>
+                    <p className="text-zinc-500 text-[9px] mt-0.5">Affected channel: <span className="text-zinc-300 font-bold">{inc.affectedQueue}</span></p>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 text-zinc-400 leading-relaxed font-sans text-xs">
+                  <p><strong>Impact:</strong> {inc.impact}</p>
+                  <p><strong>Suspected Cause:</strong> {inc.suspectedRootCause}</p>
+                </div>
+
+                {inc.recommendation && (
+                  <div className="p-2.5 bg-indigo-950/20 border border-indigo-950 rounded text-zinc-300 font-sans leading-normal text-[11px] flex items-start space-x-1.5">
+                    <Sparkles className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="font-mono text-[9px] uppercase tracking-wider text-indigo-400 block mb-0.5">Remediation Action</strong>
+                      {inc.recommendation}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Metrics Console Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
-          title="Jobs Processed"
-          value={stats.totalProcessed.toLocaleString()}
-          subtext="realtime completions streaming"
+          title="System Health Score"
+          value={activeIncidents.length === 0 ? '100%' : `${100 - activeIncidents.length * 25}%`}
+          subtext={activeIncidents.length === 0 ? 'all subsystems reporting normal' : 'elevated incident rates'}
           icon={CheckCircle2}
-          iconColor="text-emerald-400"
-          pulseActive={true}
-          pulseColor="bg-emerald-400"
-        />
-
-        <MetricCard
-          title="Active Thread Count"
-          value={stats.activeJobs}
-          subtext="concurrency thread threads active"
-          icon={Activity}
-          iconColor="text-blue-400"
-          pulseActive={stats.activeJobs > 0}
-          pulseColor="bg-blue-500"
-        />
-
-        <MetricCard
-          title="Dead Letter Queue"
-          value={deadLettersCount}
-          subtext="requires engineering action"
-          icon={Skull}
-          iconColor="text-rose-500"
-          pulseActive={deadLettersCount > 0}
+          iconColor={activeIncidents.length === 0 ? 'text-emerald-400' : 'text-rose-500'}
+          pulseActive={activeIncidents.length > 0}
           pulseColor="bg-rose-500"
         />
 
         <MetricCard
-          title="Average Job Latency"
+          title="Max Queue Failure Rate"
+          value={`${maxFailureRate}%`}
+          subtext="rolling execution failures"
+          icon={Skull}
+          iconColor="text-rose-500"
+          pulseActive={maxFailureRate > 15}
+          pulseColor="bg-rose-500"
+        />
+
+        <MetricCard
+          title="Max Backlog Growth"
+          value={`+${maxBacklogGrowth} jobs`}
+          subtext="waiting queue accumulation"
+          icon={Activity}
+          iconColor="text-blue-400"
+          pulseActive={maxBacklogGrowth > 10}
+          pulseColor="bg-blue-500"
+        />
+
+        <MetricCard
+          title="Average Latency"
           value={`${runningAverageLatency} ms`}
-          subtext="worker process delay duration"
+          subtext="average worker execution delay"
           icon={Clock}
           iconColor="text-zinc-400"
         />
@@ -218,10 +270,6 @@ export default function DashboardOverview() {
                 <h3 className="font-bold text-xs font-mono text-white tracking-tight uppercase">Active Queue Telemetry Indices</h3>
                 <p className="text-[10px] text-zinc-500 font-mono">Telemetry indices enqueued in Redis memory pools</p>
               </div>
-              <a href="/queues" className="text-[10px] font-bold font-mono text-zinc-400 hover:text-white transition-colors flex items-center space-x-1">
-                <span>configure indices</span>
-                <span>&rarr;</span>
-              </a>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -2,40 +2,39 @@
 
 import React, { useState, useEffect } from 'react';
 import useSocket from '../../hooks/useSocket';
-import { AlertTriangle, Terminal, RefreshCw, ChevronDown, ChevronUp, Sparkles, ShieldCheck, Clock } from 'lucide-react';
-import { AIIncidentTimeline } from '../../components/AIIncidentTimeline';
-
+import { 
+  AlertTriangle, Clock, RefreshCw, ChevronDown, ChevronUp, Sparkles, 
+  Terminal, Activity, CheckCircle2, History, ShieldAlert, FileText, Play 
+} from 'lucide-react';
+import { Incident } from '@queuewatch/shared';
 import { useAuth } from '../../context/AuthContext';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-const QUEUES = ['email_queue', 'image_processing_queue', 'webhook_delivery_queue', 'ai_task_queue'];
 
-export default function IncidentRegistry() {
+export default function IncidentsRegistry() {
   const { authFetch } = useAuth();
-  const [incidents, setIncidents] = useState<any[]>([]);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
-  const [replayLoading, setReplayLoading] = useState<string | null>(null);
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'exceptions' | 'timeline'>('exceptions');
-  const [timelineTrigger, setTimelineTrigger] = useState(0);
+
+  // V2 Tab states & resources
+  const [activeTabs, setActiveTabs] = useState<Record<string, string>>({});
+  const [timelines, setTimelines] = useState<Record<string, any[]>>({});
+  const [investigations, setInvestigations] = useState<Record<string, any>>({});
+  const [incidentLogs, setIncidentLogs] = useState<Record<string, any[]>>({});
+  const [incidentDlq, setIncidentDlq] = useState<Record<string, any[]>>({});
+  const [replayLoading, setReplayLoading] = useState<string | null>(null);
 
   const loadIncidents = async () => {
     try {
-      const allJobsPromises = QUEUES.map(async (queueName) => {
-        const res = await authFetch(`${API_URL}/api/queues/${queueName}/jobs?limit=100`);
-        if (res.ok) {
-          const data = await res.json();
-          // Filter only failed status jobs
-          return data.filter((j: any) => j.status === 'failed');
-        }
-        return [];
-      });
-
-      const results = await Promise.all(allJobsPromises);
-      const flattened = results.flat().sort((a, b) => b.timestamp - a.timestamp);
-      setIncidents(flattened);
+      const res = await authFetch(`${API_URL}/api/incidents`);
+      if (res.ok) {
+        const data = await res.json();
+        setIncidents(data);
+      }
     } catch (e) {
-      console.error('Failed to load incidents registry:', e);
+      console.error('Failed to load incidents:', e);
     } finally {
       setLoading(false);
     }
@@ -45,322 +44,528 @@ export default function IncidentRegistry() {
     loadIncidents();
   }, []);
 
-  // Live Socket IO updates to refresh incident registry dynamically
   useSocket({
-    'job.failed': () => {
-      loadIncidents();
-      // Tick trigger to refresh timeline if tab is open
-      setTimelineTrigger(prev => prev + 1);
+    'incident.created': (newIncident: Incident) => {
+      setIncidents((prev) => [newIncident, ...prev.filter(i => i.id !== newIncident.id)]);
     },
-    'job.completed': () => {
-      loadIncidents();
-      setTimelineTrigger(prev => prev + 1);
-    },
-    'job.deadlettered': () => {
-      loadIncidents();
-      setTimelineTrigger(prev => prev + 1);
+    'incident.updated': (updatedIncident: Incident) => {
+      setIncidents((prev) => prev.map(i => i.id === updatedIncident.id ? updatedIncident : i));
     },
   });
 
-  const triggerReplay = async (jobId: string) => {
-    setReplayLoading(jobId);
+  const loadTimeline = async (id: string) => {
     try {
-      const res = await authFetch(`${API_URL}/api/queues/jobs/${jobId}/replay`, {
+      const res = await authFetch(`${API_URL}/api/incidents/${id}/timeline`);
+      if (res.ok) {
+        const data = await res.json();
+        setTimelines(prev => ({ ...prev, [id]: data }));
+      }
+    } catch (e) {
+      console.error('Failed to load timeline:', e);
+    }
+  };
+
+  const loadInvestigation = async (id: string) => {
+    try {
+      const res = await authFetch(`${API_URL}/api/incidents/${id}/investigation`);
+      if (res.ok) {
+        const data = await res.json();
+        setInvestigations(prev => ({ ...prev, [id]: data }));
+      } else {
+        setInvestigations(prev => ({ ...prev, [id]: null }));
+      }
+    } catch (e) {
+      console.error('Failed to load investigation:', e);
+    }
+  };
+
+  const loadIncidentLogs = async (id: string, queueName: string) => {
+    try {
+      const res = await authFetch(`${API_URL}/api/logs?queueName=${queueName}&limit=50`);
+      if (res.ok) {
+        const data = await res.json();
+        setIncidentLogs(prev => ({ ...prev, [id]: data }));
+      }
+    } catch (e) {
+      console.error('Failed to load incident logs:', e);
+    }
+  };
+
+  const loadIncidentDlq = async (id: string, queueName: string) => {
+    try {
+      const res = await authFetch(`${API_URL}/api/dead-letter`);
+      if (res.ok) {
+        const data = await res.json();
+        const filtered = data.filter((j: any) => j.queueName === queueName);
+        setIncidentDlq(prev => ({ ...prev, [id]: filtered }));
+      }
+    } catch (e) {
+      console.error('Failed to load incident dlq:', e);
+    }
+  };
+
+  const handleTabChange = (incidentId: string, queueName: string, tab: string) => {
+    setActiveTabs(prev => ({ ...prev, [incidentId]: tab }));
+    if (tab === 'timeline') loadTimeline(incidentId);
+    if (tab === 'investigation') loadInvestigation(incidentId);
+    if (tab === 'logs') loadIncidentLogs(incidentId, queueName);
+    if (tab === 'dlq') loadIncidentDlq(incidentId, queueName);
+  };
+
+  const runInvestigation = async (id: string, queueName: string) => {
+    setAnalyzingId(id);
+    try {
+      const res = await authFetch(`${API_URL}/api/incidents/${id}/investigate`, {
         method: 'POST',
       });
       if (res.ok) {
-        setIncidents((prev) => prev.filter((inc) => inc.id !== jobId));
+        const report = await res.json();
+        setInvestigations(prev => ({ ...prev, [id]: report }));
+        // switch tab to investigation
+        handleTabChange(id, queueName, 'investigation');
       }
     } catch (e) {
-      console.error('Failed to replay job:', e);
+      console.error('Failed to run AI investigation:', e);
+    } finally {
+      setAnalyzingId(null);
+    }
+  };
+
+  const handleReplayDlq = async (incidentId: string, queueName: string, jobId: string) => {
+    setReplayLoading(jobId);
+    try {
+      const res = await authFetch(`${API_URL}/api/dead-letter/${jobId}/replay`, {
+        method: 'POST',
+      });
+      if (res.ok) {
+        loadIncidentDlq(incidentId, queueName);
+      }
+    } catch (e) {
+      console.error('Failed to replay DLQ job:', e);
     } finally {
       setReplayLoading(null);
     }
   };
 
-  const getRemediation = (reason: string, queue: string) => {
-    const defaultFix = {
-      description: 'Review job attempt backoff delays inside Redis indices. Ensure exponential backoff limits are active.',
-      code: `const myQueue = new Queue('${queue}', {
-  defaultJobOptions: {
-    attempts: 5,
-    backoff: {
-      type: 'exponential',
-      delay: 2000
+  const handleResolveDlq = async (incidentId: string, queueName: string, jobId: string) => {
+    try {
+      const res = await authFetch(`${API_URL}/api/dead-letter/${jobId}/resolve`, {
+        method: 'POST',
+      });
+      if (res.ok) {
+        loadIncidentDlq(incidentId, queueName);
+      }
+    } catch (e) {
+      console.error('Failed to resolve DLQ job:', e);
     }
-  }
-});`
-    };
-
-    if (reason.toLowerCase().includes('sendgrid') || reason.toLowerCase().includes('smtp') || queue === 'email_queue') {
-      return {
-        description: 'SendGrid rate limits triggered HTTP 429 block. Enable strict BullMQ delays, single-concurrency limiters, and backoff extensions.',
-        code: `// Concurrency limit & backoff adjustment
-const myWorker = new Worker('email_queue', async (job) => {
-  await sendGridMail(job.data);
-}, {
-  concurrency: 1, // Restrict thread limits
-  limiter: {
-    max: 10,
-    duration: 1000 // Max 10 emails per second
-  }
-});`
-      };
-    }
-
-    if (reason.toLowerCase().includes('stripe') || reason.toLowerCase().includes('webhook') || queue === 'webhook_delivery_queue') {
-      return {
-        description: 'Stripe HTTP 503 Gateway timeouts detected. Enforce a Circuit Breaker pattern (Opossum wrapper) to defer execution instead of pinning CPU threads.',
-        code: `// Circuit Breaker Integration
-import CircuitBreaker from 'opossum';
-
-const options = {
-  timeout: 3000, // Trigger fallback if 3s delay exceeded
-  errorThresholdPercentage: 50,
-  resetTimeout: 30000 // Stalled cooldown for 30s
-};
-
-const breaker = new CircuitBreaker(stripeCall, options);
-breaker.fallback(() => {
-  throw new Error('CircuitOpen: post-poning webhook delivery');
-});`
-      };
-    }
-
-    if (reason.toLowerCase().includes('payload') || reason.toLowerCase().includes('validation') || queue === 'image_processing_queue') {
-      return {
-        description: 'Schema parameter mismatches. Enforce input schema validation before queue enqueueing to prevent garbage metrics in Redis.',
-        code: `// Zod Schema Pre-validation
-import { z } from 'zod';
-
-const PayloadSchema = z.object({
-  imageUrl: z.string().url(),
-  format: z.enum(['png', 'jpeg']).default('png')
-});
-
-async function safeEnqueue(payload: unknown) {
-  const result = PayloadSchema.safeParse(payload);
-  if (!result.success) {
-    throw new Error('Payload mismatch: ' + result.error.message);
-  }
-  return queue.add('job_name', result.data);
-}`
-      };
-    }
-
-    if (reason.toLowerCase().includes('sqlite') || reason.toLowerCase().includes('database') || queue === 'ai_task_queue') {
-      return {
-        description: 'SQLite database connection pool locks. Enforce connection pooling limits, increase transaction timeout bounds, or scale pods.',
-        code: `// Knex/TypeORM config adjustment
-const dbConfig = {
-  client: 'sqlite3',
-  connection: { filename: './db.sqlite' },
-  pool: {
-    min: 2,
-    max: 10,
-    idleTimeoutMillis: 30000
-  },
-  useNullAsDefault: true
-};`
-      };
-    }
-
-    return defaultFix;
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header section */}
+    <div className="space-y-6 font-mono text-[10px]">
+      
+      {/* Page Header */}
       <div className="border-b border-zinc-900 pb-4">
-        <h2 className="text-sm font-bold text-white uppercase tracking-tight flex items-center space-x-2 font-mono">
+        <h2 className="text-sm font-bold text-white uppercase tracking-tight flex items-center space-x-2">
           <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
-          <span>Incident Resolution Registry</span>
+          <span>Incident Diagnostics Control Room</span>
         </h2>
-        <p className="text-[10px] text-zinc-500 font-mono mt-0.5">
-          Failed and retry-stalled job exceptions across active BullMQ workers. Audit live exception callstacks.
+        <p className="text-[10px] text-zinc-500 mt-0.5">
+          Real-time detected queue anomalies, worker slowdowns, and AI-assisted reliability diagnostics.
         </p>
       </div>
 
-      {/* Tabs Selector Toggle */}
-      <div className="flex border-b border-zinc-900 font-mono text-[10px]">
-        <button
-          onClick={() => setActiveTab('exceptions')}
-          className={`px-4 py-2 font-bold border-b transition-all flex items-center space-x-2 ${
-            activeTab === 'exceptions' 
-              ? 'border-white text-white' 
-              : 'border-transparent text-zinc-500 hover:text-zinc-300'
-          }`}
-        >
-          <AlertTriangle className="w-3.5 h-3.5" />
-          <span>Exceptions Logs ({incidents.length})</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('timeline')}
-          className={`px-4 py-2 font-bold border-b transition-all flex items-center space-x-2 ${
-            activeTab === 'timeline' 
-              ? 'border-white text-white' 
-              : 'border-transparent text-zinc-500 hover:text-zinc-300'
-          }`}
-        >
-          <Clock className="w-3.5 h-3.5" />
-          <span>AI Incident Log</span>
-        </button>
-      </div>
+      {loading ? (
+        <div className="space-y-4 animate-pulse">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-zinc-950 border border-zinc-900 p-5 rounded-lg h-28"></div>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {incidents.map((inc) => {
+            const isExpanded = expandedId === inc.id;
+            const isAnalyzing = analyzingId === inc.id;
+            const currentTab = activeTabs[inc.id] || 'overview';
 
-      {activeTab === 'exceptions' ? (
-        <>
-          {loading ? (
-            <div className="space-y-4 animate-pulse">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="bg-zinc-950 border border-zinc-900 p-5 rounded-lg flex flex-col justify-between h-28">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2.5 h-2.5 bg-zinc-900 rounded-full"></div>
-                      <div className="h-3 w-24 bg-zinc-900 rounded"></div>
-                    </div>
-                    <div className="h-3 w-16 bg-zinc-900 rounded"></div>
-                  </div>
-                  <div className="h-3.5 w-64 bg-zinc-900 rounded mt-2"></div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-3 font-mono text-[10px]">
-              {incidents.map((job) => {
-                const isExpanded = expandedId === job.id;
-                const isReplaying = replayLoading === job.id;
-                const fixBlueprint = getRemediation(job.failedReason || '', job.queueName);
-
-                return (
-                  <div 
-                    key={job.id} 
-                    className={`bg-zinc-950 border rounded-lg p-4 transition-all ${
-                      isExpanded ? 'border-zinc-700 bg-zinc-900/10' : 'border-zinc-900 hover:border-zinc-800'
-                    }`}
-                  >
-                    {/* Header Row */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                      <div className="flex items-start space-x-2.5 min-w-0">
-                        <button 
-                          onClick={() => setExpandedId(isExpanded ? null : job.id)}
-                          className="mt-0.5 text-zinc-500 hover:text-white transition-colors shrink-0"
-                        >
-                          {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                        </button>
-                        <div className="min-w-0">
-                          <div className="flex items-center space-x-2">
-                            <span className="font-bold text-zinc-400 select-all">{job.id}</span>
-                            <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-rose-950/20 border border-rose-900/30 text-rose-400 uppercase">
-                              FAILED
-                            </span>
-                            <span className="px-1.5 py-0.5 rounded text-[9px] bg-zinc-900 border border-zinc-800 text-zinc-500 font-bold">
-                              {job.queueName}
-                            </span>
-                          </div>
-                          <h3 className="font-bold text-white text-[11px] mt-1.5">{job.name}</h3>
-                          <p className="text-[10px] text-rose-400 font-mono mt-1 break-words leading-relaxed max-w-2xl">
-                            {job.failedReason || 'Null exception message'}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center space-x-3 shrink-0 self-end md:self-center font-mono text-[9px]">
-                        <span className="text-zinc-500 font-bold uppercase">
-                          Attempts: {job.attemptsMade} / {job.maxAttempts}
+            return (
+              <div 
+                key={inc.id}
+                className={`bg-zinc-950 border rounded-lg p-4 transition-all ${
+                  isExpanded 
+                    ? 'border-zinc-700 bg-zinc-900/10' 
+                    : inc.status === 'resolved' 
+                      ? 'border-zinc-900 opacity-60 hover:opacity-90' 
+                      : 'border-zinc-900 hover:border-zinc-800'
+                }`}
+              >
+                {/* Header block */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div className="flex items-start space-x-2.5 min-w-0">
+                    <button
+                      onClick={() => {
+                        const nextExpanded = !isExpanded;
+                        setExpandedId(nextExpanded ? inc.id : null);
+                        if (nextExpanded) {
+                          handleTabChange(inc.id, inc.affectedQueue, 'overview');
+                        }
+                      }}
+                      className="mt-0.5 text-zinc-500 hover:text-white transition-colors shrink-0"
+                    >
+                      {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    </button>
+                    <div className="min-w-0">
+                      <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                        <span className="font-bold text-zinc-400 select-all">{inc.id}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold border uppercase ${
+                          inc.status === 'resolved' 
+                            ? 'bg-emerald-950/20 border-emerald-900 text-emerald-400' 
+                            : 'bg-rose-950/20 border-rose-900 text-rose-400'
+                        }`}>
+                          {inc.status}
                         </span>
-                        <button
-                          onClick={() => triggerReplay(job.id)}
-                          disabled={isReplaying}
-                          className="px-2.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-white font-bold transition-all disabled:opacity-50 flex items-center space-x-1"
-                        >
-                          {isReplaying ? (
-                            <>
-                              <RefreshCw className="w-3 h-3 animate-spin" />
-                              <span>Replaying...</span>
-                            </>
-                          ) : (
-                            <>
-                              <RefreshCw className="w-3 h-3" />
-                              <span>Retry</span>
-                            </>
-                          )}
-                        </button>
+                        <span className="px-1.5 py-0.5 rounded text-[8px] bg-zinc-900 border border-zinc-800 text-zinc-400 uppercase">
+                          {inc.severity}
+                        </span>
+                        <span className="text-zinc-500 text-[9px] font-sans">Queue: <strong className="text-zinc-300 font-mono">{inc.affectedQueue}</strong></span>
                       </div>
+                      <h3 className="font-bold text-white text-[11px] mt-1.5">{inc.title}</h3>
+                      <p className="text-[10px] text-zinc-400 font-sans mt-1 leading-relaxed">
+                        {inc.summary}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-3 shrink-0 self-end md:self-center">
+                    <button
+                      onClick={() => runInvestigation(inc.id, inc.affectedQueue)}
+                      disabled={isAnalyzing || inc.status === 'resolved'}
+                      className="px-2.5 py-1 rounded bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-zinc-300 font-bold transition-all disabled:opacity-50 flex items-center space-x-1.5 shadow"
+                    >
+                      {isAnalyzing ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>INVESTIGATING...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>RUN AI INVESTIGATION</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Details / Tabs Panel */}
+                {isExpanded && (
+                  <div className="mt-4 border-t border-zinc-900 pt-4 space-y-4">
+                    {/* Tab Navigation */}
+                    <div className="flex border-b border-zinc-900 text-[9px] font-bold">
+                      <button
+                        onClick={() => handleTabChange(inc.id, inc.affectedQueue, 'overview')}
+                        className={`px-3 py-1.5 border-t-2 -mb-px transition-all uppercase flex items-center space-x-1 ${
+                          currentTab === 'overview' 
+                            ? 'border-indigo-500 text-white bg-zinc-900/40' 
+                            : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                        }`}
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>Overview</span>
+                      </button>
+                      
+                      <button
+                        onClick={() => handleTabChange(inc.id, inc.affectedQueue, 'timeline')}
+                        className={`px-3 py-1.5 border-t-2 -mb-px transition-all uppercase flex items-center space-x-1 ${
+                          currentTab === 'timeline' 
+                            ? 'border-indigo-500 text-white bg-zinc-900/40' 
+                            : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                        }`}
+                      >
+                        <History className="w-3.5 h-3.5" />
+                        <span>SRE Timeline</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleTabChange(inc.id, inc.affectedQueue, 'investigation')}
+                        className={`px-3 py-1.5 border-t-2 -mb-px transition-all uppercase flex items-center space-x-1 ${
+                          currentTab === 'investigation' 
+                            ? 'border-indigo-500 text-white bg-zinc-900/40' 
+                            : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                        }`}
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>AI Investigation</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleTabChange(inc.id, inc.affectedQueue, 'logs')}
+                        className={`px-3 py-1.5 border-t-2 -mb-px transition-all uppercase flex items-center space-x-1 ${
+                          currentTab === 'logs' 
+                            ? 'border-indigo-500 text-white bg-zinc-900/40' 
+                            : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                        }`}
+                      >
+                        <Terminal className="w-3.5 h-3.5" />
+                        <span>Queue Logs</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleTabChange(inc.id, inc.affectedQueue, 'dlq')}
+                        className={`px-3 py-1.5 border-t-2 -mb-px transition-all uppercase flex items-center space-x-1 ${
+                          currentTab === 'dlq' 
+                            ? 'border-indigo-500 text-white bg-zinc-900/40' 
+                            : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                        }`}
+                      >
+                        <ShieldAlert className="w-3.5 h-3.5" />
+                        <span>DLQ Jobs</span>
+                      </button>
                     </div>
 
-                    {/* Expanded Details Panel */}
-                    {isExpanded && (
-                      <div className="mt-4 border-t border-zinc-900 pt-4 space-y-4 font-mono text-[10px]">
+                    {/* Tab Contents */}
+                    <div className="pt-2">
+                      {/* Overview Tab */}
+                      {currentTab === 'overview' && (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          {/* Left Side: Exception stack trace */}
-                          <div className="space-y-1.5">
-                            <span className="text-[9px] font-bold text-zinc-500 uppercase">Trace exception logs</span>
-                            <pre className="bg-rose-950/5 border border-rose-900/10 p-3.5 rounded text-[9.5px] text-rose-350 font-mono overflow-x-auto leading-relaxed max-h-56 overflow-y-auto whitespace-pre-wrap select-all">
-                              {job.stackTrace?.join('\n') || job.failedReason || 'No execution callstack trace registered in Redis.'}
-                            </pre>
-                          </div>
-
-                          {/* Right Side: Payload inspector */}
-                          <div className="space-y-1.5">
-                            <span className="text-[9px] font-bold text-zinc-500 uppercase">Input parameters</span>
-                            <pre className="bg-black/40 border border-zinc-900 p-3.5 rounded text-[9.5px] text-zinc-400 font-mono overflow-x-auto leading-relaxed select-all">
-                              {JSON.stringify(job.data || {}, null, 2)}
-                            </pre>
-                          </div>
-                        </div>
-
-                        {/* Bottom AI Blueprint Fix */}
-                        <div className="bg-zinc-900/20 border border-zinc-900 p-4 rounded space-y-2">
-                          <div className="flex items-center justify-between border-b border-zinc-900 pb-2">
-                            <div className="flex items-center space-x-2">
-                              <Sparkles className="w-3.5 h-3.5 text-zinc-500" />
-                              <h4 className="font-bold text-white">AI Telemetry Resolution Blueprint</h4>
+                          {/* Left Side: Root Cause & Diagnostics */}
+                          <div className="space-y-3">
+                            <div className="p-3.5 bg-black/40 border border-zinc-900 rounded space-y-2">
+                              <h4 className="text-[9.5px] font-bold text-white uppercase border-b border-zinc-900 pb-1.5 flex items-center space-x-1">
+                                <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                                <span>AI operational insight</span>
+                              </h4>
+                              <div className="space-y-2 font-sans text-zinc-350 text-xs">
+                                <p><strong>Suspected Cause:</strong> {inc.suspectedRootCause}</p>
+                                <p><strong>Impact:</strong> {inc.impact}</p>
+                              </div>
                             </div>
-                            <span className="text-[9px] text-zinc-600 font-bold">Confidence: 98%</span>
+
+                            {inc.recommendation && (
+                              <div className="p-3.5 bg-indigo-950/10 border border-indigo-900/30 rounded space-y-1.5">
+                                <h4 className="text-[9.5px] font-bold text-white uppercase flex items-center space-x-1 font-mono">
+                                  <Terminal className="w-3.5 h-3.5 text-indigo-400" />
+                                  <span>Remediation Recommendation</span>
+                                </h4>
+                                <p className="font-sans text-zinc-350 text-xs leading-normal">
+                                  {inc.recommendation}
+                                </p>
+                              </div>
+                            )}
                           </div>
 
-                          <p className="text-[10px] text-zinc-450 leading-relaxed font-sans">
-                            {fixBlueprint.description}
-                          </p>
-
-                          <div className="space-y-1 mt-2">
-                            <div className="flex items-center space-x-1.5 text-zinc-500 font-bold font-mono text-[9px]">
-                              <Terminal className="w-3 h-3 text-zinc-650" />
-                              <span>PROPOSED INTERCEPTOR CODE</span>
+                          {/* Right Side: Evidence Logs */}
+                          <div className="space-y-3">
+                            <div className="space-y-1.5">
+                              <span className="text-[9px] font-bold text-zinc-500 uppercase">TELEMETRY EVIDENCE</span>
+                              <pre className="bg-rose-950/5 border border-rose-900/10 p-3.5 rounded text-[9.5px] text-rose-350 font-mono overflow-x-auto leading-relaxed select-all">
+                                {inc.evidence}
+                              </pre>
                             </div>
-                            <pre className="bg-black/40 border border-zinc-900 p-3 rounded text-[9.5px] font-mono text-zinc-400 overflow-x-auto select-all leading-normal whitespace-pre">
-                              {fixBlueprint.code}
-                            </pre>
+
+                            {inc.relatedErrors && inc.relatedErrors.length > 0 && (
+                              <div className="space-y-1.5">
+                                <span className="text-[9px] font-bold text-zinc-500 uppercase">RELATED EXCEPTIONS</span>
+                                <div className="bg-black/20 border border-zinc-900 rounded p-3 space-y-1.5 font-mono text-[9px] max-h-36 overflow-y-auto">
+                                  {inc.relatedErrors.map((err, idx) => (
+                                    <div key={idx} className="text-rose-400/80 border-b border-zinc-900/40 pb-1 last:border-b-0">
+                                      &rarr; {err}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
+                      )}
 
-                        <div className="flex items-center space-x-4 text-[9px] text-zinc-500 font-bold">
-                          <span>FAILED AT: <span className="text-zinc-400 font-medium font-sans">{new Date(job.timestamp).toLocaleString()}</span></span>
-                          <span>&bull;</span>
-                          <span>RETRY STRATEGY: <span className="text-zinc-400 font-medium font-sans">Exponential Backoff (delay 2s)</span></span>
+                      {/* Timeline Tab */}
+                      {currentTab === 'timeline' && (
+                        <div className="space-y-4 max-w-2xl">
+                          <div className="border-l-2 border-zinc-800 ml-3.5 space-y-5 py-2">
+                            {(timelines[inc.id] || []).map((t, idx) => (
+                              <div key={idx} className="relative pl-6">
+                                <div className="absolute -left-[7px] top-1 w-3 h-3 rounded-full bg-zinc-900 border border-zinc-700 flex items-center justify-center">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></div>
+                                </div>
+                                <div className="space-y-1 bg-zinc-900/20 border border-zinc-900/60 p-3 rounded-lg">
+                                  <div className="flex justify-between items-center">
+                                    <h4 className="font-bold text-white uppercase text-[10px]">{t.title}</h4>
+                                    <span className="text-zinc-500 font-sans">{new Date(t.timestamp).toLocaleTimeString()}</span>
+                                  </div>
+                                  <p className="text-zinc-400 font-sans text-xs">{t.desc}</p>
+                                </div>
+                              </div>
+                            ))}
+                            {(!timelines[inc.id] || timelines[inc.id].length === 0) && (
+                              <p className="text-zinc-650 ml-6">Generating incident timeline...</p>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                      )}
 
-              {incidents.length === 0 && (
-                <div className="bg-zinc-950 border border-zinc-900 p-10 rounded-lg text-center space-y-2">
-                  <div className="inline-flex p-2.5 rounded bg-zinc-900 text-emerald-400 border border-zinc-900">
-                    <ShieldCheck className="w-5 h-5" />
+                      {/* AI Investigation Tab */}
+                      {currentTab === 'investigation' && (
+                        <div className="space-y-4">
+                          {investigations[inc.id] === undefined ? (
+                            <div className="text-zinc-500 animate-pulse py-6">Connecting diagnostic reports...</div>
+                          ) : investigations[inc.id] === null ? (
+                            <div className="bg-zinc-950 border border-zinc-900 p-8 rounded text-center space-y-3">
+                              <Sparkles className="w-6 h-6 text-indigo-400 mx-auto" />
+                              <h3 className="text-white font-bold uppercase">No Investigation Report Captured</h3>
+                              <p className="text-zinc-500 text-xs font-sans max-w-md mx-auto">
+                                The Incident Investigation Agent has not run on this incident. Trigger diagnostic steps now to trace failing jobs, evaluate metrics, and audit root causes.
+                              </p>
+                              <button
+                                onClick={() => runInvestigation(inc.id, inc.affectedQueue)}
+                                disabled={isAnalyzing}
+                                className="px-3 py-1.5 rounded bg-indigo-900/40 hover:bg-indigo-950 border border-indigo-900 text-indigo-200 text-[10px] font-bold transition-all shadow"
+                              >
+                                {isAnalyzing ? 'RUNNING AGENT...' : 'EXECUTE INVESTIGATION'}
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="space-y-4 font-mono">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="bg-zinc-900/20 border border-zinc-900 p-4 rounded-lg space-y-2">
+                                  <span className="text-zinc-500 uppercase text-[9px] font-bold block">CONFIDENCE SCORE</span>
+                                  <div className="flex items-baseline space-x-1.5">
+                                    <span className="text-2xl font-bold text-white">{investigations[inc.id].confidenceScore}%</span>
+                                    <span className="text-zinc-500 text-xs">accuracy</span>
+                                  </div>
+                                </div>
+                                <div className="bg-zinc-900/20 border border-zinc-900 p-4 rounded-lg space-y-2 md:col-span-2">
+                                  <span className="text-zinc-500 uppercase text-[9px] font-bold block">ROOT CAUSE DETERMINATION</span>
+                                  <p className="text-zinc-300 font-sans text-xs">{investigations[inc.id].rootCause}</p>
+                                </div>
+                              </div>
+
+                              <div className="bg-zinc-900/20 border border-zinc-900 p-4 rounded-lg space-y-2.5">
+                                <span className="text-zinc-500 uppercase text-[9px] font-bold block">TIMELINE DIAGNOSTIC SUMMARY</span>
+                                <p className="text-zinc-400 font-sans text-xs leading-relaxed">{investigations[inc.id].timelineSummary}</p>
+                              </div>
+
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                <div className="bg-zinc-900/20 border border-zinc-900 p-4 rounded-lg space-y-3">
+                                  <span className="text-zinc-500 uppercase text-[9px] font-bold block">EVIDENCE AUDITED</span>
+                                  <ul className="space-y-1.5 font-sans text-zinc-400 text-xs">
+                                    {investigations[inc.id].evidence?.map((ev: string, idx: number) => (
+                                      <li key={idx} className="flex items-start space-x-2">
+                                        <span className="text-rose-500 font-bold font-mono text-[10px] shrink-0 mt-0.5">&bull;</span>
+                                        <span>{ev}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+
+                                <div className="bg-zinc-900/20 border border-zinc-900 p-4 rounded-lg space-y-3">
+                                  <span className="text-zinc-500 uppercase text-[9px] font-bold block">RECOMMENDED REMEDIATION ACTIONS</span>
+                                  <ul className="space-y-1.5 font-sans text-zinc-400 text-xs">
+                                    {investigations[inc.id].recommendedActions?.map((act: string, idx: number) => (
+                                      <li key={idx} className="flex items-start space-x-2">
+                                        <span className="text-indigo-400 font-bold font-mono text-[10px] shrink-0 mt-0.5">&rarr;</span>
+                                        <span>{act}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Queue Logs Tab */}
+                      {currentTab === 'logs' && (
+                        <div className="bg-black/40 border border-zinc-900 rounded p-4 max-h-72 overflow-y-auto space-y-2">
+                          {(incidentLogs[inc.id] || []).map((l, idx) => (
+                            <div key={idx} className="flex items-start gap-2 border-b border-zinc-900/40 pb-1 last:border-b-0">
+                              <span className="text-zinc-650 shrink-0">{new Date(l.timestamp).toLocaleTimeString()}</span>
+                              <span className={`px-1.5 py-0.2 rounded text-[7px] font-bold ${
+                                l.level === 'error' ? 'bg-rose-950/40 text-rose-400 border border-rose-900/50' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
+                              }`}>{l.level.toUpperCase()}</span>
+                              <span className="text-zinc-300 font-sans text-xs flex-1 break-all">{l.message}</span>
+                            </div>
+                          ))}
+                          {(!incidentLogs[inc.id] || incidentLogs[inc.id].length === 0) && (
+                            <p className="text-zinc-650 py-4 text-center">No log captures for queue {inc.affectedQueue}.</p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* DLQ Jobs Tab */}
+                      {currentTab === 'dlq' && (
+                        <div className="border border-zinc-900 rounded overflow-hidden">
+                          <table className="w-full text-left border-collapse text-[10px]">
+                            <thead>
+                              <tr className="bg-zinc-900/30 border-b border-zinc-900 text-zinc-500 font-bold uppercase text-[8px]">
+                                <th className="p-3">Job ID</th>
+                                <th className="p-3">Action Name</th>
+                                <th className="p-3">Attempts</th>
+                                <th className="p-3">Failure Reason</th>
+                                <th className="p-3 text-right">Recovery</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(incidentDlq[inc.id] || []).map((job) => (
+                                <tr key={job.id} className="border-b border-zinc-900/40 last:border-0 hover:bg-zinc-900/5">
+                                  <td className="p-3 text-zinc-400 select-all font-bold">{job.id}</td>
+                                  <td className="p-3 text-white font-semibold">{job.jobName}</td>
+                                  <td className="p-3 text-zinc-400">{job.attemptsMade} / {job.maxAttempts}</td>
+                                  <td className="p-3 text-rose-400/90 truncate max-w-xs">{job.failedReason}</td>
+                                  <td className="p-3 text-right space-x-2">
+                                    <button
+                                      onClick={() => handleReplayDlq(inc.id, inc.affectedQueue, job.id)}
+                                      disabled={replayLoading === job.id}
+                                      className="px-2 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 text-emerald-400 border border-zinc-800 text-[9px] font-bold"
+                                    >
+                                      {replayLoading === job.id ? 'Replaying...' : 'Replay'}
+                                    </button>
+                                    <button
+                                      onClick={() => handleResolveDlq(inc.id, inc.affectedQueue, job.id)}
+                                      className="px-2 py-0.5 rounded bg-zinc-900 hover:bg-zinc-850 text-zinc-500 hover:text-white border border-zinc-800 text-[9px] font-bold"
+                                    >
+                                      Resolve
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                              {(!incidentDlq[inc.id] || incidentDlq[inc.id].length === 0) && (
+                                <tr>
+                                  <td colSpan={5} className="p-6 text-center text-zinc-650 font-bold">
+                                    No active dead-lettered states registered for queue {inc.affectedQueue}.
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                    </div>
+
+                    <div className="flex items-center space-x-4 text-[9px] text-zinc-500 font-bold border-t border-zinc-900/40 pt-2.5">
+                      <span>DETECTED AT: <span className="text-zinc-400 font-sans">{new Date(inc.firstDetectedAt).toLocaleString()}</span></span>
+                      <span>&bull;</span>
+                      <span>LAST RECALCULATED: <span className="text-zinc-400 font-sans">{new Date(inc.lastUpdatedAt).toLocaleString()}</span></span>
+                    </div>
                   </div>
-                  <h3 className="text-white font-bold text-xs uppercase tracking-tight font-mono">No Active Incidents</h3>
-                  <p className="text-[10px] text-zinc-500 max-w-sm mx-auto">
-                    All background consumer workers are operating with healthy states. No failed execution records in Redis.
-                  </p>
-                </div>
-              )}
+                )}
+              </div>
+            );
+          })}
+
+          {incidents.length === 0 && (
+            <div className="bg-zinc-950 border border-zinc-900 p-12 rounded-lg text-center space-y-2.5">
+              <div className="inline-flex p-3 rounded bg-zinc-900 text-emerald-400 border border-zinc-900">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <h3 className="text-white font-bold text-xs uppercase tracking-tight">No anomalies detected</h3>
+              <p className="text-[10px] text-zinc-500 max-w-sm mx-auto leading-relaxed font-sans">
+                All consumer background workers are reporting positive heartbeats and processing workloads inside active SLAs.
+              </p>
             </div>
           )}
-        </>
-      ) : (
-        <AIIncidentTimeline refreshTrigger={timelineTrigger} />
+        </div>
       )}
     </div>
   );

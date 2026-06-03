@@ -6,6 +6,8 @@ import { SimulationConfigService } from '../queues/simulation-config.service';
 import { QueuesService } from '../queues/queues.service';
 import { QueueWebSocketGateway } from '../websocket/websocket.gateway';
 import { MetricsService } from '../metrics/metrics.service';
+import { TelemetryService } from '../telemetry/telemetry.service';
+import { DbService } from '../db/db.service';
 
 @Injectable()
 export class WorkersService implements OnModuleInit, OnModuleDestroy {
@@ -21,7 +23,9 @@ export class WorkersService implements OnModuleInit, OnModuleDestroy {
     private queuesService: QueuesService,
     private wsGateway: QueueWebSocketGateway,
     @Inject(forwardRef(() => MetricsService))
-    private metricsService: MetricsService
+    private metricsService: MetricsService,
+    private telemetryService: TelemetryService,
+    private dbService: DbService
   ) {
     this.redisConnection = {
       host: this.configService.get<string>('REDIS_HOST') || 'localhost',
@@ -31,10 +35,10 @@ export class WorkersService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit() {
     const queueNames = [
-      'email_queue',
-      'image_processing_queue',
-      'webhook_delivery_queue',
-      'ai_task_queue',
+      'email_notifications',
+      'webhook_delivery',
+      'image_processing',
+      'ai_tasks',
     ];
 
     for (const name of queueNames) {
@@ -47,12 +51,20 @@ export class WorkersService implements OnModuleInit, OnModuleDestroy {
         },
         {
           connection: this.redisConnection,
-          concurrency: name === 'email_queue' ? 2 : 5, // Strict concurrency on SMTP email queue
+          concurrency: name === 'email_notifications' ? 2 : 5, // Strict concurrency on email notifications queue
         }
       );
 
       this.registerWorkerListeners(worker, name);
       this.workers.set(name, worker);
+
+      // Record worker online
+      this.telemetryService.recordEvent({
+        type: 'worker.status',
+        queueName: name as QueueName,
+        workerId: `worker_${name}_1`,
+        status: 'online',
+      });
     }
 
     // Start worker health telemetry ticker
@@ -65,13 +77,14 @@ export class WorkersService implements OnModuleInit, OnModuleDestroy {
     const start = Date.now();
     this.logger.log(`Worker thread processing job ${job.id} (${job.name}) on queue ${queueName}`);
 
-    // Emit job.active event via Socket.IO
-    this.wsGateway.broadcast('job.active', {
-      queueName,
+    // Emit job.active event via telemetry
+    this.telemetryService.recordEvent({
+      type: 'job.active',
+      queueName: queueName as QueueName,
       jobId: job.id,
       jobName: job.name,
       status: 'active',
-      timestamp: Date.now(),
+      payload: job.data,
     });
 
     const config = this.simConfig.getConfig();
@@ -87,15 +100,15 @@ export class WorkersService implements OnModuleInit, OnModuleDestroy {
     }
 
     // 2. Failure Simulation Logic
-    if (config.simulateSmtpFailure && queueName === 'email_queue') {
+    if (config.simulateSmtpFailure && queueName === 'email_notifications') {
       throw new Error('SMTP Error: 421 - Too many concurrent connections from your IP range. SendGrid delivery throttled.');
     }
 
-    if (config.simulateWebhookOutage && queueName === 'webhook_delivery_queue') {
+    if (config.simulateWebhookOutage && queueName === 'webhook_delivery') {
       throw new Error('Webhook Delivery Outage: Stripe API connection failed with code 503 (Service Unavailable). Connection timed out.');
     }
 
-    if (config.simulateInvalidPayload && queueName === 'image_processing_queue') {
+    if (config.simulateInvalidPayload && queueName === 'image_processing') {
       throw new Error("InvalidPayloadError: Schema validation failed. Missing required parameter 'imageUrl' in job payload.");
     }
 
@@ -104,7 +117,7 @@ export class WorkersService implements OnModuleInit, OnModuleDestroy {
     }
 
     // Random flakiness in traffic mode to keep metrics charts exciting
-    if (config.generateTraffic && Math.random() < 0.08 && queueName === 'ai_task_queue') {
+    if (config.generateTraffic && Math.random() < 0.08 && queueName === 'ai_tasks') {
       throw new Error('DatabaseConnectionTimeoutError: SQLite connection pool exceeded lock count (30000ms delay). Query failed.');
     }
 
@@ -122,14 +135,14 @@ export class WorkersService implements OnModuleInit, OnModuleDestroy {
       // Record latency snapshot in Metrics sliding window
       this.metricsService.recordLatency(queueName, result.duration);
 
-      // Emit job.completed event
-      this.wsGateway.broadcast('job.completed', {
-        queueName,
+      // Record and broadcast telemetry
+      this.telemetryService.recordEvent({
+        type: 'job.completed',
+        queueName: queueName as QueueName,
         jobId: job.id,
         jobName: job.name,
         status: 'completed',
-        timestamp: Date.now(),
-        latency: result.duration,
+        duration: result.duration,
       });
     });
 
@@ -143,19 +156,21 @@ export class WorkersService implements OnModuleInit, OnModuleDestroy {
       if (isDeadLetter) {
         this.logger.warn(`Job ${job.id} permanently failed inside queue ${queueName}. Relocating to Dead-Letter Queue.`);
 
-        // 1. Move original job parameters to Dead-Letter Queue (DLQ) support queue
-        const dlq = this.queuesService.getQueue('dead_letter_queue');
-        if (dlq) {
-          await dlq.add(job.name, {
-            originalQueue: queueName,
-            originalJobName: job.name,
-            originalData: job.data,
-            failedAt: Date.now(),
-            errorMessage: err.message,
-            stackTrace: err.stack,
-            attemptsMade,
-          });
-        }
+        // 1. Construct and save DeadLetterJob to DB
+        const dlqJob = {
+          id: `dlq_${job.id || Math.random().toString(36).substr(2, 9)}`,
+          queueName: queueName as QueueName,
+          jobId: job.id || '',
+          jobName: job.name,
+          payload: job.data,
+          failedReason: err.message,
+          stackTrace: err.stack ? [err.stack] : [],
+          attemptsMade,
+          maxAttempts,
+          timestamp: Date.now(),
+          replayStatus: 'pending' as const,
+        };
+        await this.dbService.saveDeadLetterJob(dlqJob);
 
         // 2. Broadcast deadlettered event via websockets
         this.wsGateway.broadcast('job.deadlettered', {
@@ -181,7 +196,7 @@ export class WorkersService implements OnModuleInit, OnModuleDestroy {
   }
 
   private broadcastWorkerHealth() {
-    const queueNames = ['email_queue', 'image_processing_queue', 'webhook_delivery_queue', 'ai_task_queue'];
+    const queueNames = ['email_notifications', 'webhook_delivery', 'image_processing', 'ai_tasks'];
     const config = this.simConfig.getConfig();
 
     const healthReports = queueNames.map((name) => {
@@ -194,8 +209,56 @@ export class WorkersService implements OnModuleInit, OnModuleDestroy {
         cpuUsage = 85 + Math.random() * 10;
         memoryUsage = 70 + Math.random() * 15;
       } else if (
-        (config.simulateSmtpFailure && name === 'email_queue') ||
-        (config.simulateWebhookOutage && name === 'webhook_delivery_queue') ||
+        (config.simulateSmtpFailure && name === 'email_notifications') ||
+        (config.simulateWebhookOutage && name === 'webhook_delivery') ||
+        config.simulateTimeoutFailure
+      ) {
+        status = 'down';
+        cpuUsage = 2 + Math.random() * 3;
+        memoryUsage = 15 + Math.random() * 5;
+      }
+
+      const report = {
+        workerId: `worker_${name}_1`,
+        queueName: name as QueueName,
+        status,
+        concurrency: name === 'email_notifications' ? 2 : 5,
+        cpuUsage: Math.round(cpuUsage),
+        memoryUsage: Math.round(memoryUsage),
+        lastActive: Date.now(),
+      };
+
+      // Record status in telemetry
+      this.telemetryService.recordEvent({
+        type: 'worker.status',
+        queueName: name as QueueName,
+        workerId: report.workerId,
+        status: status === 'down' ? 'offline' : 'online',
+        latency: status === 'overloaded' ? 9000 : 800,
+      });
+
+      return report;
+    });
+
+    this.wsGateway.broadcast('worker.health.updated', healthReports);
+  }
+
+  getWorkersList(): any[] {
+    const queueNames = ['email_notifications', 'webhook_delivery', 'image_processing', 'ai_tasks'];
+    const config = this.simConfig.getConfig();
+
+    return queueNames.map((name) => {
+      let status: 'healthy' | 'overloaded' | 'down' = 'healthy';
+      let cpuUsage = 5 + Math.random() * 15;
+      let memoryUsage = 20 + Math.random() * 25;
+
+      if (config.simulateWorkerSlowdown) {
+        status = 'overloaded';
+        cpuUsage = 85 + Math.random() * 10;
+        memoryUsage = 70 + Math.random() * 15;
+      } else if (
+        (config.simulateSmtpFailure && name === 'email_notifications') ||
+        (config.simulateWebhookOutage && name === 'webhook_delivery') ||
         config.simulateTimeoutFailure
       ) {
         status = 'down';
@@ -207,14 +270,12 @@ export class WorkersService implements OnModuleInit, OnModuleDestroy {
         workerId: `worker_${name}_1`,
         queueName: name,
         status,
-        concurrency: name === 'email_queue' ? 2 : 5,
+        concurrency: name === 'email_notifications' ? 2 : 5,
         cpuUsage: Math.round(cpuUsage),
         memoryUsage: Math.round(memoryUsage),
         lastActive: Date.now(),
       };
     });
-
-    this.wsGateway.broadcast('worker.health.updated', healthReports);
   }
 
   async onModuleDestroy() {
@@ -222,8 +283,18 @@ export class WorkersService implements OnModuleInit, OnModuleDestroy {
       clearInterval(this.healthInterval);
     }
     for (const [name, worker] of this.workers) {
+      // Record worker offline
+      try {
+        this.telemetryService.recordEvent({
+          type: 'worker.status',
+          queueName: name as QueueName,
+          workerId: `worker_${name}_1`,
+          status: 'offline',
+        });
+      } catch (e) {}
       await worker.close();
       this.logger.log(`Worker processor for queue "${name}" connection closed.`);
     }
   }
 }
+

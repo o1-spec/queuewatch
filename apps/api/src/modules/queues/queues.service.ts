@@ -1,10 +1,11 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger, Inject, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue, Job } from 'bullmq';
 import { QueueName } from '@queuewatch/shared';
 import Redis from 'ioredis';
 import { QueueWebSocketGateway } from '../websocket/websocket.gateway';
 import { SimulationConfigService } from './simulation-config.service';
+import { TelemetryService } from '../telemetry/telemetry.service';
 
 @Injectable()
 export class QueuesService implements OnModuleInit, OnModuleDestroy {
@@ -15,7 +16,9 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private configService: ConfigService,
     private wsGateway: QueueWebSocketGateway,
-    public simConfig: SimulationConfigService
+    public simConfig: SimulationConfigService,
+    @Inject(forwardRef(() => TelemetryService))
+    private telemetryService: TelemetryService
   ) {}
 
   async onModuleInit() {
@@ -46,10 +49,10 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
 
   private initializeQueues() {
     const queueNames = [
-      'email_queue',
-      'image_processing_queue',
-      'webhook_delivery_queue',
-      'ai_task_queue',
+      'email_notifications',
+      'webhook_delivery',
+      'image_processing',
+      'ai_tasks',
       'dead_letter_queue', // Custom support queue holding failed metadata
     ];
 
@@ -89,10 +92,10 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
   async getQueuesList(): Promise<any[]> {
     const list: any[] = [];
     const activeQueueNames = [
-      'email_queue',
-      'image_processing_queue',
-      'webhook_delivery_queue',
-      'ai_task_queue',
+      'email_notifications',
+      'webhook_delivery',
+      'image_processing',
+      'ai_tasks',
     ];
 
     for (const name of activeQueueNames) {
@@ -131,13 +134,14 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
     const job = await queue.add(jobName, data);
     this.logger.log(`Enqueued job ${job.id} (${jobName}) inside ${queueName}`);
 
-    // Emit job.created event via Socket.IO
-    this.wsGateway.broadcast('job.created', {
-      queueName,
+    // Record and broadcast telemetry
+    this.telemetryService.recordEvent({
+      type: 'job.created',
+      queueName: queueName as QueueName,
       jobId: job.id,
       jobName,
       status: 'waiting',
-      timestamp: Date.now(),
+      payload: data,
     });
 
     return {

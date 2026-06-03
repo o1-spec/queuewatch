@@ -8,7 +8,7 @@ import { QueueName } from '@queuewatch/shared';
 import { useAuth } from '../../context/AuthContext';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-const QUEUES = ['email_queue', 'image_processing_queue', 'webhook_delivery_queue', 'ai_task_queue'] as const;
+const QUEUES = ['email_notifications', 'webhook_delivery', 'image_processing', 'ai_tasks'] as const;
 
 export default function OutageControls() {
   const { authFetch } = useAuth();
@@ -21,38 +21,19 @@ export default function OutageControls() {
     simulateTimeoutFailure: false,
   });
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState<string | null>(null);
   const [dispatchLoading, setDispatchLoading] = useState<string | null>(null);
   const [customPayload, setCustomPayload] = useState<string>('{\n  "email": "user@hackathon.dev",\n  "name": "Jane Miller"\n}');
-  const [selectedQueue, setSelectedQueue] = useState<QueueName>('email_queue');
-  const [selectedJobAction, setSelectedJobAction] = useState<string>('welcome_email');
-
-  // Load active simulation states from backend on mount
-  const fetchSimConfig = async () => {
-    try {
-      const res = await authFetch(`${API_URL}/api/queues`);
-      if (res.ok) {
-        // Since config resides in memory, it will map to running settings
-        // We can check if any worker indicates active simulations
-      }
-    } catch (e) {
-      console.error('Failed to load active simulation flags:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchSimConfig();
-  }, []);
+  const [selectedQueue, setSelectedQueue] = useState<QueueName>('email_notifications');
+  const [selectedJobAction, setSelectedJobAction] = useState<string>('send_welcome_email');
 
   // Listen to workers updates to sync toggle switches automatically
   useSocket({
     'worker.health.updated': (data: any[]) => {
-      const emailWorker = data.find(w => w.queueName === 'email_queue');
-      const webhookWorker = data.find(w => w.queueName === 'webhook_delivery_queue');
-      const imageWorker = data.find(w => w.queueName === 'image_processing_queue');
+      const emailWorker = data.find(w => w.queueName === 'email_notifications');
+      const webhookWorker = data.find(w => w.queueName === 'webhook_delivery');
+      const imageWorker = data.find(w => w.queueName === 'image_processing');
       
       setSimConfig((prev) => ({
         ...prev,
@@ -64,20 +45,27 @@ export default function OutageControls() {
     }
   });
 
-  // Sync state to backend
+  // Sync state to backend using new endpoints
   const updateConfig = async (key: string, value: boolean) => {
-    const newConfig = { ...simConfig, [key]: value };
-    setSimConfig(newConfig);
     setSubmitting(key);
+    let endpoint = 'normal-traffic';
+    
+    if (key === 'simulateSmtpFailure' && value) endpoint = 'smtp-failure';
+    else if (key === 'simulateWebhookOutage' && value) endpoint = 'webhook-outage';
+    else if (key === 'simulateWorkerSlowdown' && value) endpoint = 'worker-slowdown';
+    else if (key === 'simulateInvalidPayload' && value) endpoint = 'invalid-payload';
+    else if (!value) endpoint = 'recover';
 
     try {
-      await authFetch(`${API_URL}/api/queues/email_queue/simulate`, {
+      const res = await authFetch(`${API_URL}/api/simulation/${endpoint}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [key]: value }),
       });
+      if (res.ok) {
+        const body = await res.json();
+        setSimConfig(body.config);
+      }
     } catch (e) {
-      console.error(`Failed to push simulation key ${key}:`, e);
+      console.error(`Failed to push simulation endpoint ${endpoint}:`, e);
     } finally {
       setSubmitting(null);
     }
@@ -85,25 +73,16 @@ export default function OutageControls() {
 
   const recoverAllWorkers = async () => {
     setSubmitting('recovery');
-    const healthyConfig = {
-      generateTraffic: true,
-      simulateSmtpFailure: false,
-      simulateWebhookOutage: false,
-      simulateWorkerSlowdown: false,
-      simulateInvalidPayload: false,
-      simulateTimeoutFailure: false,
-    };
-
-    setSimConfig(healthyConfig);
-
     try {
-      await authFetch(`${API_URL}/api/queues/email_queue/simulate`, {
+      const res = await authFetch(`${API_URL}/api/simulation/recover`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(healthyConfig),
       });
+      if (res.ok) {
+        const body = await res.json();
+        setSimConfig(body.config);
+      }
     } catch (e) {
-      console.error('Failed to recovery simulation settings:', e);
+      console.error('Failed to recover simulation settings:', e);
     } finally {
       setSubmitting(null);
     }
@@ -111,19 +90,18 @@ export default function OutageControls() {
 
   const handleQueueChange = (queue: QueueName) => {
     setSelectedQueue(queue);
-    // Pre-populate sensible actions and payloads based on queue selection
-    if (queue === 'email_queue') {
-      setSelectedJobAction('welcome_email');
+    if (queue === 'email_notifications') {
+      setSelectedJobAction('send_welcome_email');
       setCustomPayload(JSON.stringify({ email: "user@hackathon.dev", name: "Jane Miller" }, null, 2));
-    } else if (queue === 'webhook_delivery_queue') {
-      setSelectedJobAction('stripe_invoice');
+    } else if (queue === 'webhook_delivery') {
+      setSelectedJobAction('stripe_invoice_payment_succeeded');
       setCustomPayload(JSON.stringify({ invoiceId: "in_stripe_8231", amount: 4900, currency: "usd" }, null, 2));
-    } else if (queue === 'image_processing_queue') {
-      setSelectedJobAction('profile_avatar');
+    } else if (queue === 'image_processing') {
+      setSelectedJobAction('resize_avatar');
       setCustomPayload(JSON.stringify({ userId: "usr_avatar_9182", imageUrl: "https://assets.dev/avatar.jpg" }, null, 2));
-    } else if (queue === 'ai_task_queue') {
-      setSelectedJobAction('reliability_audit');
-      setCustomPayload(JSON.stringify({ auditId: "aud_9281", targetServer: "us-east-1", scope: "memory_footprint" }, null, 2));
+    } else if (queue === 'ai_tasks') {
+      setSelectedJobAction('vectorize_documents');
+      setCustomPayload(JSON.stringify({ docId: "doc_9281", scope: "memory_footprint" }, null, 2));
     }
   };
 
@@ -139,7 +117,7 @@ export default function OutageControls() {
         return;
       }
 
-      const res = await authFetch(`${API_URL}/api/queues/${selectedQueue}/jobs`, {
+      await authFetch(`${API_URL}/api/queues/${selectedQueue}/jobs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -147,13 +125,6 @@ export default function OutageControls() {
           data: parsed
         })
       });
-
-      if (res.ok) {
-        // Job successfully added.
-      } else {
-        const errorText = await res.text();
-        console.error('Manual enqueue failed:', errorText);
-      }
     } catch (e) {
       console.error('Failed manual job dispatch:', e);
     } finally {
@@ -168,7 +139,7 @@ export default function OutageControls() {
         <div>
           <h2 className="text-sm font-bold text-white tracking-tight flex items-center space-x-2 uppercase">
             <Sliders className="w-4 h-4 text-zinc-400 shrink-0" />
-            <span>Simulation Sandbox & Incident Injectors</span>
+            <span>Incident Sandbox & Outage Injectors</span>
           </h2>
           <p className="text-[10px] text-zinc-500 mt-0.5">
             Inject artificial background traffic, trigger worker bottlenecks, and dispatch custom BullMQ job schemas.
@@ -317,7 +288,7 @@ export default function OutageControls() {
                           : 'bg-zinc-950 border-zinc-900 text-zinc-500 hover:border-zinc-800 hover:text-zinc-300'
                       }`}
                     >
-                      {q.replace('_queue', '')}
+                      {q.replace('_notifications', '').replace('_tasks', '')}
                     </button>
                   ))}
                 </div>
@@ -331,7 +302,7 @@ export default function OutageControls() {
                   value={selectedJobAction}
                   onChange={(e) => setSelectedJobAction(e.target.value)}
                   className="w-full bg-zinc-900/25 border border-zinc-900 rounded px-3 py-2 text-[10px] text-white focus:outline-none focus:border-zinc-850"
-                  placeholder="e.g. welcome_email"
+                  placeholder="e.g. send_welcome_email"
                 />
               </div>
 
@@ -341,8 +312,8 @@ export default function OutageControls() {
                   <label className="text-zinc-500">JSON Parameters Payload Input</label>
                   <button 
                     onClick={() => {
-                      if (selectedQueue === 'image_processing_queue') {
-                        setCustomPayload('{\n  "userId": "usr_avatar_9182"\n}'); // missing imageUrl, triggers invalid schema
+                      if (selectedQueue === 'image_processing') {
+                        setCustomPayload('{\n  "userId": "usr_avatar_9182"\n}'); // missing imageUrl
                       }
                     }}
                     className="text-zinc-400 hover:text-white text-[8px] lowercase flex items-center space-x-1"

@@ -28,12 +28,12 @@ import LandingLoader from '../components/LandingLoader';
 
 export default function SaaSLandingPage() {
   const [logs, setLogs] = useState<Array<{ time: string; queue: string; job: string; attempt: string; status: 'SUCCESS' | 'ACTIVE' | 'RETRY' | 'FAILED' | 'DLQ'; details: string }>>([
-    { time: '21:40:12.103', queue: 'email_queue', job: 'welcome_email', attempt: '1/3', status: 'ACTIVE', details: 'Worker thread [node-1] popped job welcome_email' },
-    { time: '21:40:12.450', queue: 'email_queue', job: 'welcome_email', attempt: '1/3', status: 'SUCCESS', details: 'Job processed successfully in 347ms' },
-    { time: '21:40:13.120', queue: 'webhook_delivery_queue', job: 'stripe_invoice', attempt: '1/3', status: 'ACTIVE', details: 'Pushing webhook request payload to partner endpoint' },
-    { time: '21:40:14.210', queue: 'webhook_delivery_queue', job: 'stripe_invoice', attempt: '1/3', status: 'RETRY', details: 'HTTP 503 Service Unavailable - Scheduling exponential backoff (2000ms)' },
-    { time: '21:40:16.215', queue: 'webhook_delivery_queue', job: 'stripe_invoice', attempt: '2/3', status: 'ACTIVE', details: 'Pushing webhook request payload (retry attempt 2)' },
-    { time: '21:40:17.302', queue: 'webhook_delivery_queue', job: 'stripe_invoice', attempt: '2/3', status: 'RETRY', details: 'HTTP 503 Service Unavailable - Scheduling exponential backoff (4000ms)' },
+    { time: '21:40:12.103', queue: 'email_notifications', job: 'welcome_email', attempt: '1/3', status: 'ACTIVE', details: 'Worker thread [node-1] popped job welcome_email' },
+    { time: '21:40:12.450', queue: 'email_notifications', job: 'welcome_email', attempt: '1/3', status: 'SUCCESS', details: 'Job processed successfully in 347ms' },
+    { time: '21:40:13.120', queue: 'webhook_delivery', job: 'stripe_invoice', attempt: '1/3', status: 'ACTIVE', details: 'Pushing webhook request payload to partner endpoint' },
+    { time: '21:40:14.210', queue: 'webhook_delivery', job: 'stripe_invoice', attempt: '1/3', status: 'RETRY', details: 'HTTP 503 Service Unavailable - Scheduling exponential backoff (2000ms)' },
+    { time: '21:40:16.215', queue: 'webhook_delivery', job: 'stripe_invoice', attempt: '2/3', status: 'ACTIVE', details: 'Pushing webhook request payload (retry attempt 2)' },
+    { time: '21:40:17.302', queue: 'webhook_delivery', job: 'stripe_invoice', attempt: '2/3', status: 'RETRY', details: 'HTTP 503 Service Unavailable - Scheduling exponential backoff (4000ms)' },
   ]);
 
   useEffect(() => {
@@ -41,12 +41,12 @@ export default function SaaSLandingPage() {
       setLogs((prev) => {
         const nextLogs = [...prev];
         const newLogOptions = [
-          { time: new Date().toLocaleTimeString(), queue: 'image_processing_queue', job: 'profile_avatar', attempt: '1/5', status: 'ACTIVE' as const, details: 'Resizing avatar binary upload usr_avatar_9182' },
-          { time: new Date().toLocaleTimeString(), queue: 'image_processing_queue', job: 'profile_avatar', attempt: '1/5', status: 'SUCCESS' as const, details: 'Avatar successfully processed, written to S3 bucket' },
-          { time: new Date().toLocaleTimeString(), queue: 'webhook_delivery_queue', job: 'stripe_invoice', attempt: '3/3', status: 'FAILED' as const, details: 'HTTP 503 Timeout - Max retries exceeded' },
-          { time: new Date().toLocaleTimeString(), queue: 'webhook_delivery_queue', job: 'stripe_invoice', attempt: '3/3', status: 'DLQ' as const, details: 'Routed to dead_letter_queue. DLQ incident logged.' },
-          { time: new Date().toLocaleTimeString(), queue: 'ai_task_queue', job: 'reliability_audit', attempt: '1/3', status: 'ACTIVE' as const, details: 'Auditing active waiting counts on queues:email_queue' },
-          { time: new Date().toLocaleTimeString(), queue: 'ai_task_queue', job: 'reliability_audit', attempt: '1/3', status: 'SUCCESS' as const, details: 'Remediation blueprint written to queuewatch:ai_snapshots' },
+          { time: new Date().toLocaleTimeString(), queue: 'image_processing', job: 'profile_avatar', attempt: '1/5', status: 'ACTIVE' as const, details: 'Resizing avatar binary upload usr_avatar_9182' },
+          { time: new Date().toLocaleTimeString(), queue: 'image_processing', job: 'profile_avatar', attempt: '1/5', status: 'SUCCESS' as const, details: 'Avatar successfully processed, written to S3 bucket' },
+          { time: new Date().toLocaleTimeString(), queue: 'webhook_delivery', job: 'stripe_invoice', attempt: '3/3', status: 'FAILED' as const, details: 'HTTP 503 Timeout - Max retries exceeded' },
+          { time: new Date().toLocaleTimeString(), queue: 'webhook_delivery', job: 'stripe_invoice', attempt: '3/3', status: 'DLQ' as const, details: 'Routed to dead_letter_queue. DLQ incident logged.' },
+          { time: new Date().toLocaleTimeString(), queue: 'ai_tasks', job: 'reliability_audit', attempt: '1/3', status: 'ACTIVE' as const, details: 'Auditing active waiting counts on queues:email_notifications' },
+          { time: new Date().toLocaleTimeString(), queue: 'ai_tasks', job: 'reliability_audit', attempt: '1/3', status: 'SUCCESS' as const, details: 'Remediation blueprint written to queuewatch:ai_snapshots' },
         ];
 
         const randomItem = newLogOptions[Math.floor(Math.random() * newLogOptions.length)];
@@ -118,11 +118,11 @@ export default function SaaSLandingPage() {
           </div>
 
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight leading-[1.05]">
-            Visibility for asynchronous systems.
+            Operational diagnostics for asynchronous systems.
           </h2>
 
           <p className="text-zinc-400 text-sm leading-relaxed max-w-xl">
-            A lightweight, production-ready observability platform for BullMQ. Monitor queues, retries, and worker failures in one unified, real-time pane.
+            A lightweight, production-ready diagnostics and observability platform for BullMQ. Monitor queues, retries, and worker failures in one unified, real-time pane.
           </p>
 
           {/* Copyable CLI Command */}
@@ -205,21 +205,21 @@ export default function SaaSLandingPage() {
                 </thead>
                 <tbody>
                   <tr className="border-b border-zinc-900/40 text-zinc-300">
-                    <td className="p-2 text-white">image-processing-queue</td>
+                    <td className="p-2 text-white">image_processing</td>
                     <td className="p-2 text-right text-zinc-500">12</td>
                     <td className="p-2 text-right text-indigo-400">3</td>
                     <td className="p-2 text-right text-zinc-500">1,432</td>
                     <td className="p-2 text-right text-rose-500">2</td>
                   </tr>
                   <tr className="border-b border-zinc-900/40 text-zinc-300">
-                    <td className="p-2 text-white">webhook-delivery-queue</td>
+                    <td className="p-2 text-white">webhook_delivery</td>
                     <td className="p-2 text-right text-zinc-500">0</td>
                     <td className="p-2 text-right text-zinc-500">0</td>
                     <td className="p-2 text-right text-zinc-500">8,941</td>
                     <td className="p-2 text-right text-rose-500">1</td>
                   </tr>
                   <tr className="text-zinc-300">
-                    <td className="p-2 text-white">ai-task-queue</td>
+                    <td className="p-2 text-white">ai_tasks</td>
                     <td className="p-2 text-right text-zinc-500">1</td>
                     <td className="p-2 text-right text-indigo-400">1</td>
                     <td className="p-2 text-right text-zinc-500">312</td>
@@ -285,7 +285,7 @@ export default function SaaSLandingPage() {
                 <span>WebSocket Stream Connected</span>
               </div>
               <div className="text-[10.5px] text-zinc-500">
-                Subscribed to: email_queue, image_processing_queue, webhook_delivery_queue, ai_task_queue
+                Subscribed to: email_notifications, image_processing, webhook_delivery, ai_tasks
               </div>
             </div>
           </div>
@@ -332,7 +332,7 @@ export default function SaaSLandingPage() {
 
           <div className="space-y-1 font-mono">
             <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-zinc-500">
-              <span>queue: image_processing_queue</span>
+              <span>queue: image_processing</span>
               <span className="hidden sm:inline">&bull;</span>
               <span>attempts: 5/5 retries failed</span>
             </div>

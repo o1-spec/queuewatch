@@ -50,7 +50,7 @@ export default function QueuesExplorer() {
   }, []);
 
   useSocket({
-    'queue.metrics.updated': (socketMetrics: QueueMetrics[]) => {
+    'metrics.updated': (socketMetrics: QueueMetrics[]) => {
       setMetrics(socketMetrics);
       setQueues((prev) =>
         prev.map((q) => {
