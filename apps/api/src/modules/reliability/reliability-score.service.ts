@@ -8,25 +8,25 @@ export class ReliabilityScoreService {
 
   constructor(private readonly dbService: DbService) {}
 
-  async getLatestScores(): Promise<ReliabilityScore[]> {
-    const scores = await this.dbService.getReliabilityScores();
+  async getLatestScores(projectId?: string): Promise<ReliabilityScore[]> {
+    const scores = await this.dbService.getReliabilityScores(projectId);
     if (scores.length === 0) {
       // Calculate and save initial scores dynamically
-      await this.recalculateAllScores();
-      return this.dbService.getReliabilityScores();
+      await this.recalculateAllScores(projectId);
+      return this.dbService.getReliabilityScores(projectId);
     }
     return scores;
   }
 
-  async getHistory(targetId: string): Promise<ReliabilityScore[]> {
-    return this.dbService.getReliabilityHistory(targetId);
+  async getHistory(targetId: string, projectId?: string): Promise<ReliabilityScore[]> {
+    return this.dbService.getReliabilityHistory(targetId, projectId);
   }
 
-  async recalculateAllScores(): Promise<void> {
+  async recalculateAllScores(projectId?: string): Promise<void> {
     try {
-      const incidents = await this.dbService.getIncidents();
-      const telemetry = await this.dbService.getTelemetry(100);
-      const workers = await this.dbService.getWorkers();
+      const incidents = await this.dbService.getIncidents(projectId);
+      const telemetry = await this.dbService.getTelemetry(100, projectId);
+      const workers = await this.dbService.getWorkers(projectId);
 
       // We'll calculate scores for our seeded queues
       const queueNames = ['email_notifications', 'webhook_delivery', 'image_processing', 'ai_tasks'];
@@ -71,12 +71,12 @@ export class ReliabilityScoreService {
           timestamp: Date.now()
         };
 
-        await this.dbService.saveReliabilityScore(newScore);
+        await this.dbService.saveReliabilityScore(newScore, projectId);
       }
 
       // Also calculate for the services based on their linked queues
-      const services = await this.dbService.getServices();
-      const allScores = await this.dbService.getReliabilityScores();
+      const services = await this.dbService.getServices(projectId);
+      const allScores = await this.dbService.getReliabilityScores(projectId);
 
       for (const svc of services) {
         let scoreSum = 0;
@@ -105,7 +105,7 @@ export class ReliabilityScoreService {
           timestamp: Date.now()
         };
 
-        await this.dbService.saveReliabilityScore(newScore);
+        await this.dbService.saveReliabilityScore(newScore, projectId);
       }
     } catch (e) {
       this.logger.error('Failed to recalculate SRE reliability scores:', e);

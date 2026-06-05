@@ -8,12 +8,12 @@ export class DependencyGraphService {
 
   constructor(private readonly dbService: DbService) {}
 
-  async getGraph(): Promise<DependencyGraph> {
-    return this.dbService.getDependencyGraph();
+  async getGraph(projectId?: string): Promise<DependencyGraph> {
+    return this.dbService.getDependencyGraph(projectId);
   }
 
-  async getDependencies(serviceId: string): Promise<{ upstream: string[]; downstream: string[] }> {
-    const graph = await this.getGraph();
+  async getDependencies(serviceId: string, projectId?: string): Promise<{ upstream: string[]; downstream: string[] }> {
+    const graph = await this.getGraph(projectId);
     const downstream = graph.serviceImpacts[serviceId] || [];
     
     // Compute upstream dynamically by looking for serviceId in downstream lists
@@ -27,8 +27,8 @@ export class DependencyGraphService {
     return { upstream, downstream };
   }
 
-  async addDependencyEdge(from: string, to: string): Promise<DependencyGraph> {
-    const graph = await this.getGraph();
+  async addDependencyEdge(from: string, to: string, projectId?: string): Promise<DependencyGraph> {
+    const graph = await this.getGraph(projectId);
     // Add edge if not exists
     const exists = graph.edges.some(e => e.from === from && e.to === to);
     if (!exists) {
@@ -40,7 +40,7 @@ export class DependencyGraphService {
           graph.serviceImpacts[from].push(to);
         }
       }
-      await this.dbService.saveDependencyGraph(graph);
+      await this.dbService.saveDependencyGraph(graph, projectId);
     }
     return graph;
   }

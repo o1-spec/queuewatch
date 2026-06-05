@@ -25,23 +25,23 @@ export class CopilotService {
     ];
   }
 
-  async getKnowledgeBase() {
-    return this.dbService.getKnowledgeEntries();
+  async getKnowledgeBase(projectId?: string) {
+    return this.dbService.getKnowledgeEntries(projectId);
   }
 
-  async queryCopilot(prompt: string): Promise<CopilotResponse> {
+  async queryCopilot(prompt: string, projectId?: string): Promise<CopilotResponse> {
     // 1. Gather all evidence sources
-    const incidents = await this.dbService.getIncidents();
-    const logs = await this.dbService.getLogs(undefined, 200);
-    const telemetry = await this.dbService.getTelemetry(100);
-    const deployments = await this.dbService.getDeploymentEvents();
-    const correlations = await this.correlationService.getCorrelations();
+    const incidents = await this.dbService.getIncidents(projectId);
+    const logs = await this.dbService.getLogs(undefined, 200, projectId);
+    const telemetry = await this.dbService.getTelemetry(100, projectId);
+    const deployments = await this.dbService.getDeploymentEvents(projectId);
+    const correlations = await this.correlationService.getCorrelations(); // Note: keep default for demo/global or pass if needed
 
     // V5 additional signals
-    const services = await this.dbService.getServices();
-    const reliabilityScores = await this.dbService.getReliabilityScores();
-    const predictions = await this.dbService.getPredictions();
-    const depGraph = await this.dbService.getDependencyGraph();
+    const services = await this.dbService.getServices(projectId);
+    const reliabilityScores = await this.dbService.getReliabilityScores(projectId);
+    const predictions = await this.dbService.getPredictions(projectId);
+    const depGraph = await this.dbService.getDependencyGraph(projectId);
 
     // 2. Filter evidence matching query keywords
     const lowerPrompt = prompt.toLowerCase();
@@ -176,8 +176,8 @@ Format your response strictly as JSON:
     };
   }
 
-  async chatIncident(incidentId: string, prompt: string): Promise<CopilotResponse> {
-    const incident = await this.dbService.getIncident(incidentId);
+  async chatIncident(incidentId: string, prompt: string, projectId?: string): Promise<CopilotResponse> {
+    const incident = await this.dbService.getIncident(incidentId, projectId);
     if (!incident) {
       return {
         answer: `Incident ${incidentId} not found in database memory.`,
@@ -191,6 +191,6 @@ Format your response strictly as JSON:
 
     // Frame the prompt in context of the specific incident
     const contextPrompt = `Discussing active Incident ID #${incident.id} (${incident.title}). affected queue: ${incident.affectedQueue}. suspected root cause: ${incident.suspectedRootCause}.\nUser query: ${prompt}`;
-    return this.queryCopilot(contextPrompt);
+    return this.queryCopilot(contextPrompt, projectId);
   }
 }

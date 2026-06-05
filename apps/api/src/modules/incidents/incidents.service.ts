@@ -23,16 +23,16 @@ export class IncidentsService {
     private jiraService: JiraService
   ) {}
 
-  async getIncidents(): Promise<Incident[]> {
-    const list = await this.dbService.getIncidents();
+  async getIncidents(projectId?: string): Promise<Incident[]> {
+    const list = await this.dbService.getIncidents(projectId);
     return list.sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt);
   }
 
-  async getIncidentById(id: string): Promise<Incident | null> {
-    return this.dbService.getIncident(id);
+  async getIncidentById(id: string, projectId?: string): Promise<Incident | null> {
+    return this.dbService.getIncident(id, projectId);
   }
 
-  async createIncident(data: Omit<Incident, 'id' | 'firstDetectedAt' | 'lastUpdatedAt'>): Promise<Incident> {
+  async createIncident(data: Omit<Incident, 'id' | 'firstDetectedAt' | 'lastUpdatedAt'>, projectId?: string): Promise<Incident> {
     const id = `inc_${Math.random().toString(36).substr(2, 9)}`;
     const now = Date.now();
     const newIncident: Incident = {
@@ -43,8 +43,8 @@ export class IncidentsService {
       status: 'open',
     };
 
-    await this.dbService.saveIncident(newIncident);
-    this.wsGateway.broadcast('incident.created', newIncident);
+    await this.dbService.saveIncident(newIncident, projectId);
+    this.wsGateway.broadcast('incident.created', { ...newIncident, projectId });
     this.logger.warn(`[Incident] New incident created: ${newIncident.title} on queue ${newIncident.affectedQueue}`);
 
     // Trigger alerts safely
@@ -57,8 +57,8 @@ export class IncidentsService {
     return newIncident;
   }
 
-  async updateIncident(id: string, updates: Partial<Incident>): Promise<Incident> {
-    const existing = await this.dbService.getIncident(id);
+  async updateIncident(id: string, updates: Partial<Incident>, projectId?: string): Promise<Incident> {
+    const existing = await this.dbService.getIncident(id, projectId);
     if (!existing) {
       throw new Error(`Incident with ID ${id} not found`);
     }
@@ -69,14 +69,14 @@ export class IncidentsService {
       lastUpdatedAt: Date.now(),
     };
 
-    await this.dbService.saveIncident(updated);
-    this.wsGateway.broadcast('incident.updated', updated);
+    await this.dbService.saveIncident(updated, projectId);
+    this.wsGateway.broadcast('incident.updated', { ...updated, projectId });
     this.logger.log(`[Incident] Incident updated: ${updated.id} (${updated.status})`);
     return updated;
   }
 
-  async acknowledgeIncident(id: string, userId = 'admin', userName = 'Admin Owner'): Promise<Incident> {
-    const incident = await this.dbService.getIncident(id);
+  async acknowledgeIncident(id: string, userId = 'admin', userName = 'Admin Owner', projectId?: string): Promise<Incident> {
+    const incident = await this.dbService.getIncident(id, projectId);
     if (!incident) throw new Error(`Incident ${id} not found`);
 
     const updated = await this.updateIncident(id, {
@@ -84,31 +84,31 @@ export class IncidentsService {
       acknowledgedAt: Date.now(),
       assigneeId: userId,
       responseOwner: userName,
-    });
+    }, projectId);
 
-    this.wsGateway.broadcast('incident.acknowledged', updated);
+    this.wsGateway.broadcast('incident.acknowledged', { ...updated, projectId });
     return updated;
   }
 
-  async assignIncident(id: string, userId: string, userName: string): Promise<Incident> {
+  async assignIncident(id: string, userId: string, userName: string, projectId?: string): Promise<Incident> {
     const updated = await this.updateIncident(id, {
       assigneeId: userId,
       responseOwner: userName,
-    });
-    this.wsGateway.broadcast('incident.assigned', updated);
+    }, projectId);
+    this.wsGateway.broadcast('incident.assigned', { ...updated, projectId });
     return updated;
   }
 
-  async escalateIncident(id: string): Promise<Incident> {
-    const incident = await this.dbService.getIncident(id);
+  async escalateIncident(id: string, projectId?: string): Promise<Incident> {
+    const incident = await this.dbService.getIncident(id, projectId);
     if (!incident) throw new Error(`Incident ${id} not found`);
 
     const updated = await this.updateIncident(id, {
       status: 'investigating',
       escalatedAt: Date.now(),
-    });
+    }, projectId);
 
-    this.wsGateway.broadcast('incident.escalated', updated);
+    this.wsGateway.broadcast('incident.escalated', { ...updated, projectId });
 
     // Send escalated alerts
     try {
@@ -120,8 +120,8 @@ export class IncidentsService {
     return updated;
   }
 
-  async resolveIncident(id: string, summary: string): Promise<Incident> {
-    const incident = await this.dbService.getIncident(id);
+  async resolveIncident(id: string, summary: string, projectId?: string): Promise<Incident> {
+    const incident = await this.dbService.getIncident(id, projectId);
     if (!incident) throw new Error(`Incident ${id} not found`);
 
     const now = Date.now();
@@ -150,7 +150,7 @@ export class IncidentsService {
       status: 'resolved',
       resolvedAt: now,
       resolutionSummary,
-    });
+    }, projectId);
 
     // V4: Automatically generate Knowledge Base entry on resolution
     try {
@@ -163,20 +163,20 @@ export class IncidentsService {
         resolution: summary || 'Manual service restart.',
         preventionRecommendation: incident.recommendation || 'No custom recommendation.',
         createdAt: now,
-      });
+      }, projectId);
       this.logger.log(`Automatically registered Knowledge Base entry for incident ${id}.`);
     } catch (e) {
       this.logger.error(`Failed to register knowledge base entry: ${e.message}`);
     }
 
-    this.wsGateway.broadcast('incident.resolved', updated);
-    this.wsGateway.broadcast('postmortem.generated', { incidentId: id, resolutionSummary });
+    this.wsGateway.broadcast('incident.resolved', { ...updated, projectId });
+    this.wsGateway.broadcast('postmortem.generated', { incidentId: id, resolutionSummary, projectId });
     return updated;
   }
 
   // --- External issue trackers ---
-  async createGitHubIssue(id: string): Promise<Incident> {
-    const incident = await this.dbService.getIncident(id);
+  async createGitHubIssue(id: string, projectId?: string): Promise<Incident> {
+    const incident = await this.dbService.getIncident(id, projectId);
     if (!incident) throw new Error(`Incident ${id} not found`);
 
     const issueUrl = await this.gitHubService.createIssue(
@@ -187,11 +187,11 @@ export class IncidentsService {
 
     return this.updateIncident(id, {
       githubIssueUrl: issueUrl,
-    });
+    }, projectId);
   }
 
-  async createJiraTicket(id: string): Promise<Incident> {
-    const incident = await this.dbService.getIncident(id);
+  async createJiraTicket(id: string, projectId?: string): Promise<Incident> {
+    const incident = await this.dbService.getIncident(id, projectId);
     if (!incident) throw new Error(`Incident ${id} not found`);
 
     const ticketUrl = await this.jiraService.createTicket(
@@ -202,15 +202,15 @@ export class IncidentsService {
 
     return this.updateIncident(id, {
       jiraTicketUrl: ticketUrl,
-    });
+    }, projectId);
   }
 
   // --- Comments ---
-  async getComments(incidentId: string): Promise<IncidentComment[]> {
-    return this.dbService.getComments(incidentId);
+  async getComments(incidentId: string, projectId?: string): Promise<IncidentComment[]> {
+    return this.dbService.getComments(incidentId, projectId);
   }
 
-  async addComment(incidentId: string, message: string, userId = 'admin', userName = 'Admin Owner'): Promise<IncidentComment> {
+  async addComment(incidentId: string, message: string, userId = 'admin', userName = 'Admin Owner', projectId?: string): Promise<IncidentComment> {
     const comment: IncidentComment = {
       id: `comment_${Math.random().toString(36).substr(2, 9)}`,
       incidentId,
@@ -220,18 +220,18 @@ export class IncidentsService {
       createdAt: Date.now(),
     };
 
-    await this.dbService.saveComment(comment);
-    this.wsGateway.broadcast('incident.comment.created', comment);
+    await this.dbService.saveComment(comment, projectId);
+    this.wsGateway.broadcast('incident.comment.created', { ...comment, projectId });
     return comment;
   }
 
-  async deleteComment(incidentId: string, commentId: string) {
-    await this.dbService.deleteComment(incidentId, commentId);
+  async deleteComment(incidentId: string, commentId: string, projectId?: string) {
+    await this.dbService.deleteComment(incidentId, commentId, projectId);
   }
 
   // --- Diagnostics with Deployments Correlation ---
-  async analyzeIncident(id: string): Promise<Incident> {
-    const incident = await this.dbService.getIncident(id);
+  async analyzeIncident(id: string, projectId?: string): Promise<Incident> {
+    const incident = await this.dbService.getIncident(id, projectId);
     if (!incident) {
       throw new Error(`Incident ${id} not found`);
     }
@@ -239,7 +239,7 @@ export class IncidentsService {
     this.logger.log(`[Incident] Running V3 AI diagnostics with deployment correlation for incident ${id}...`);
     
     // Correlate recent deployment events within last 30 minutes of first detected incident
-    const allDeps = await this.dbService.getDeploymentEvents();
+    const allDeps = await this.dbService.getDeploymentEvents(projectId);
     const incidentTime = incident.firstDetectedAt;
     const windowStart = incidentTime - 30 * 60 * 1000;
     
@@ -262,13 +262,14 @@ export class IncidentsService {
       impact: diagnosis.impact,
       severity: diagnosis.severity || incident.severity,
       evidence: incident.evidence + (deploymentEvidenceText ? `\n${deploymentEvidenceText}` : ''),
-    });
+    }, projectId);
 
     this.wsGateway.broadcast('ai.insight.generated', {
       incidentId: id,
       summary: updated.summary,
       recommendation: updated.recommendation,
       suspectedRootCause: updated.suspectedRootCause,
+      projectId,
     });
 
     return updated;
@@ -454,8 +455,8 @@ export class IncidentsService {
     }
   }
 
-  private async getOpenIncidentByTitle(title: string): Promise<Incident | undefined> {
-    const list = await this.dbService.getIncidents();
+  private async getOpenIncidentByTitle(title: string, projectId?: string): Promise<Incident | undefined> {
+    const list = await this.dbService.getIncidents(projectId);
     return list.find((inc) => inc.title === title && inc.status === 'open');
   }
 }

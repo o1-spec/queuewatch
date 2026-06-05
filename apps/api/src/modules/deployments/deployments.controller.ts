@@ -4,6 +4,7 @@ import { DbService } from '../db/db.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { DeploymentEvent } from '@queuewatch/shared';
 import { QueueWebSocketGateway } from '../websocket/websocket.gateway';
+import { ProjectId } from '../auth/project-id.decorator';
 
 @ApiTags('Deployments & releases')
 @ApiBearerAuth()
@@ -17,29 +18,29 @@ export class DeploymentsController {
 
   @Get()
   @ApiOperation({ summary: 'List all deployment events' })
-  async getDeployments() {
-    return this.dbService.getDeploymentEvents();
+  async getDeployments(@ProjectId() projectId: string) {
+    return this.dbService.getDeploymentEvents(projectId);
   }
 
   @Get('recent')
   @ApiOperation({ summary: 'List deployment events within the last 30 minutes' })
-  async getRecentDeployments() {
-    const all = await this.dbService.getDeploymentEvents();
+  async getRecentDeployments(@ProjectId() projectId: string) {
+    const all = await this.dbService.getDeploymentEvents(projectId);
     const thirtyMinAgo = Date.now() - 30 * 60 * 1000;
     return all.filter((d) => d.deployedAt >= thirtyMinAgo);
   }
 
   @Post()
   @ApiOperation({ summary: 'Register a new deployment release' })
-  async createDeployment(@Body() data: Omit<DeploymentEvent, 'id' | 'deployedAt'>) {
+  async createDeployment(@ProjectId() projectId: string, @Body() data: Omit<DeploymentEvent, 'id' | 'deployedAt'>) {
     const event: DeploymentEvent = {
       ...data,
       id: `dep_${Math.random().toString(36).substr(2, 9)}`,
       deployedAt: Date.now(),
     };
 
-    await this.dbService.saveDeploymentEvent(event);
-    this.wsGateway.broadcast('deployment.created', event);
+    await this.dbService.saveDeploymentEvent(event, projectId);
+    this.wsGateway.broadcast('deployment.created', { ...event, projectId });
     return event;
   }
 }

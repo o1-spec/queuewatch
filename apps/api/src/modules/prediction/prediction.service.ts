@@ -8,21 +8,21 @@ export class PredictionService {
 
   constructor(private readonly dbService: DbService) {}
 
-  async getLatestPredictions(): Promise<Prediction[]> {
+  async getLatestPredictions(projectId?: string): Promise<Prediction[]> {
     // Run deterministic rules dynamically to populate predictions
-    await this.generateHeuristicPredictions();
-    return this.dbService.getPredictions();
+    await this.generateHeuristicPredictions(projectId);
+    return this.dbService.getPredictions(projectId);
   }
 
-  async getPredictionById(id: string): Promise<Prediction | null> {
-    return this.dbService.getPrediction(id);
+  async getPredictionById(id: string, projectId?: string): Promise<Prediction | null> {
+    return this.dbService.getPrediction(id, projectId);
   }
 
-  private async generateHeuristicPredictions(): Promise<void> {
+  private async generateHeuristicPredictions(projectId?: string): Promise<void> {
     try {
-      const telemetry = await this.dbService.getTelemetry(100);
-      const workers = await this.dbService.getWorkers();
-      const incidents = await this.dbService.getIncidents();
+      const telemetry = await this.dbService.getTelemetry(100, projectId);
+      const workers = await this.dbService.getWorkers(projectId);
+      const incidents = await this.dbService.getIncidents(projectId);
       const queueNames = ['email_notifications', 'webhook_delivery', 'image_processing', 'ai_tasks'];
 
       for (const queue of queueNames) {
@@ -50,7 +50,7 @@ export class PredictionService {
             targetQueue: queue,
             timestamp: Date.now()
           };
-          await this.dbService.savePrediction(pred);
+          await this.dbService.savePrediction(pred, projectId);
         }
 
         // 2. Worker health degradation rule
@@ -71,7 +71,7 @@ export class PredictionService {
             targetQueue: queue,
             timestamp: Date.now()
           };
-          await this.dbService.savePrediction(pred);
+          await this.dbService.savePrediction(pred, projectId);
         }
       }
     } catch (e) {

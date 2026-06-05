@@ -11,18 +11,18 @@ export class ServiceCorrelationService {
     private readonly depGraphService: DependencyGraphService
   ) {}
 
-  async calculateBlastRadius(incidentId: string): Promise<{
+  async calculateBlastRadius(incidentId: string, projectId?: string): Promise<{
     impactedServices: string[];
     impactedQueues: string[];
     estimatedBlastRadius: 'low' | 'medium' | 'high' | 'critical';
     blastDescription: string;
   }> {
-    const incident = await this.dbService.getIncident(incidentId);
+    const incident = await this.dbService.getIncident(incidentId, projectId);
     if (!incident) {
       return { impactedServices: [], impactedQueues: [], estimatedBlastRadius: 'low', blastDescription: 'Incident context not found.' };
     }
 
-    const graph = await this.depGraphService.getGraph();
+    const graph = await this.depGraphService.getGraph(projectId);
     const impactedQueues: string[] = [incident.affectedQueue];
     const impactedServices: string[] = [];
 

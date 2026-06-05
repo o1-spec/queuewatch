@@ -6,7 +6,7 @@ import {
   InvestigationReport, DeadLetterJob, IncidentComment, NotificationSetting, 
   EscalationRule, DeploymentEvent, Notification, KnowledgeEntry, Runbook,
   Service, Environment, DependencyGraph, ReliabilityScore, Prediction, GlobalHealth,
-  WorkerHealth, QueueName
+  WorkerHealth, QueueName, Project
 } from '@queuewatch/shared';
 
 @Injectable()
@@ -42,6 +42,12 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     return this.redis;
   }
 
+  private getScopedKey(projectId: string | undefined, baseKey: string): string {
+    const pid = projectId || 'proj_demo';
+    return `queuewatch:project:${pid}:${baseKey}`;
+  }
+
+
   private async seedInitialData() {
     // Seed default admin user and demo API key
     const demoUserExists = await this.redis.exists('queuewatch:users:admin');
@@ -54,13 +60,34 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       }));
     }
 
-    const demoKeyExists = await this.redis.exists('queuewatch:api_keys:qw_demo_api_key_v2');
-    if (!demoKeyExists) {
-      await this.redis.set('queuewatch:api_keys:qw_demo_api_key_v2', 'admin');
+    // Seed default project proj_demo
+    const demoProjExists = await this.redis.exists('queuewatch:project_metadata:proj_demo');
+    if (!demoProjExists) {
+      const demoProject: Project = {
+        id: 'proj_demo',
+        name: 'Demo Project',
+        apiKey: 'qw_demo_api_key_v2',
+        createdAt: Date.now(),
+      };
+      await this.redis.set('queuewatch:project_metadata:proj_demo', JSON.stringify(demoProject));
+      await this.redis.sadd('queuewatch:user_projects:demo_user_sre_910', 'proj_demo');
+      await this.redis.sadd('queuewatch:user_projects:u_admin', 'proj_demo');
     }
 
+    // Seed default API key mapping for qw_demo_api_key_v2
+    const demoKeyExists = await this.redis.exists('queuewatch:api_keys:qw_demo_api_key_v2');
+    if (!demoKeyExists) {
+      await this.redis.set(
+        'queuewatch:api_keys:qw_demo_api_key_v2',
+        JSON.stringify({ projectId: 'proj_demo', userId: 'demo_user_sre_910' })
+      );
+    }
+
+    const demoProjKey = 'proj_demo';
+
     // Seed default alert rules if empty
-    const rulesCount = await this.redis.hlen('queuewatch:alert_rules');
+    const alertRulesKey = this.getScopedKey(demoProjKey, 'alert_rules');
+    const rulesCount = await this.redis.hlen(alertRulesKey);
     if (rulesCount === 0) {
       const defaultRules = [
         {
@@ -88,12 +115,13 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       ];
 
       for (const rule of defaultRules) {
-        await this.redis.hset('queuewatch:alert_rules', rule.id, JSON.stringify(rule));
+        await this.redis.hset(alertRulesKey, rule.id, JSON.stringify(rule));
       }
     }
 
     // Seed default escalation rules
-    const escRulesCount = await this.redis.hlen('queuewatch:escalation_rules');
+    const escRulesKey = this.getScopedKey(demoProjKey, 'escalation_rules');
+    const escRulesCount = await this.redis.hlen(escRulesKey);
     if (escRulesCount === 0) {
       const defaultEscRules = [
         {
@@ -119,12 +147,13 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       ];
 
       for (const rule of defaultEscRules) {
-        await this.redis.hset('queuewatch:escalation_rules', rule.id, JSON.stringify(rule));
+        await this.redis.hset(escRulesKey, rule.id, JSON.stringify(rule));
       }
     }
 
     // Seed default knowledge base entries
-    const knowCount = await this.redis.hlen('queuewatch:knowledge_base');
+    const kbKey = this.getScopedKey(demoProjKey, 'knowledge_base');
+    const knowCount = await this.redis.hlen(kbKey);
     if (knowCount === 0) {
       const defaultKnowledge = [
         {
@@ -150,12 +179,13 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       ];
 
       for (const entry of defaultKnowledge) {
-        await this.redis.hset('queuewatch:knowledge_base', entry.id, JSON.stringify(entry));
+        await this.redis.hset(kbKey, entry.id, JSON.stringify(entry));
       }
     }
 
     // Seed default runbooks
-    const runbooksCount = await this.redis.hlen('queuewatch:runbooks');
+    const rbKey = this.getScopedKey(demoProjKey, 'runbooks');
+    const runbooksCount = await this.redis.hlen(rbKey);
     if (runbooksCount === 0) {
       const defaultRunbooks = [
         {
@@ -187,12 +217,13 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       ];
 
       for (const rb of defaultRunbooks) {
-        await this.redis.hset('queuewatch:runbooks', rb.id, JSON.stringify(rb));
+        await this.redis.hset(rbKey, rb.id, JSON.stringify(rb));
       }
     }
 
     // Seed default environments
-    const envsCount = await this.redis.hlen('queuewatch:environments');
+    const envsKey = this.getScopedKey(demoProjKey, 'environments');
+    const envsCount = await this.redis.hlen(envsKey);
     if (envsCount === 0) {
       const defaultEnvs = [
         { id: 'env_prod', name: 'production', type: 'production' },
@@ -200,12 +231,13 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         { id: 'env_dev', name: 'development', type: 'development' },
       ];
       for (const env of defaultEnvs) {
-        await this.redis.hset('queuewatch:environments', env.name, JSON.stringify(env));
+        await this.redis.hset(envsKey, env.name, JSON.stringify(env));
       }
     }
 
     // Seed default services
-    const servicesCount = await this.redis.hlen('queuewatch:services');
+    const servicesKey = this.getScopedKey(demoProjKey, 'services');
+    const servicesCount = await this.redis.hlen(servicesKey);
     if (servicesCount === 0) {
       const defaultServices = [
         {
@@ -275,12 +307,13 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         }
       ];
       for (const svc of defaultServices) {
-        await this.redis.hset('queuewatch:services', svc.id, JSON.stringify(svc));
+        await this.redis.hset(servicesKey, svc.id, JSON.stringify(svc));
       }
     }
 
     // Seed default dependency graph
-    const depExists = await this.redis.exists('queuewatch:dependency_graph');
+    const dgKey = this.getScopedKey(demoProjKey, 'dependency_graph');
+    const depExists = await this.redis.exists(dgKey);
     if (!depExists) {
       const defaultGraph = {
         nodes: [
@@ -310,11 +343,12 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
           svc_notification: ['svc_ai']
         }
       };
-      await this.redis.set('queuewatch:dependency_graph', JSON.stringify(defaultGraph));
+      await this.redis.set(dgKey, JSON.stringify(defaultGraph));
     }
 
     // Seed default predictions
-    const predictionsCount = await this.redis.hlen('queuewatch:predictions');
+    const predictionsKey = this.getScopedKey(demoProjKey, 'predictions');
+    const predictionsCount = await this.redis.hlen(predictionsKey);
     if (predictionsCount === 0) {
       const defaultPredictions = [
         {
@@ -350,63 +384,113 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         }
       ];
       for (const pred of defaultPredictions) {
-        await this.redis.hset('queuewatch:predictions', pred.id, JSON.stringify(pred));
+        await this.redis.hset(predictionsKey, pred.id, JSON.stringify(pred));
       }
     }
   }
 
   // --- Users API ---
   async getUser(username: string): Promise<any | null> {
-    const raw = await this.redis.get(`queuewatch:users:${username}`);
+    const raw = await this.redis.get(`queuewatch:users:${username.toLowerCase()}`);
     return raw ? JSON.parse(raw) : null;
   }
 
   async saveUser(user: any) {
-    await this.redis.set(`queuewatch:users:${user.username}`, JSON.stringify(user));
+    const key = (user.email || user.username || '').toLowerCase();
+    await this.redis.set(`queuewatch:users:${key}`, JSON.stringify(user));
   }
 
   // --- API Keys (SDK Auth) ---
   async validateApiKey(key: string): Promise<string | null> {
-    return this.redis.get(`queuewatch:api_keys:${key}`);
+    const mapping = await this.resolveApiKey(key);
+    return mapping ? mapping.userId : null;
   }
 
   async saveApiKey(key: string, username: string) {
-    await this.redis.set(`queuewatch:api_keys:${key}`, username);
+    await this.redis.set(`queuewatch:api_keys:${key}`, JSON.stringify({ projectId: 'proj_demo', userId: username }));
   }
 
-  // --- Incidents Storage ---
-  async getIncidents(): Promise<Incident[]> {
-    const rawList = await this.redis.hvals('queuewatch:incidents');
-    return rawList.map(item => JSON.parse(item));
+  // --- Projects Storage ---
+  async getProjects(userId: string): Promise<Project[]> {
+    const projectIds = await this.redis.smembers(`queuewatch:user_projects:${userId}`);
+    if (!projectIds || projectIds.length === 0) return [];
+    const projects: Project[] = [];
+    for (const pid of projectIds) {
+      const p = await this.getProject(pid);
+      if (p) projects.push(p);
+    }
+    return projects;
   }
 
-  async getIncident(id: string): Promise<Incident | null> {
-    const raw = await this.redis.hget('queuewatch:incidents', id);
+  async getProject(projectId: string): Promise<Project | null> {
+    const raw = await this.redis.get(`queuewatch:project_metadata:${projectId}`);
     return raw ? JSON.parse(raw) : null;
   }
 
-  async saveIncident(incident: Incident) {
-    await this.redis.hset('queuewatch:incidents', incident.id, JSON.stringify(incident));
+  async saveProject(project: Project, userId: string): Promise<void> {
+    await this.redis.set(`queuewatch:project_metadata:${project.id}`, JSON.stringify(project));
+    await this.redis.sadd(`queuewatch:user_projects:${userId}`, project.id);
+  }
+
+  async deleteProject(projectId: string, userId: string): Promise<void> {
+    const project = await this.getProject(projectId);
+    if (project) {
+      await this.redis.del(`queuewatch:project_metadata:${projectId}`);
+      await this.redis.srem(`queuewatch:user_projects:${userId}`, projectId);
+      if (project.apiKey) {
+        await this.redis.del(`queuewatch:api_keys:${project.apiKey}`);
+      }
+    }
+  }
+
+  async saveApiKeyMapping(apiKey: string, metadata: { projectId: string; userId: string }): Promise<void> {
+    await this.redis.set(`queuewatch:api_keys:${apiKey}`, JSON.stringify(metadata));
+  }
+
+  async resolveApiKey(apiKey: string): Promise<{ projectId: string; userId: string } | null> {
+    const raw = await this.redis.get(`queuewatch:api_keys:${apiKey}`);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return { projectId: 'proj_demo', userId: raw };
+    }
+  }
+
+  // --- Incidents Storage ---
+  async getIncidents(projectId?: string): Promise<Incident[]> {
+    const rawList = await this.redis.hvals(this.getScopedKey(projectId, 'incidents'));
+    return rawList.map(item => JSON.parse(item));
+  }
+
+  async getIncident(id: string, projectId?: string): Promise<Incident | null> {
+    const raw = await this.redis.hget(this.getScopedKey(projectId, 'incidents'), id);
+    return raw ? JSON.parse(raw) : null;
+  }
+
+  async saveIncident(incident: Incident, projectId?: string) {
+    await this.redis.hset(this.getScopedKey(projectId, 'incidents'), incident.id, JSON.stringify(incident));
   }
 
   // --- Telemetry Storage ---
-  async saveTelemetry(event: TelemetryEvent) {
-    await this.redis.lpush('queuewatch:telemetry', JSON.stringify(event));
-    await this.redis.ltrim('queuewatch:telemetry', 0, 999); // Keep last 1000 events
+  async saveTelemetry(event: TelemetryEvent, projectId?: string) {
+    const key = this.getScopedKey(projectId, 'telemetry');
+    await this.redis.lpush(key, JSON.stringify(event));
+    await this.redis.ltrim(key, 0, 999); // Keep last 1000 events
   }
 
-  async getTelemetry(limit = 100): Promise<TelemetryEvent[]> {
-    const list = await this.redis.lrange('queuewatch:telemetry', 0, limit - 1);
+  async getTelemetry(limit = 100, projectId?: string): Promise<TelemetryEvent[]> {
+    const list = await this.redis.lrange(this.getScopedKey(projectId, 'telemetry'), 0, limit - 1);
     return list.map(item => JSON.parse(item));
   }
 
-  async getTelemetryByQueue(queueName: string, limit = 50): Promise<TelemetryEvent[]> {
-    const all = await this.getTelemetry(200);
+  async getTelemetryByQueue(queueName: string, limit = 50, projectId?: string): Promise<TelemetryEvent[]> {
+    const all = await this.getTelemetry(200, projectId);
     return all.filter(item => item.queueName === queueName).slice(0, limit);
   }
 
-  async getWorkers(): Promise<WorkerHealth[]> {
-    const rawList = await this.redis.hvals('queuewatch:workers');
+  async getWorkers(projectId?: string): Promise<WorkerHealth[]> {
+    const rawList = await this.redis.hvals(this.getScopedKey(projectId, 'workers'));
     if (rawList.length > 0) {
       return rawList.map(item => JSON.parse(item));
     }
@@ -422,14 +506,19 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     }));
   }
 
-  // --- Logs Storage ---
-  async saveLog(entry: LogEntry) {
-    await this.redis.lpush('queuewatch:logs', JSON.stringify(entry));
-    await this.redis.ltrim('queuewatch:logs', 0, 1999); // Keep last 2000 log lines
+  async saveWorker(worker: WorkerHealth, projectId?: string) {
+    await this.redis.hset(this.getScopedKey(projectId, 'workers'), worker.workerId, JSON.stringify(worker));
   }
 
-  async getLogs(queueName?: string, limit = 100): Promise<LogEntry[]> {
-    const list = await this.redis.lrange('queuewatch:logs', 0, -1);
+  // --- Logs Storage ---
+  async saveLog(entry: LogEntry, projectId?: string) {
+    const key = this.getScopedKey(projectId, 'logs');
+    await this.redis.lpush(key, JSON.stringify(entry));
+    await this.redis.ltrim(key, 0, 1999); // Keep last 2000 log lines
+  }
+
+  async getLogs(queueName?: string, limit = 100, projectId?: string): Promise<LogEntry[]> {
+    const list = await this.redis.lrange(this.getScopedKey(projectId, 'logs'), 0, -1);
     const parsed = list.map(item => JSON.parse(item) as LogEntry);
     if (queueName) {
       return parsed.filter(item => item.queueName === queueName).slice(0, limit);
@@ -438,76 +527,77 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   }
 
   // --- Investigations Storage ---
-  async getInvestigation(incidentId: string): Promise<InvestigationReport | null> {
-    const raw = await this.redis.get(`queuewatch:investigations:${incidentId}`);
+  async getInvestigation(incidentId: string, projectId?: string): Promise<InvestigationReport | null> {
+    const raw = await this.redis.get(this.getScopedKey(projectId, `investigations:${incidentId}`));
     return raw ? JSON.parse(raw) : null;
   }
 
-  async saveInvestigation(report: InvestigationReport) {
-    await this.redis.set(`queuewatch:investigations:${report.incidentId}`, JSON.stringify(report));
+  async saveInvestigation(report: InvestigationReport, projectId?: string) {
+    await this.redis.set(this.getScopedKey(projectId, `investigations:${report.incidentId}`), JSON.stringify(report));
   }
 
   // --- Alert Rules Storage ---
-  async getAlertRules(): Promise<AlertRule[]> {
-    const rawList = await this.redis.hvals('queuewatch:alert_rules');
+  async getAlertRules(projectId?: string): Promise<AlertRule[]> {
+    const rawList = await this.redis.hvals(this.getScopedKey(projectId, 'alert_rules'));
     return rawList.map(item => JSON.parse(item));
   }
 
-  async getAlertRule(id: string): Promise<AlertRule | null> {
-    const raw = await this.redis.hget('queuewatch:alert_rules', id);
+  async getAlertRule(id: string, projectId?: string): Promise<AlertRule | null> {
+    const raw = await this.redis.hget(this.getScopedKey(projectId, 'alert_rules'), id);
     return raw ? JSON.parse(raw) : null;
   }
 
-  async saveAlertRule(rule: AlertRule) {
-    await this.redis.hset('queuewatch:alert_rules', rule.id, JSON.stringify(rule));
+  async saveAlertRule(rule: AlertRule, projectId?: string) {
+    await this.redis.hset(this.getScopedKey(projectId, 'alert_rules'), rule.id, JSON.stringify(rule));
   }
 
-  async deleteAlertRule(id: string) {
-    await this.redis.hdel('queuewatch:alert_rules', id);
+  async deleteAlertRule(id: string, projectId?: string) {
+    await this.redis.hdel(this.getScopedKey(projectId, 'alert_rules'), id);
   }
 
   // --- Alert Notifications ---
-  async getAlertNotifications(limit = 50): Promise<AlertNotification[]> {
-    const list = await this.redis.lrange('queuewatch:alert_notifications', 0, limit - 1);
+  async getAlertNotifications(limit = 50, projectId?: string): Promise<AlertNotification[]> {
+    const list = await this.redis.lrange(this.getScopedKey(projectId, 'alert_notifications'), 0, limit - 1);
     return list.map(item => JSON.parse(item));
   }
 
-  async saveAlertNotification(notif: AlertNotification) {
-    await this.redis.lpush('queuewatch:alert_notifications', JSON.stringify(notif));
-    await this.redis.ltrim('queuewatch:alert_notifications', 0, 99); // Keep last 100 notifications
+  async saveAlertNotification(notif: AlertNotification, projectId?: string) {
+    const key = this.getScopedKey(projectId, 'alert_notifications');
+    await this.redis.lpush(key, JSON.stringify(notif));
+    await this.redis.ltrim(key, 0, 99); // Keep last 100 notifications
   }
 
   // --- Dead Letter Jobs ---
-  async getDeadLetterJobs(): Promise<DeadLetterJob[]> {
-    const rawList = await this.redis.hvals('queuewatch:dead_letter_jobs');
+  async getDeadLetterJobs(projectId?: string): Promise<DeadLetterJob[]> {
+    const rawList = await this.redis.hvals(this.getScopedKey(projectId, 'dead_letter_jobs'));
     return rawList.map(item => JSON.parse(item));
   }
 
-  async getDeadLetterJob(id: string): Promise<DeadLetterJob | null> {
-    const raw = await this.redis.hget('queuewatch:dead_letter_jobs', id);
+  async getDeadLetterJob(id: string, projectId?: string): Promise<DeadLetterJob | null> {
+    const raw = await this.redis.hget(this.getScopedKey(projectId, 'dead_letter_jobs'), id);
     return raw ? JSON.parse(raw) : null;
   }
 
-  async saveDeadLetterJob(job: DeadLetterJob) {
-    await this.redis.hset('queuewatch:dead_letter_jobs', job.id, JSON.stringify(job));
+  async saveDeadLetterJob(job: DeadLetterJob, projectId?: string) {
+    await this.redis.hset(this.getScopedKey(projectId, 'dead_letter_jobs'), job.id, JSON.stringify(job));
   }
 
-  async deleteDeadLetterJob(id: string) {
-    await this.redis.hdel('queuewatch:dead_letter_jobs', id);
+  async deleteDeadLetterJob(id: string, projectId?: string) {
+    await this.redis.hdel(this.getScopedKey(projectId, 'dead_letter_jobs'), id);
   }
 
   // --- Comments ---
-  async getComments(incidentId: string): Promise<IncidentComment[]> {
-    const rawList = await this.redis.hvals(`queuewatch:comments:${incidentId}`);
+  async getComments(incidentId: string, projectId?: string): Promise<IncidentComment[]> {
+    const rawList = await this.redis.hvals(this.getScopedKey(projectId, `comments:${incidentId}`));
     return rawList.map(item => JSON.parse(item)).sort((a, b) => a.createdAt - b.createdAt);
   }
 
-  async saveComment(comment: IncidentComment) {
-    await this.redis.hset(`queuewatch:comments:${comment.incidentId}`, comment.id, JSON.stringify(comment));
+  async saveComment(comment: IncidentComment, projectId?: string) {
+    await this.redis.hset(this.getScopedKey(projectId, `comments:${comment.incidentId}`), comment.id, JSON.stringify(comment));
   }
 
-  async deleteComment(incidentId: string, commentId: string) {
-    await this.redis.hdel(`queuewatch:comments:${incidentId}`, commentId);
+  async deleteComment(incidentId: string, commentId: string, projectId?: string) {
+    await this.redis.hdel(this.getScopedKey(projectId, `comments:${incidentId}`), commentId);
   }
 
   // --- Notification Settings ---
@@ -529,139 +619,143 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   }
 
   // --- Escalation Rules ---
-  async getEscalationRules(): Promise<EscalationRule[]> {
-    const rawList = await this.redis.hvals('queuewatch:escalation_rules');
+  async getEscalationRules(projectId?: string): Promise<EscalationRule[]> {
+    const rawList = await this.redis.hvals(this.getScopedKey(projectId, 'escalation_rules'));
     return rawList.map(item => JSON.parse(item));
   }
 
-  async getEscalationRule(id: string): Promise<EscalationRule | null> {
-    const raw = await this.redis.hget('queuewatch:escalation_rules', id);
+  async getEscalationRule(id: string, projectId?: string): Promise<EscalationRule | null> {
+    const raw = await this.redis.hget(this.getScopedKey(projectId, 'escalation_rules'), id);
     return raw ? JSON.parse(raw) : null;
   }
 
-  async saveEscalationRule(rule: EscalationRule) {
-    await this.redis.hset('queuewatch:escalation_rules', rule.id, JSON.stringify(rule));
+  async saveEscalationRule(rule: EscalationRule, projectId?: string) {
+    await this.redis.hset(this.getScopedKey(projectId, 'escalation_rules'), rule.id, JSON.stringify(rule));
   }
 
-  async deleteEscalationRule(id: string) {
-    await this.redis.hdel('queuewatch:escalation_rules', id);
+  async deleteEscalationRule(id: string, projectId?: string) {
+    await this.redis.hdel(this.getScopedKey(projectId, 'escalation_rules'), id);
   }
 
   // --- Deployment Events ---
-  async getDeploymentEvents(): Promise<DeploymentEvent[]> {
-    const list = await this.redis.lrange('queuewatch:deployments', 0, -1);
+  async getDeploymentEvents(projectId?: string): Promise<DeploymentEvent[]> {
+    const list = await this.redis.lrange(this.getScopedKey(projectId, 'deployments'), 0, -1);
     return list.map(item => JSON.parse(item));
   }
 
-  async saveDeploymentEvent(event: DeploymentEvent) {
-    await this.redis.lpush('queuewatch:deployments', JSON.stringify(event));
-    await this.redis.ltrim('queuewatch:deployments', 0, 99); // Keep last 100 deployments
+  async saveDeploymentEvent(event: DeploymentEvent, projectId?: string) {
+    const key = this.getScopedKey(projectId, 'deployments');
+    await this.redis.lpush(key, JSON.stringify(event));
+    await this.redis.ltrim(key, 0, 99); // Keep last 100 deployments
   }
 
   // --- V3 Notifications ---
-  async getNotifications(limit = 100): Promise<Notification[]> {
-    const list = await this.redis.lrange('queuewatch:notifications', 0, limit - 1);
+  async getNotifications(limit = 100, projectId?: string): Promise<Notification[]> {
+    const list = await this.redis.lrange(this.getScopedKey(projectId, 'notifications'), 0, limit - 1);
     return list.map(item => JSON.parse(item));
   }
 
-  async saveNotification(notif: Notification) {
-    await this.redis.lpush('queuewatch:notifications', JSON.stringify(notif));
-    await this.redis.ltrim('queuewatch:notifications', 0, 499); // Keep last 500 notifications
+  async saveNotification(notif: Notification, projectId?: string) {
+    const key = this.getScopedKey(projectId, 'notifications');
+    await this.redis.lpush(key, JSON.stringify(notif));
+    await this.redis.ltrim(key, 0, 499); // Keep last 500 notifications
   }
 
   // --- V4 Knowledge Base ---
-  async getKnowledgeEntries(): Promise<KnowledgeEntry[]> {
-    const rawList = await this.redis.hvals('queuewatch:knowledge_base');
+  async getKnowledgeEntries(projectId?: string): Promise<KnowledgeEntry[]> {
+    const rawList = await this.redis.hvals(this.getScopedKey(projectId, 'knowledge_base'));
     return rawList.map(item => JSON.parse(item)).sort((a, b) => b.createdAt - a.createdAt);
   }
 
-  async saveKnowledgeEntry(entry: KnowledgeEntry) {
-    await this.redis.hset('queuewatch:knowledge_base', entry.id, JSON.stringify(entry));
+  async saveKnowledgeEntry(entry: KnowledgeEntry, projectId?: string) {
+    await this.redis.hset(this.getScopedKey(projectId, 'knowledge_base'), entry.id, JSON.stringify(entry));
   }
 
   // --- V4 Runbooks ---
-  async getRunbooks(): Promise<Runbook[]> {
-    const rawList = await this.redis.hvals('queuewatch:runbooks');
+  async getRunbooks(projectId?: string): Promise<Runbook[]> {
+    const rawList = await this.redis.hvals(this.getScopedKey(projectId, 'runbooks'));
     return rawList.map(item => JSON.parse(item)).sort((a, b) => b.createdAt - a.createdAt);
   }
 
-  async getRunbook(id: string): Promise<Runbook | null> {
-    const raw = await this.redis.hget('queuewatch:runbooks', id);
+  async getRunbook(id: string, projectId?: string): Promise<Runbook | null> {
+    const raw = await this.redis.hget(this.getScopedKey(projectId, 'runbooks'), id);
     return raw ? JSON.parse(raw) : null;
   }
 
-  async saveRunbook(runbook: Runbook) {
-    await this.redis.hset('queuewatch:runbooks', runbook.id, JSON.stringify(runbook));
+  async saveRunbook(runbook: Runbook, projectId?: string) {
+    await this.redis.hset(this.getScopedKey(projectId, 'runbooks'), runbook.id, JSON.stringify(runbook));
   }
 
   // --- V5 Service Registry ---
-  async getServices(): Promise<Service[]> {
-    const rawList = await this.redis.hvals('queuewatch:services');
+  async getServices(projectId?: string): Promise<Service[]> {
+    const rawList = await this.redis.hvals(this.getScopedKey(projectId, 'services'));
     return rawList.map(item => JSON.parse(item));
   }
 
-  async getService(id: string): Promise<Service | null> {
-    const raw = await this.redis.hget('queuewatch:services', id);
+  async getService(id: string, projectId?: string): Promise<Service | null> {
+    const raw = await this.redis.hget(this.getScopedKey(projectId, 'services'), id);
     return raw ? JSON.parse(raw) : null;
   }
 
-  async saveService(service: Service) {
-    await this.redis.hset('queuewatch:services', service.id, JSON.stringify(service));
+  async saveService(service: Service, projectId?: string) {
+    await this.redis.hset(this.getScopedKey(projectId, 'services'), service.id, JSON.stringify(service));
   }
 
-  async deleteService(id: string) {
-    await this.redis.hdel('queuewatch:services', id);
+  async deleteService(id: string, projectId?: string) {
+    await this.redis.hdel(this.getScopedKey(projectId, 'services'), id);
   }
 
-  async getEnvironments(): Promise<Environment[]> {
-    const rawList = await this.redis.hvals('queuewatch:environments');
+  async getEnvironments(projectId?: string): Promise<Environment[]> {
+    const rawList = await this.redis.hvals(this.getScopedKey(projectId, 'environments'));
     return rawList.map(item => JSON.parse(item));
   }
 
-  async saveEnvironment(env: Environment) {
-    await this.redis.hset('queuewatch:environments', env.name, JSON.stringify(env));
+  async saveEnvironment(env: Environment, projectId?: string) {
+    await this.redis.hset(this.getScopedKey(projectId, 'environments'), env.name, JSON.stringify(env));
   }
 
   // --- V5 Dependency Graph ---
-  async getDependencyGraph(): Promise<DependencyGraph> {
-    const raw = await this.redis.get('queuewatch:dependency_graph');
+  async getDependencyGraph(projectId?: string): Promise<DependencyGraph> {
+    const raw = await this.redis.get(this.getScopedKey(projectId, 'dependency_graph'));
     if (raw) return JSON.parse(raw);
     return { nodes: [], edges: [], serviceImpacts: {} };
   }
 
-  async saveDependencyGraph(graph: DependencyGraph) {
-    await this.redis.set('queuewatch:dependency_graph', JSON.stringify(graph));
+  async saveDependencyGraph(graph: DependencyGraph, projectId?: string) {
+    await this.redis.set(this.getScopedKey(projectId, 'dependency_graph'), JSON.stringify(graph));
   }
 
   // --- V5 Reliability Scores ---
-  async getReliabilityScores(): Promise<ReliabilityScore[]> {
-    const rawList = await this.redis.hvals('queuewatch:reliability_scores');
+  async getReliabilityScores(projectId?: string): Promise<ReliabilityScore[]> {
+    const rawList = await this.redis.hvals(this.getScopedKey(projectId, 'reliability_scores'));
     return rawList.map(item => JSON.parse(item));
   }
 
-  async saveReliabilityScore(score: ReliabilityScore) {
-    await this.redis.hset('queuewatch:reliability_scores', `${score.targetType}:${score.targetId}`, JSON.stringify(score));
-    await this.redis.lpush(`queuewatch:reliability_history:${score.targetId}`, JSON.stringify(score));
-    await this.redis.ltrim(`queuewatch:reliability_history:${score.targetId}`, 0, 99);
+  async saveReliabilityScore(score: ReliabilityScore, projectId?: string) {
+    const key = this.getScopedKey(projectId, 'reliability_scores');
+    await this.redis.hset(key, `${score.targetType}:${score.targetId}`, JSON.stringify(score));
+    const histKey = this.getScopedKey(projectId, `reliability_history:${score.targetId}`);
+    await this.redis.lpush(histKey, JSON.stringify(score));
+    await this.redis.ltrim(histKey, 0, 99);
   }
 
-  async getReliabilityHistory(targetId: string): Promise<ReliabilityScore[]> {
-    const list = await this.redis.lrange(`queuewatch:reliability_history:${targetId}`, 0, -1);
+  async getReliabilityHistory(targetId: string, projectId?: string): Promise<ReliabilityScore[]> {
+    const list = await this.redis.lrange(this.getScopedKey(projectId, `reliability_history:${targetId}`), 0, -1);
     return list.map(item => JSON.parse(item));
   }
 
   // --- V5 Predictions ---
-  async getPredictions(): Promise<Prediction[]> {
-    const rawList = await this.redis.hvals('queuewatch:predictions');
+  async getPredictions(projectId?: string): Promise<Prediction[]> {
+    const rawList = await this.redis.hvals(this.getScopedKey(projectId, 'predictions'));
     return rawList.map(item => JSON.parse(item)).sort((a, b) => b.timestamp - a.timestamp);
   }
 
-  async getPrediction(id: string): Promise<Prediction | null> {
-    const raw = await this.redis.hget('queuewatch:predictions', id);
+  async getPrediction(id: string, projectId?: string): Promise<Prediction | null> {
+    const raw = await this.redis.hget(this.getScopedKey(projectId, 'predictions'), id);
     return raw ? JSON.parse(raw) : null;
   }
 
-  async savePrediction(pred: Prediction) {
-    await this.redis.hset('queuewatch:predictions', pred.id, JSON.stringify(pred));
+  async savePrediction(pred: Prediction, projectId?: string) {
+    await this.redis.hset(this.getScopedKey(projectId, 'predictions'), pred.id, JSON.stringify(pred));
   }
 }

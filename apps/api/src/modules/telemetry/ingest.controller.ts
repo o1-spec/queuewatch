@@ -19,16 +19,16 @@ export class IngestController {
     private readonly wsGateway: QueueWebSocketGateway
   ) {}
 
-  private async authorize(authHeader: string): Promise<string> {
+  private async authorize(authHeader: string): Promise<{ projectId: string; userId: string }> {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new UnauthorizedException('Missing or invalid Authorization header');
     }
     const token = authHeader.substring(7);
-    const owner = await this.dbService.validateApiKey(token);
-    if (!owner) {
+    const mapping = await this.dbService.resolveApiKey(token);
+    if (!mapping) {
       throw new UnauthorizedException('Invalid API Key credentials');
     }
-    return owner;
+    return mapping;
   }
 
   @Post('events')
@@ -37,10 +37,10 @@ export class IngestController {
     @Headers('authorization') authHeader: string,
     @Body() body: { events: any[] }
   ) {
-    await this.authorize(authHeader);
+    const { projectId } = await this.authorize(authHeader);
     
     const events = body.events || [];
-    this.logger.log(`Ingesting ${events.length} telemetry events from SDK`);
+    this.logger.log(`Ingesting ${events.length} telemetry events from SDK for project ${projectId}`);
 
     for (const event of events) {
       // Save to database
@@ -49,15 +49,15 @@ export class IngestController {
         id: event.id || `tel_${Math.random().toString(36).substr(2, 9)}`,
         timestamp: event.timestamp || Date.now(),
       };
-      await this.dbService.saveTelemetry(telemetryEvent);
+      await this.dbService.saveTelemetry(telemetryEvent, projectId);
 
       // Record latency snapshot if completed
       if (event.type === 'job.completed' && typeof event.duration === 'number') {
         this.metricsService.recordLatency(event.queueName, event.duration);
       }
 
-      // Broadcast event via WebSockets
-      this.wsGateway.broadcast('telemetry.event', telemetryEvent);
+      // Broadcast event via WebSockets with projectId attached
+      this.wsGateway.broadcast('telemetry.event', { ...telemetryEvent, projectId });
     }
 
     return { success: true, count: events.length };
@@ -69,7 +69,7 @@ export class IngestController {
     @Headers('authorization') authHeader: string,
     @Body() body: any
   ) {
-    await this.authorize(authHeader);
+    const { projectId } = await this.authorize(authHeader);
 
     const logEntry = {
       ...body,
@@ -77,8 +77,8 @@ export class IngestController {
       timestamp: body.timestamp || Date.now(),
     };
 
-    await this.dbService.saveLog(logEntry);
-    this.wsGateway.broadcast('log.ingested', logEntry);
+    await this.dbService.saveLog(logEntry, projectId);
+    this.wsGateway.broadcast('log.ingested', { ...logEntry, projectId });
 
     return { success: true };
   }
@@ -89,7 +89,7 @@ export class IngestController {
     @Headers('authorization') authHeader: string,
     @Body() body: any
   ) {
-    await this.authorize(authHeader);
+    const { projectId } = await this.authorize(authHeader);
 
     const report = {
       workerId: body.workerId || 'sdk_worker',
@@ -101,7 +101,10 @@ export class IngestController {
       lastActive: Date.now(),
     };
 
-    this.wsGateway.broadcast('worker.health.updated', [report]);
+    // Save worker health report to DB
+    await this.dbService.saveWorker(report, projectId);
+
+    this.wsGateway.broadcast('worker.health.updated', [{ ...report, projectId }]);
     return { success: true };
   }
 }

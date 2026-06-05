@@ -17,6 +17,7 @@ import { DeploymentsModule } from './modules/deployments/deployments.module';
 import { EscalationModule } from './modules/escalation/escalation.module';
 import { CopilotModule } from './modules/copilot/copilot.module';
 import { ServiceRegistryModule } from './modules/service-registry/service-registry.module';
+import { ProjectsModule } from './modules/projects/projects.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { ServiceRegistryModule } from './modules/service-registry/service-regist
     EscalationModule,
     CopilotModule,
     ServiceRegistryModule,
+    ProjectsModule,
   ],
 })
 export class AppModule {}

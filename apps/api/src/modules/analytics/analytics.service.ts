@@ -7,7 +7,7 @@ export class AnalyticsService {
 
   constructor(private readonly dbService: DbService) {}
 
-  async getReports(): Promise<{
+  async getReports(projectId?: string): Promise<{
     incidentsBySeverity: Record<string, number>;
     mttrMinutes: number;
     topRecurringIssues: { pattern: string; count: number }[];
@@ -15,9 +15,9 @@ export class AnalyticsService {
     queuePerformance: { name: string; throughput: number; failureRate: number }[];
     serviceReliability: { name: string; score: number }[];
   }> {
-    const incidents = await this.dbService.getIncidents();
-    const scores = await this.dbService.getReliabilityScores();
-    const services = await this.dbService.getServices();
+    const incidents = await this.dbService.getIncidents(projectId);
+    const scores = await this.dbService.getReliabilityScores(projectId);
+    const services = await this.dbService.getServices(projectId);
 
     // 1. Incidents by severity
     const severityCounts = { critical: 0, high: 0, medium: 0, low: 0 };
@@ -51,7 +51,7 @@ export class AnalyticsService {
       .slice(0, 3);
 
     // 4. Deployment stability rate
-    const deployments = await this.dbService.getDeploymentEvents();
+    const deployments = await this.dbService.getDeploymentEvents(projectId);
     // Stability rate = 100% minus percent of deployments correlated to incidents
     let incidentCorrelatedCount = 0;
     for (const dep of deployments) {

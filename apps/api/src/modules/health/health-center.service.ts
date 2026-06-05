@@ -8,11 +8,11 @@ export class HealthCenterService {
 
   constructor(private readonly dbService: DbService) {}
 
-  async getGlobalHealth(): Promise<GlobalHealth> {
-    const services = await this.dbService.getServices();
-    const incidents = await this.dbService.getIncidents();
-    const scores = await this.dbService.getReliabilityScores();
-    const predictions = await this.dbService.getPredictions();
+  async getGlobalHealth(projectId?: string): Promise<GlobalHealth> {
+    const services = await this.dbService.getServices(projectId);
+    const incidents = await this.dbService.getIncidents(projectId);
+    const scores = await this.dbService.getReliabilityScores(projectId);
+    const predictions = await this.dbService.getPredictions(projectId);
 
     const healthyServicesCount = services.filter(s => s.status === 'healthy').length;
     const degradedServicesCount = services.filter(s => s.status === 'degraded').length;

@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Param, Query, NotFoundException, UseGuards
 import { ApiTags, ApiOperation, ApiParam, ApiBody, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { QueuesService } from './queues.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ProjectId } from '../auth/project-id.decorator';
 
 class CreateJobDto {
   name: string;
@@ -65,9 +66,9 @@ export class QueuesController {
   @Post(':name/jobs')
   @ApiOperation({ summary: 'Enqueue a job manually' })
   @ApiParam({ name: 'name', enum: ['email_notifications', 'webhook_delivery', 'image_processing', 'ai_tasks'] })
-  async enqueueJob(@Param('name') name: string, @Body() body: CreateJobDto) {
+  async enqueueJob(@ProjectId() projectId: string, @Param('name') name: string, @Body() body: CreateJobDto) {
     try {
-      return await this.queuesService.addJob(name, body.name, body.data || {});
+      return await this.queuesService.addJob(name, body.name, body.data || {}, projectId);
     } catch (e) {
       throw new NotFoundException(e.message);
     }
@@ -97,9 +98,9 @@ export class QueuesController {
 
   @Post('jobs/:id/replay')
   @ApiOperation({ summary: 'Replay a failed/DLQ job' })
-  async replayJob(@Param('id') id: string) {
+  async replayJob(@ProjectId() projectId: string, @Param('id') id: string) {
     try {
-      return await this.queuesService.replayJob(id);
+      return await this.queuesService.replayJob(id, projectId);
     } catch (e) {
       throw new NotFoundException(e.message);
     }

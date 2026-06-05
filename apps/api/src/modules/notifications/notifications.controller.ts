@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { NotificationSetting } from '@queuewatch/shared';
+import { ProjectId } from '../auth/project-id.decorator';
 
 @ApiTags('Notification triggers and settings')
 @ApiBearerAuth()
@@ -13,8 +14,8 @@ export class NotificationsController {
 
   @Get()
   @ApiOperation({ summary: 'Get recent notification dispatch records' })
-  async getNotifications() {
-    return this.notificationsService.getNotifications();
+  async getNotifications(@ProjectId() projectId: string) {
+    return this.notificationsService.getNotifications(100, projectId);
   }
 
   @Get('settings')

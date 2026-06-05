@@ -8,24 +8,24 @@ export class ServiceRegistryService {
 
   constructor(private readonly dbService: DbService) {}
 
-  async getServices(): Promise<Service[]> {
-    return this.dbService.getServices();
+  async getServices(projectId?: string): Promise<Service[]> {
+    return this.dbService.getServices(projectId);
   }
 
-  async getServiceById(id: string): Promise<Service | null> {
-    return this.dbService.getService(id);
+  async getServiceById(id: string, projectId?: string): Promise<Service | null> {
+    return this.dbService.getService(id, projectId);
   }
 
-  async createService(service: Service): Promise<Service> {
-    await this.dbService.saveService(service);
+  async createService(service: Service, projectId?: string): Promise<Service> {
+    await this.dbService.saveService(service, projectId);
     return service;
   }
 
-  async deleteService(id: string): Promise<void> {
-    await this.dbService.deleteService(id);
+  async deleteService(id: string, projectId?: string): Promise<void> {
+    await this.dbService.deleteService(id, projectId);
   }
 
-  async getEnvironments(): Promise<Environment[]> {
-    return this.dbService.getEnvironments();
+  async getEnvironments(projectId?: string): Promise<Environment[]> {
+    return this.dbService.getEnvironments(projectId);
   }
 }

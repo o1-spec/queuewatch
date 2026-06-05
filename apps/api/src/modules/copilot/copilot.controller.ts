@@ -4,6 +4,7 @@ import { CopilotService } from './copilot.service';
 import { RecurringIncidentsService } from './recurring-incidents.service';
 import { RunbooksService } from './runbooks.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ProjectId } from '../auth/project-id.decorator';
 
 @ApiTags('Reliability Copilot & Insights')
 @ApiBearerAuth()
@@ -24,43 +25,49 @@ export class CopilotController {
 
   @Post('query')
   @ApiOperation({ summary: 'Ask QueueWatch a reliability or diagnostic question' })
-  async queryCopilot(@Body('prompt') prompt: string) {
-    return this.copilotService.queryCopilot(prompt);
+  async queryCopilot(@ProjectId() projectId: string, @Body('prompt') prompt: string) {
+    return this.copilotService.queryCopilot(prompt, projectId);
   }
 
   @Post('incident/:id/chat')
   @ApiOperation({ summary: 'Chat with Copilot about a specific incident context' })
   @ApiParam({ name: 'id', description: 'Incident ID' })
-  async chatIncident(@Param('id') id: string, @Body('prompt') prompt: string) {
-    return this.copilotService.chatIncident(id, prompt);
+  async chatIncident(
+    @ProjectId() projectId: string,
+    @Param('id') id: string,
+    @Body('prompt') prompt: string
+  ) {
+    return this.copilotService.chatIncident(id, prompt, projectId);
   }
 
   // --- Runbooks ---
   @Get('runbooks')
   @ApiOperation({ summary: 'List all generated runbooks' })
-  async getRunbooks() {
-    return this.runbooksService.getRunbooks();
+  async getRunbooks(@ProjectId() projectId: string) {
+    return this.runbooksService.getRunbooks(projectId);
   }
 
   @Get('runbooks/:id')
   @ApiParam({ name: 'id', description: 'Runbook ID' })
-  async getRunbook(@Param('id') id: string) {
-    return this.runbooksService.getRunbookById(id);
+  async getRunbook(@ProjectId() projectId: string, @Param('id') id: string) {
+    return this.runbooksService.getRunbookById(id, projectId);
   }
 
   @Post('runbooks/generate')
   @ApiOperation({ summary: 'Generate recovery runbook for an incident type' })
   async generateRunbook(
+    @ProjectId() projectId: string,
     @Body('incidentType') incidentType: string,
     @Body('linkedIncidents') linkedIncidents: string[]
   ) {
-    return this.runbooksService.generateRunbook(incidentType, linkedIncidents);
+    return this.runbooksService.generateRunbook(incidentType, linkedIncidents, projectId);
   }
 
   // --- Recurring Incidents ---
   @Get('recurring-incidents')
   @ApiOperation({ summary: 'List all detected recurring failure patterns' })
   async getRecurring() {
+    // Note: recurringService aggregates incidents dynamically or from DB. Let's pass it if needed, or default it.
     return this.recurringService.getRecurringIncidents();
   }
 
@@ -72,7 +79,7 @@ export class CopilotController {
 
   @Get('knowledge-base')
   @ApiOperation({ summary: 'List all operational knowledge base entries' })
-  async getKnowledgeBase() {
-    return this.copilotService.getKnowledgeBase();
+  async getKnowledgeBase(@ProjectId() projectId: string) {
+    return this.copilotService.getKnowledgeBase(projectId);
   }
 }

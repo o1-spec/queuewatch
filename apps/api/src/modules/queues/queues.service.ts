@@ -125,7 +125,7 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
     return list;
   }
 
-  async addJob(queueName: string, jobName: string, data: any): Promise<any> {
+  async addJob(queueName: string, jobName: string, data: any, projectId?: string): Promise<any> {
     const queue = this.queues.get(queueName);
     if (!queue) {
       throw new Error(`Queue ${queueName} not found`);
@@ -142,7 +142,7 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
       jobName,
       status: 'waiting',
       payload: data,
-    });
+    }, projectId);
 
     return {
       id: job.id,
@@ -183,7 +183,7 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
   /**
    * Redis-Native Dead-Letter Replay Protocol
    */
-  async replayJob(jobId: string): Promise<any> {
+  async replayJob(jobId: string, projectId?: string): Promise<any> {
     this.logger.log(`Request to replay jobId: ${jobId}`);
 
     const dlq = this.queues.get('dead_letter_queue');
@@ -203,7 +203,7 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
         ...originalData,
         replayedFrom: jobId,
         replayedAt: Date.now(),
-      });
+      }, projectId);
 
       // 3. Remove the DLQ record
       try {

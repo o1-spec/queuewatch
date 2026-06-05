@@ -12,17 +12,17 @@ export class RunbooksService {
     private readonly configService: ConfigService
   ) {}
 
-  async getRunbooks(): Promise<Runbook[]> {
-    return this.dbService.getRunbooks();
+  async getRunbooks(projectId?: string): Promise<Runbook[]> {
+    return this.dbService.getRunbooks(projectId);
   }
 
-  async getRunbookById(id: string): Promise<Runbook> {
-    const r = await this.dbService.getRunbook(id);
+  async getRunbookById(id: string, projectId?: string): Promise<Runbook> {
+    const r = await this.dbService.getRunbook(id, projectId);
     if (!r) throw new NotFoundException(`Runbook ${id} not found`);
     return r;
   }
 
-  async generateRunbook(incidentType: string, linkedIncidents: string[]): Promise<Runbook> {
+  async generateRunbook(incidentType: string, linkedIncidents: string[], projectId?: string): Promise<Runbook> {
     const ollamaUrl = this.configService.get<string>('OLLAMA_BASE_URL') || 'http://localhost:11434';
     const model = this.configService.get<string>('OLLAMA_MODEL') || 'llama3.1';
     
@@ -78,7 +78,7 @@ export class RunbooksService {
       createdAt: Date.now(),
     };
 
-    await this.dbService.saveRunbook(runbook);
+    await this.dbService.saveRunbook(runbook, projectId);
     return runbook;
   }
 }

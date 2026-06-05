@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Param, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ProjectId } from '../auth/project-id.decorator';
 import { ServiceRegistryService } from './service-registry.service';
 import { DependencyGraphService } from '../dependency-graph/dependency-graph.service';
 import { ReliabilityScoreService } from '../reliability/reliability-score.service';
@@ -28,79 +29,79 @@ export class ServiceRegistryController {
   // --- Services ---
   @Get('services')
   @ApiOperation({ summary: 'Get all registered services' })
-  async getServices() {
-    return this.serviceRegistry.getServices();
+  async getServices(@ProjectId() projectId: string) {
+    return this.serviceRegistry.getServices(projectId);
   }
 
   @Get('services/environments')
   @ApiOperation({ summary: 'Get all environments' })
-  async getEnvironments() {
-    return this.serviceRegistry.getEnvironments();
+  async getEnvironments(@ProjectId() projectId: string) {
+    return this.serviceRegistry.getEnvironments(projectId);
   }
 
   @Post('services')
   @ApiOperation({ summary: 'Create new service' })
-  async createService(@Body() service: Service) {
-    return this.serviceRegistry.createService(service);
+  async createService(@ProjectId() projectId: string, @Body() service: Service) {
+    return this.serviceRegistry.createService(service, projectId);
   }
 
   // --- Dependencies ---
   @Get('dependencies/graph')
   @ApiOperation({ summary: 'Get global dependency graph' })
-  async getGraph() {
-    return this.depGraph.getGraph();
+  async getGraph(@ProjectId() projectId: string) {
+    return this.depGraph.getGraph(projectId);
   }
 
   @Get('dependencies/:serviceId')
   @ApiParam({ name: 'serviceId' })
-  async getServiceDependencies(@Param('serviceId') serviceId: string) {
-    return this.depGraph.getDependencies(serviceId);
+  async getServiceDependencies(@ProjectId() projectId: string, @Param('serviceId') serviceId: string) {
+    return this.depGraph.getDependencies(serviceId, projectId);
   }
 
   // --- Reliability Scores ---
   @Get('reliability')
   @ApiOperation({ summary: 'Get current reliability scores' })
-  async getReliability() {
-    return this.reliabilityScore.getLatestScores();
+  async getReliability(@ProjectId() projectId: string) {
+    return this.reliabilityScore.getLatestScores(projectId);
   }
 
   @Get('reliability/history/:targetId')
   @ApiParam({ name: 'targetId' })
-  async getHistory(@Param('targetId') targetId: string) {
-    return this.reliabilityScore.getHistory(targetId);
+  async getHistory(@ProjectId() projectId: string, @Param('targetId') targetId: string) {
+    return this.reliabilityScore.getHistory(targetId, projectId);
   }
 
   // --- Predictions ---
   @Get('predictions')
   @ApiOperation({ summary: 'Get active predictions and risk scores' })
-  async getPredictions() {
-    return this.prediction.getLatestPredictions();
+  async getPredictions(@ProjectId() projectId: string) {
+    return this.prediction.getLatestPredictions(projectId);
   }
 
   @Get('predictions/:id')
   @ApiParam({ name: 'id' })
-  async getPrediction(@Param('id') id: string) {
-    return this.prediction.getPredictionById(id);
+  async getPrediction(@ProjectId() projectId: string, @Param('id') id: string) {
+    return this.prediction.getPredictionById(id, projectId);
   }
 
   // --- Global Health Center ---
   @Get('health-center')
   @ApiOperation({ summary: 'Get SRE Operational Health Center summaries' })
-  async getHealth() {
-    return this.healthCenter.getGlobalHealth();
+  async getHealth(@ProjectId() projectId: string) {
+    return this.healthCenter.getGlobalHealth(projectId);
   }
 
   // --- Analytics ---
   @Get('analytics')
   @ApiOperation({ summary: 'Get SRE Reports and MTTR analytics' })
-  async getAnalytics() {
-    return this.analytics.getReports();
+  async getAnalytics(@ProjectId() projectId: string) {
+    return this.analytics.getReports(projectId);
   }
 
   // --- Incident Blast Radius ---
   @Get('incidents/:id/blast-radius')
   @ApiParam({ name: 'id' })
-  async getBlastRadius(@Param('id') id: string) {
-    return this.correlation.calculateBlastRadius(id);
+  async getBlastRadius(@ProjectId() projectId: string, @Param('id') id: string) {
+    return this.correlation.calculateBlastRadius(id, projectId);
   }
 }

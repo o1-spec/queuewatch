@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Project } from '@queuewatch/shared';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -32,6 +33,13 @@ interface AuthContextType {
   user: UserProfile | null;
   token: string | null;
   loading: boolean;
+  projects: Project[];
+  projectsLoaded: boolean;
+  activeProjectId: string | null;
+  activeProject: Project | null;
+  setActiveProjectId: (projectId: string | null) => void;
+  fetchProjects: () => Promise<Project[]>;
+  createProject: (name: string) => Promise<Project>;
   login: (email: string, password: string) => Promise<UserProfile>;
   register: (name: string, email: string, password: string) => Promise<UserProfile>;
   logout: () => void;
@@ -44,23 +52,116 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectsLoaded, setProjectsLoaded] = useState(false);
+  const [activeProjectId, setActiveProjectIdState] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const activeProject = projects.find(p => p.id === activeProjectId) || null;
+
+  const setActiveProjectId = (id: string | null) => {
+    setActiveProjectIdState(id);
+    if (id) {
+      localStorage.setItem('queuewatch_active_project_id', id);
+    } else {
+      localStorage.removeItem('queuewatch_active_project_id');
+    }
+  };
 
   useEffect(() => {
     try {
       const storedToken = getCookie('queuewatch_token');
       const storedUser = localStorage.getItem('queuewatch_user');
+      const storedActiveProjectId = localStorage.getItem('queuewatch_active_project_id');
 
       if (storedToken && storedUser) {
         setToken(storedToken);
         setUser(JSON.parse(storedUser));
+        if (storedActiveProjectId) {
+          setActiveProjectIdState(storedActiveProjectId);
+        }
+      } else {
+        setProjectsLoaded(true); // not logged in, nothing to load
       }
     } catch (e) {
       console.error('Failed to load session from session storage:', e);
+      setProjectsLoaded(true);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const fetchProjects = async (): Promise<Project[]> => {
+    const activeToken = token || getCookie('queuewatch_token');
+    if (!activeToken) {
+      setProjectsLoaded(true);
+      return [];
+    }
+    try {
+      const res = await fetch(`${API_URL}/api/projects`, {
+        headers: {
+          'Authorization': `Bearer ${activeToken}`
+        }
+      });
+      if (!res.ok) throw new Error('Failed to fetch projects');
+      const data: Project[] = await res.json();
+      setProjects(data);
+
+      let currentActiveId = activeProjectId;
+      if (!currentActiveId && data.length > 0) {
+        // Find if localstorage had one
+        const storedActiveProjectId = localStorage.getItem('queuewatch_active_project_id');
+        if (storedActiveProjectId && data.some(p => p.id === storedActiveProjectId)) {
+          currentActiveId = storedActiveProjectId;
+        } else {
+          currentActiveId = data[0].id;
+        }
+      }
+      if (currentActiveId && !data.some(p => p.id === currentActiveId)) {
+        currentActiveId = data.length > 0 ? data[0].id : null;
+      }
+
+      setActiveProjectId(currentActiveId);
+      return data;
+    } catch (err) {
+      console.error('fetchProjects error:', err);
+      return [];
+    } finally {
+      setProjectsLoaded(true);
+    }
+  };
+
+  useEffect(() => {
+    if (token) {
+      fetchProjects();
+    } else {
+      setProjects([]);
+      setActiveProjectIdState(null);
+      setProjectsLoaded(true); // reset
+    }
+  }, [token]);
+
+  const createProject = async (name: string): Promise<Project> => {
+    const res = await authFetch(`${API_URL}/api/projects`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+
+    if (!res.ok) {
+      const errorMsg = await res.text();
+      let parsedError = 'Failed to create project.';
+      try {
+        parsedError = JSON.parse(errorMsg).message || parsedError;
+      } catch {}
+      throw new Error(parsedError);
+    }
+
+    const data: Project = await res.json();
+    setProjects(prev => [...prev, data]);
+    setActiveProjectId(data.id);
+    return data;
+  };
 
   const login = async (email: string, password: string): Promise<UserProfile> => {
     const res = await fetch(`${API_URL}/api/auth/login`, {
@@ -117,8 +218,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     setToken(null);
     setUser(null);
+    setProjects([]);
+    setActiveProjectIdState(null);
+    setProjectsLoaded(false);
     deleteCookie('queuewatch_token');
     localStorage.removeItem('queuewatch_user');
+    localStorage.removeItem('queuewatch_active_project_id');
   };
 
   const isAuthenticated = () => {
@@ -132,6 +237,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (activeToken) {
       headers.set('Authorization', `Bearer ${activeToken}`);
     }
+    if (activeProjectId) {
+      headers.set('x-project-id', activeProjectId);
+    }
 
     return fetch(input, {
       ...init,
@@ -140,7 +248,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, isAuthenticated, authFetch }}>
+    <AuthContext.Provider value={{
+      user,
+      token,
+      loading,
+      projects,
+      projectsLoaded,
+      activeProjectId,
+      activeProject,
+      setActiveProjectId,
+      fetchProjects,
+      createProject,
+      login,
+      register,
+      logout,
+      isAuthenticated,
+      authFetch
+    }}>
       {children}
     </AuthContext.Provider>
   );

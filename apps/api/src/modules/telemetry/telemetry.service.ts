@@ -12,7 +12,7 @@ export class TelemetryService {
     private dbService: DbService
   ) {}
 
-  async recordEvent(event: Omit<TelemetryEvent, 'id' | 'timestamp'>) {
+  async recordEvent(event: Omit<TelemetryEvent, 'id' | 'timestamp'>, projectId?: string) {
     const fullEvent: TelemetryEvent = {
       ...event,
       id: (event as any).id || `tel_${Math.random().toString(36).substr(2, 9)}`,
@@ -20,18 +20,18 @@ export class TelemetryService {
     } as TelemetryEvent;
 
     // Save to Redis Persistent database
-    await this.dbService.saveTelemetry(fullEvent);
+    await this.dbService.saveTelemetry(fullEvent, projectId);
 
-    // Broadcast telemetry via WS gateway
-    this.wsGateway.broadcast('telemetry.event', fullEvent);
-    this.logger.debug(`[Telemetry] Persisted ${fullEvent.type} on ${fullEvent.queueName}`);
+    // Broadcast telemetry via WS gateway with projectId attached
+    this.wsGateway.broadcast('telemetry.event', { ...fullEvent, projectId });
+    this.logger.debug(`[Telemetry] Persisted ${fullEvent.type} on ${fullEvent.queueName} for project ${projectId || 'proj_demo'}`);
   }
 
-  async getEvents(limit = 100): Promise<TelemetryEvent[]> {
-    return this.dbService.getTelemetry(limit);
+  async getEvents(limit = 100, projectId?: string): Promise<TelemetryEvent[]> {
+    return this.dbService.getTelemetry(limit, projectId);
   }
 
-  async getQueueEvents(queueName: QueueName, limit = 50): Promise<TelemetryEvent[]> {
-    return this.dbService.getTelemetryByQueue(queueName, limit);
+  async getQueueEvents(queueName: QueueName, limit = 50, projectId?: string): Promise<TelemetryEvent[]> {
+    return this.dbService.getTelemetryByQueue(queueName, limit, projectId);
   }
 }

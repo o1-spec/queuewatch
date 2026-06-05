@@ -294,3 +294,11 @@ export interface GlobalHealth {
   overallRiskScore: number;
   timestamp: number;
 }
+
+export interface Project {
+  id: string;
+  name: string;
+  apiKey: string;
+  createdAt: number;
+}
+

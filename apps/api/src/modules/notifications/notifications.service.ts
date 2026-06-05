@@ -53,7 +53,7 @@ export class NotificationsService implements OnModuleInit {
     }
   }
 
-  async sendIncidentAlert(incident: Incident, isEscalation = false) {
+  async sendIncidentAlert(incident: Incident, isEscalation = false, projectId?: string) {
     const settings = await this.dbService.getNotificationSettings('admin');
     
     // Check severity filters
@@ -83,8 +83,8 @@ export class NotificationsService implements OnModuleInit {
         status: 'sent',
         timestamp: Date.now(),
       };
-      await this.dbService.saveNotification(notif);
-      this.wsGateway.broadcast('notification.created', notif);
+      await this.dbService.saveNotification(notif, projectId);
+      this.wsGateway.broadcast('notification.created', { ...notif, projectId });
     }
 
     // 2. Email notification
@@ -215,7 +215,7 @@ export class NotificationsService implements OnModuleInit {
     return settings;
   }
 
-  async getNotifications(limit = 100): Promise<Notification[]> {
-    return this.dbService.getNotifications(limit);
+  async getNotifications(limit = 100, projectId?: string): Promise<Notification[]> {
+    return this.dbService.getNotifications(limit, projectId);
   }
 }

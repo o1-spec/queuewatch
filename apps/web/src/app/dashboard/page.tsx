@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import useSocket from '../../hooks/useSocket';
 import Link from 'next/link';
 import { QueueMetrics, WorkerHealth, QueueName, Incident } from '@queuewatch/shared';
-import { CheckCircle2, Activity, Skull, Clock, AlertTriangle, Play, Sparkles, Server, GitCommit, BellRing } from 'lucide-react';
+import { CheckCircle2, Activity, Skull, Clock, AlertTriangle, Play, Sparkles, Server, GitCommit, BellRing, Loader2 } from 'lucide-react';
 import { MetricCard } from '../../components/MetricCard';
 import { QueueCard } from '../../components/QueueCard';
 import { WorkerCard } from '../../components/WorkerCard';
@@ -16,7 +16,10 @@ import { useAuth } from '../../context/AuthContext';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function DashboardOverview() {
-  const { authFetch } = useAuth();
+  const { authFetch, projects, projectsLoaded, createProject, activeProjectId } = useAuth();
+  const [projectName, setProjectName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState('');
   const [metrics, setMetrics] = useState<QueueMetrics[]>([]);
   const [workers, setWorkers] = useState<WorkerHealth[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -109,9 +112,11 @@ export default function DashboardOverview() {
   };
 
   useEffect(() => {
-    loadData();
-    loadAiReport();
-  }, []);
+    if (activeProjectId) {
+      loadData();
+      loadAiReport();
+    }
+  }, [activeProjectId]);
 
   const socketListeners = {
     'metrics.updated': (data: QueueMetrics[]) => {
@@ -195,6 +200,90 @@ export default function DashboardOverview() {
   const runningAverageLatency = averageLatencies.length > 0
     ? Math.round(averageLatencies.reduce((a, b) => a + b, 0) / averageLatencies.length)
     : 0;
+
+  if (!projectsLoaded) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4 font-mono">
+        <Loader2 className="w-6 h-6 text-zinc-500 animate-spin" />
+        <span className="text-[10px] text-zinc-500 uppercase tracking-widest">Loading Telemetry Projects...</span>
+      </div>
+    );
+  }
+
+  if (projects.length === 0) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center font-mono text-zinc-350">
+        <div className="w-full max-w-md bg-zinc-950/80 border border-zinc-900 rounded-lg p-6 md:p-8 space-y-6 shadow-2xl relative overflow-hidden backdrop-blur-md">
+          {/* Subtle neon glow */}
+          <div className="absolute -top-20 -left-20 w-40 h-40 bg-zinc-800/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-zinc-850/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="space-y-2.5 text-center relative">
+            <div className="w-10 h-10 rounded border border-zinc-850 bg-zinc-900 flex items-center justify-center mx-auto mb-2 text-zinc-400">
+              <Activity className="w-5 h-5 animate-pulse text-zinc-500" />
+            </div>
+            <h1 className="text-white text-[13px] font-bold uppercase tracking-wider">
+              Welcome to QueueWatch SRE Console
+            </h1>
+            <p className="text-zinc-400 font-sans leading-relaxed text-[11px]">
+              To begin observing your background workers and BullMQ queues, create your first project.
+            </p>
+          </div>
+
+          <form 
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!projectName.trim()) return;
+              try {
+                setCreating(true);
+                setError('');
+                await createProject(projectName.trim());
+              } catch (err: any) {
+                setError(err.message || 'Failed to create project');
+              } finally {
+                setCreating(false);
+              }
+            }}
+            className="space-y-4 relative"
+          >
+            <div className="space-y-1.5">
+              <label className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold block font-mono">Project Name</label>
+              <input
+                autoFocus
+                type="text"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                placeholder="e.g. Production Web Service"
+                className="w-full bg-zinc-900/40 border border-zinc-900 rounded px-3 py-2 focus:outline-none focus:border-zinc-700 text-[11px] text-white placeholder-zinc-750 font-mono transition-colors"
+                disabled={creating}
+              />
+            </div>
+
+            {error && (
+              <div className="text-rose-500 text-[10px] bg-rose-950/10 border border-rose-950 p-2.5 rounded">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={creating || !projectName.trim()}
+              className="w-full py-2.5 rounded bg-zinc-900 hover:bg-zinc-850 text-white font-bold transition-all border border-zinc-800 hover:border-zinc-700 disabled:opacity-50 flex items-center justify-center space-x-2 text-[11px] uppercase tracking-wider"
+            >
+              {creating ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Creating...</span>
+                </>
+              ) : (
+                <span>Create Project</span>
+              )}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   const workersHealthyCount = workers.filter((w) => w.status === 'healthy').length;
   const workersTotalCount = workers.length || 1;

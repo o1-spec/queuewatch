@@ -37,11 +37,14 @@ import {
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, loading, isAuthenticated, logout } = useAuth();
+  const { user, loading, isAuthenticated, logout, projects, activeProject, setActiveProjectId, createProject } = useAuth();
   
-  const [workspace, setWorkspace] = useState('o1-spec / queuewatch');
   const [env, setEnv] = useState<'production' | 'staging'>('production');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [creatingProject, setCreatingProject] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [paletteIndex, setPaletteIndex] = useState(0);
@@ -176,16 +179,70 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     <>
       <div>
         {/* Workspace selector SRE style */}
-        <div className="p-4 border-b border-zinc-900">
-          <div className="flex items-center justify-between bg-zinc-900/40 border border-zinc-900 rounded px-2.5 py-1.5 cursor-pointer hover:bg-zinc-900 transition-all">
+        <div className="p-4 border-b border-zinc-900 relative">
+          <div 
+            onClick={() => setShowProjectDropdown(prev => !prev)}
+            className="flex items-center justify-between bg-zinc-900/40 border border-zinc-900 rounded px-2.5 py-1.5 cursor-pointer hover:bg-zinc-900 transition-all"
+          >
             <div className="flex items-center space-x-2 min-w-0">
               <div className="w-4 h-4 rounded bg-zinc-700 flex items-center justify-center font-bold text-[10px] text-white shrink-0">
-                Q
+                P
               </div>
-              <span className="text-[11px] font-bold text-white font-mono truncate">{workspace}</span>
+              <span className="text-[11px] font-bold text-white font-mono truncate">
+                {activeProject ? activeProject.name : 'No Active Project'}
+              </span>
             </div>
             <ChevronDown className="w-3 h-3 text-zinc-500 shrink-0" />
           </div>
+
+          {/* Project selection dropdown */}
+          {showProjectDropdown && (
+            <>
+              <div 
+                className="fixed inset-0 z-40" 
+                onClick={() => setShowProjectDropdown(false)} 
+              />
+              <div className="absolute top-[52px] left-4 right-4 bg-zinc-950 border border-zinc-900 rounded shadow-2xl z-50 py-1 font-mono text-[10px] space-y-0.5 max-h-48 overflow-y-auto">
+                <div className="px-2.5 py-1 text-[8px] text-zinc-550 uppercase tracking-widest font-bold border-b border-zinc-900/60 mb-1">
+                  Select Project
+                </div>
+                {projects.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      setActiveProjectId(p.id);
+                      setShowProjectDropdown(false);
+                    }}
+                    className={`w-full text-left px-2.5 py-1.5 transition-colors flex items-center justify-between ${
+                      p.id === (activeProject?.id) 
+                        ? 'bg-zinc-900 text-white font-bold' 
+                        : 'text-zinc-400 hover:bg-zinc-900/55 hover:text-white'
+                    }`}
+                  >
+                    <span className="truncate">{p.name}</span>
+                    {p.id === (activeProject?.id) && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 ml-1.5" />
+                    )}
+                  </button>
+                ))}
+                {projects.length === 0 && (
+                  <div className="px-2.5 py-2 text-zinc-500 text-[9px]">
+                    No active projects.
+                  </div>
+                )}
+                <div className="h-px bg-zinc-900 my-1" />
+                <button
+                  onClick={() => {
+                    setShowCreateProjectModal(true);
+                    setShowProjectDropdown(false);
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 text-zinc-400 hover:bg-zinc-900/55 hover:text-white transition-colors font-bold flex items-center space-x-1.5"
+                >
+                  <span>+ Create Project</span>
+                </button>
+              </div>
+            </>
+          )}
 
           {/* Environment selector */}
           <div className="flex mt-3 gap-1 p-0.5 bg-zinc-900/50 rounded border border-zinc-900/60 font-mono text-[9px]">
@@ -418,6 +475,75 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+
+      {/* ── Create project confirmation modal ─────────────────────────────────────── */}
+      {showCreateProjectModal && (
+        <>
+          <div 
+            onClick={() => {
+              setShowCreateProjectModal(false);
+              setNewProjectName('');
+            }}
+            className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 transition-opacity animate-fade-in"
+          ></div>
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-zinc-950 border border-zinc-900 p-5 rounded-lg w-[calc(100%-2rem)] max-w-sm shadow-2xl z-50 font-mono text-[10px] space-y-4 animate-slide-up text-zinc-300">
+            <div className="flex items-center space-x-2 border-b border-zinc-900 pb-2.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 shrink-0"></span>
+              <span className="text-[11px] font-bold text-white uppercase">Create New Project</span>
+            </div>
+            
+            <div className="space-y-1.5">
+              <label className="text-[9px] uppercase tracking-wider text-zinc-405 font-bold">Project Name</label>
+              <input
+                autoFocus
+                type="text"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                placeholder="e.g. Production Web Service"
+                className="w-full bg-zinc-900/40 border border-zinc-900 rounded px-2.5 py-2 focus:outline-none focus:border-zinc-700 text-[11px] text-white"
+              />
+            </div>
+
+            <div className="flex space-x-2 pt-1.5">
+              <button
+                disabled={creatingProject}
+                onClick={() => {
+                  setShowCreateProjectModal(false);
+                  setNewProjectName('');
+                }}
+                className="flex-1 py-1.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 font-bold transition-all disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={creatingProject || !newProjectName.trim()}
+                onClick={async () => {
+                  try {
+                    setCreatingProject(true);
+                    await createProject(newProjectName.trim());
+                    setShowCreateProjectModal(false);
+                    setNewProjectName('');
+                  } catch (err: any) {
+                    alert(err.message || 'Failed to create project');
+                  } finally {
+                    setCreatingProject(false);
+                  }
+                }}
+                className="flex-1 py-1.5 rounded bg-zinc-900 hover:bg-zinc-850 text-white border border-zinc-750 font-bold transition-all disabled:opacity-50 flex items-center justify-center space-x-1.5"
+              >
+                {creatingProject ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
+                    <span>Creating...</span>
+                  </>
+                ) : (
+                  <span>Create Project</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ── Logout confirmation modal ─────────────────────────────────────── */}
       {showLogoutModal && (
