@@ -125,12 +125,7 @@ export default function SaaSLandingPage() {
 
       {/* SECTION 1: HERO */}
       <section className="relative px-4 md:px-8 lg:px-12 pt-16 pb-24 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-        <motion.div
-          className="lg:col-span-5 space-y-6"
-          initial="initial"
-          animate="animate"
-          variants={FADE_UP}
-        >
+        <div className="lg:col-span-5 space-y-6 animate-slide-up">
           <div className="inline-flex items-center space-x-2 bg-zinc-900/60 border border-zinc-800/80 px-2.5 py-1 rounded text-zinc-400 text-[10px] font-mono font-bold uppercase tracking-wider">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
             <span>PROACTIVE INCIDENT MITIGATION</span>
@@ -160,14 +155,12 @@ export default function SaaSLandingPage() {
               View Demo
             </Link>
           </div>
-        </motion.div>
+        </div>
 
         {/* Dashboard Preview Graphic */}
-        <motion.div
-          className="lg:col-span-7 bg-zinc-950/80 border border-zinc-900 rounded-lg p-5 shadow-2xl space-y-5 select-none text-zinc-400 relative overflow-hidden"
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
+        <div
+          className="lg:col-span-7 bg-zinc-950/80 border border-zinc-900 rounded-lg p-5 shadow-2xl space-y-5 select-none text-zinc-400 relative overflow-hidden animate-slide-up"
+          style={{ animationDelay: '0.1s' }}
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-zinc-900 pb-3 text-[10px] font-mono">
@@ -255,7 +248,7 @@ export default function SaaSLandingPage() {
               </div>
             </div>
           </div>
-        </motion.div>
+        </div>
       </section>
 
       {/* SECTION 2: SOCIAL PROOF BAR */}
