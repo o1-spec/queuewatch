@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '../context/AuthContext';
 import {
   Terminal,
   Activity,
@@ -41,6 +42,7 @@ const FADE_UP = {
 };
 
 export default function SaaSLandingPage() {
+  const { user, isAuthenticated } = useAuth();
   const [activeShowcaseTab, setActiveShowcaseTab] = useState<'dashboard' | 'investigation' | 'reliability'>('dashboard');
   const [copiedSdk, setCopiedSdk] = useState(false);
   const [activeCopilotQuery, setActiveCopilotQuery] = useState(0);
@@ -145,17 +147,34 @@ monitorQueue(emailQueue, {
           <Link href="#blog" className="hover:text-white transition-colors">Blog</Link>
         </nav>
 
-        <div className="flex items-center space-x-3">
-          <Link href="/login" className="text-xs font-bold font-mono text-zinc-400 hover:text-white transition-colors px-3.5 py-2">
-            Sign In
-          </Link>
-          <Link
-            href="/register"
-            className="px-4 py-2 rounded border border-zinc-800 bg-zinc-900 hover:bg-zinc-850 text-zinc-100 hover:text-white font-extrabold text-xs transition-all flex items-center space-x-1.5 font-mono"
-          >
-            <span>Get Started</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+        <div className="flex items-center space-x-3 font-mono">
+          {isAuthenticated() ? (
+            <>
+              <span className="text-[11px] text-zinc-400 hidden sm:inline">
+                Signed in as <span className="text-zinc-200 font-semibold">{user?.name || user?.email}</span>
+              </span>
+              <Link
+                href="/dashboard"
+                className="px-4 py-2 rounded border border-zinc-850 bg-zinc-900 hover:bg-zinc-800 text-zinc-100 hover:text-white font-extrabold text-xs transition-all flex items-center space-x-1.5"
+              >
+                <span>Dashboard</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link href="/login" className="text-xs font-bold text-zinc-400 hover:text-white transition-colors px-3.5 py-2">
+                Sign In
+              </Link>
+              <Link
+                href="/register"
+                className="px-4 py-2 rounded border border-zinc-800 bg-zinc-900 hover:bg-zinc-850 text-zinc-100 hover:text-white font-extrabold text-xs transition-all flex items-center space-x-1.5"
+              >
+                <span>Get Started</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
@@ -177,10 +196,10 @@ monitorQueue(emailQueue, {
 
           <div className="flex items-center gap-3 pt-2">
             <Link
-              href="/register"
+              href={isAuthenticated() ? "/dashboard" : "/register"}
               className="px-5 py-2.5 rounded bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-extrabold text-xs transition-all flex items-center justify-center space-x-2 font-mono shadow-md"
             >
-              <span>Start Monitoring</span>
+              <span>{isAuthenticated() ? "Go to Dashboard" : "Start Monitoring"}</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -769,10 +788,10 @@ monitorQueue(emailQueue, {
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
           <Link
-            href="/register"
+            href={isAuthenticated() ? "/dashboard" : "/register"}
             className="w-full sm:w-auto px-6 py-3 rounded bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-extrabold text-sm transition-all shadow-md flex items-center justify-center space-x-2 font-mono"
           >
-            <span>Start Monitoring</span>
+            <span>{isAuthenticated() ? "Go to Dashboard" : "Start Monitoring"}</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
