@@ -101,7 +101,7 @@ export default function SaaSLandingPage() {
           </span>
         </div>
 
-        <nav className="hidden md:flex items-center space-x-6 text-[11px] font-mono font-semibold text-zinc-400">
+        <nav className="hidden md:flex items-center space-x-6 text-xs font-mono font-semibold text-zinc-400">
           <Link href="#features" className="hover:text-white transition-colors">Features</Link>
           <Link href="#solutions" className="hover:text-white transition-colors">Solutions</Link>
           <Link href="#docs" className="hover:text-white transition-colors">Docs</Link>
@@ -110,15 +110,15 @@ export default function SaaSLandingPage() {
         </nav>
 
         <div className="flex items-center space-x-3">
-          <Link href="/login" className="text-[11px] font-bold font-mono text-zinc-400 hover:text-white transition-colors px-3 py-1.5">
+          <Link href="/login" className="text-xs font-bold font-mono text-zinc-400 hover:text-white transition-colors px-3.5 py-2">
             Sign In
           </Link>
           <Link
-            href="/login?demo=true"
-            className="px-3 py-1.5 rounded border border-zinc-800 bg-zinc-900 hover:bg-zinc-850 text-zinc-100 hover:text-white font-extrabold text-[11px] transition-all flex items-center space-x-1.5 font-mono"
+            href="/register"
+            className="px-4 py-2 rounded border border-zinc-800 bg-zinc-900 hover:bg-zinc-850 text-zinc-100 hover:text-white font-extrabold text-xs transition-all flex items-center space-x-1.5 font-mono"
           >
             <span>Get Started</span>
-            <ArrowRight className="w-3 h-3" />
+            <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
       </header>
@@ -131,28 +131,21 @@ export default function SaaSLandingPage() {
             <span>PROACTIVE INCIDENT MITIGATION</span>
           </div>
 
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight leading-[1.1] font-sans">
+          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.08] font-sans">
             Understand failures before your customers do.
           </h2>
 
-          <p className="text-zinc-400 text-xs sm:text-sm leading-relaxed max-w-xl">
+          <p className="text-zinc-455 text-sm sm:text-base leading-relaxed max-w-xl">
             QueueWatch helps engineering teams monitor queues, investigate incidents, analyze worker health, and improve the reliability of asynchronous systems.
           </p>
 
           <div className="flex items-center gap-3 pt-2">
             <Link
-              href="/login?demo=true"
-              className="px-4.5 py-2 rounded bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-extrabold text-[11px] transition-all flex items-center justify-center space-x-2 font-mono shadow-md"
+              href="/register"
+              className="px-5 py-2.5 rounded bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-extrabold text-xs transition-all flex items-center justify-center space-x-2 font-mono shadow-md"
             >
               <span>Start Monitoring</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-
-            <Link
-              href="/login?demo=true"
-              className="px-4.5 py-2 rounded bg-zinc-900/80 hover:bg-zinc-850 border border-zinc-800 text-zinc-300 font-extrabold text-[11px] transition-all flex items-center justify-center font-mono"
-            >
-              View Demo
+              <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
         </div>
@@ -730,27 +723,21 @@ monitorQueue(emailQueue, {
       {/* SECTION 10: FINAL CTA */}
       <section className="py-28 border-t border-zinc-900 bg-zinc-950 text-center px-4 md:px-8 lg:px-12 space-y-8">
         <div className="max-w-2xl mx-auto space-y-4">
-          <h3 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
+          <h3 className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
             Stop guessing. Start understanding.
           </h3>
-          <p className="text-zinc-400 text-xs sm:text-sm max-w-xl mx-auto leading-relaxed">
+          <p className="text-zinc-455 text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
             Detect, investigate, and prevent failures across your asynchronous systems.
           </p>
         </div>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
           <Link
-            href="/login?demo=true"
-            className="w-full sm:w-auto px-5 py-2.5 rounded bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-extrabold text-xs transition-all shadow-md flex items-center justify-center space-x-2 font-mono"
+            href="/register"
+            className="w-full sm:w-auto px-6 py-3 rounded bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-extrabold text-sm transition-all shadow-md flex items-center justify-center space-x-2 font-mono"
           >
             <span>Start Monitoring</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-          <Link
-            href="/login?demo=true"
-            className="w-full sm:w-auto px-5 py-2.5 rounded bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-zinc-300 font-extrabold text-xs transition-all flex items-center justify-center font-mono"
-          >
-            Book Demo
+            <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </section>
