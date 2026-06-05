@@ -19,14 +19,20 @@ export class IngestController {
     private readonly wsGateway: QueueWebSocketGateway
   ) {}
 
-  private async authorize(authHeader: string): Promise<{ projectId: string; userId: string }> {
+  private async authorize(authHeader: string, payloadProjectId?: string): Promise<{ projectId: string; userId: string }> {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new UnauthorizedException('Missing or invalid Authorization header');
+    }
+    if (!payloadProjectId) {
+      throw new UnauthorizedException('Missing projectId in telemetry payload');
     }
     const token = authHeader.substring(7);
     const mapping = await this.dbService.resolveApiKey(token);
     if (!mapping) {
       throw new UnauthorizedException('Invalid API Key credentials');
+    }
+    if (mapping.projectId !== payloadProjectId) {
+      throw new UnauthorizedException('API Key does not match the provided Project ID');
     }
     return mapping;
   }
@@ -35,14 +41,23 @@ export class IngestController {
   @ApiOperation({ summary: 'Ingest batched events from SDK' })
   async ingestEvents(
     @Headers('authorization') authHeader: string,
-    @Body() body: { events: any[] }
+    @Body() body: { events: any[]; projectId?: string }
   ) {
-    const { projectId } = await this.authorize(authHeader);
+    const projectId = body.projectId || (body.events && body.events[0]?.projectId);
+    const { userId } = await this.authorize(authHeader, projectId);
     
     const events = body.events || [];
     this.logger.log(`Ingesting ${events.length} telemetry events from SDK for project ${projectId}`);
 
+    // Mark project as telemetry received
+    await this.dbService.markProjectTelemetryReceived(projectId);
+
     for (const event of events) {
+      // Register queue name dynamically
+      if (event.queueName) {
+        await this.dbService.registerProjectQueue(projectId, event.queueName);
+      }
+
       // Save to database
       const telemetryEvent = {
         ...event,
@@ -69,7 +84,16 @@ export class IngestController {
     @Headers('authorization') authHeader: string,
     @Body() body: any
   ) {
-    const { projectId } = await this.authorize(authHeader);
+    const projectId = body.projectId;
+    await this.authorize(authHeader, projectId);
+
+    // Mark project as telemetry received
+    await this.dbService.markProjectTelemetryReceived(projectId);
+
+    // Register queue name if present in metadata
+    if (body.queueName) {
+      await this.dbService.registerProjectQueue(projectId, body.queueName);
+    }
 
     const logEntry = {
       ...body,
@@ -89,7 +113,16 @@ export class IngestController {
     @Headers('authorization') authHeader: string,
     @Body() body: any
   ) {
-    const { projectId } = await this.authorize(authHeader);
+    const projectId = body.projectId;
+    await this.authorize(authHeader, projectId);
+
+    // Mark project as telemetry received
+    await this.dbService.markProjectTelemetryReceived(projectId);
+
+    // Register queue name if present
+    if (body.queueName) {
+      await this.dbService.registerProjectQueue(projectId, body.queueName);
+    }
 
     const report = {
       workerId: body.workerId || 'sdk_worker',

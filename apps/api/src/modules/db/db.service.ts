@@ -432,6 +432,27 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     await this.redis.sadd(`queuewatch:user_projects:${userId}`, project.id);
   }
 
+  async markProjectTelemetryReceived(projectId: string): Promise<void> {
+    const project = await this.getProject(projectId);
+    if (project && !project.hasReceivedTelemetry) {
+      project.hasReceivedTelemetry = true;
+      project.firstTelemetryAt = Date.now();
+      await this.redis.set(`queuewatch:project_metadata:${projectId}`, JSON.stringify(project));
+      this.logger.log(`Project ${projectId} telemetry state marked as active.`);
+    }
+  }
+
+  async registerProjectQueue(projectId: string, queueName: string): Promise<void> {
+    await this.redis.sadd(`queuewatch:project:${projectId}:queues`, queueName);
+  }
+
+  async getProjectQueues(projectId: string): Promise<string[]> {
+    if (projectId === 'proj_demo') {
+      return ['email_notifications', 'webhook_delivery', 'image_processing', 'ai_tasks'];
+    }
+    return this.redis.smembers(`queuewatch:project:${projectId}:queues`);
+  }
+
   async deleteProject(projectId: string, userId: string): Promise<void> {
     const project = await this.getProject(projectId);
     if (project) {

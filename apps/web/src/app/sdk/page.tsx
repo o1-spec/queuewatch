@@ -8,11 +8,17 @@ export default function SdkSetupGuide() {
   const { activeProject } = useAuth();
   const [copiedKey, setCopiedKey] = useState(false);
   const [copiedInstall, setCopiedInstall] = useState(false);
+  const [copiedEnv, setCopiedEnv] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLogCode, setCopiedLogCode] = useState(false);
 
   const apiKey = activeProject?.apiKey || 'qw_pk_your_api_key_here';
+  const projectId = activeProject?.id || 'proj_your_project_id_here';
   const installCmd = 'npm install @queuewatch/node';
+  
+  const envExample = `QUEUEWATCH_PROJECT_ID=${projectId}
+QUEUEWATCH_API_KEY=${apiKey}
+QUEUEWATCH_ENDPOINT=http://localhost:3001`;
 
   const sdkSetupCode = `import { monitorQueue } from '@queuewatch/node';
 import { Queue } from 'bullmq';
@@ -24,9 +30,10 @@ const emailQueue = new Queue('email_notifications', {
 
 // 2. Wrap it with QueueWatch — attaches event hooks transparently
 monitorQueue(emailQueue, {
-  apiKey: '${apiKey}',
-  queueName: 'email_notifications',
-  endpoint: 'http://localhost:3001',
+  apiKey: process.env.QUEUEWATCH_API_KEY,
+  projectId: process.env.QUEUEWATCH_PROJECT_ID,
+  endpoint: process.env.QUEUEWATCH_ENDPOINT,
+  queueName: "email_notifications",
   connection: { host: 'localhost', port: 6379 },
 });
 
@@ -39,11 +46,12 @@ const emailQueue = new Queue('email_notifications', {
   connection: { host: 'localhost', port: 6379 },
 });
 
-// Initialize the SDK first (sets global API key context)
+// Initialize the SDK first (sets global API key and project context)
 monitorQueue(emailQueue, {
-  apiKey: '${apiKey}',
-  queueName: 'email_notifications',
-  endpoint: 'http://localhost:3001',
+  apiKey: process.env.QUEUEWATCH_API_KEY,
+  projectId: process.env.QUEUEWATCH_PROJECT_ID,
+  endpoint: process.env.QUEUEWATCH_ENDPOINT,
+  queueName: "email_notifications",
 });
 
 // Then stream structured logs from inside your workers:
@@ -121,8 +129,8 @@ worker.on('failed', (job, err) => {
             {activeProject ? (
               <>
                 <div className="space-y-1">
-                  <p className="text-[9px] text-zinc-500 uppercase tracking-wider">Project</p>
-                  <p className="text-zinc-200 font-sans text-xs font-semibold">{activeProject.name}</p>
+                  <p className="text-[9px] text-zinc-500 uppercase tracking-wider">Project ID</p>
+                  <p className="text-zinc-200 font-sans text-xs font-semibold">{projectId}</p>
                 </div>
                 <div className="space-y-1.5">
                   <p className="text-[9px] text-zinc-500 uppercase tracking-wider">Secret Key</p>
@@ -202,6 +210,28 @@ worker.on('failed', (job, err) => {
           <div className="bg-zinc-950 border border-zinc-900 p-5 rounded-lg space-y-3">
             <div className="flex items-center justify-between">
               <span className="px-2 py-0.5 rounded text-[8px] font-bold bg-zinc-900 border border-zinc-800 text-zinc-400 uppercase">Step 02</span>
+              <span className="text-zinc-500 text-[9px]">Environment Variables</span>
+            </div>
+            <h3 className="font-bold text-white text-xs uppercase">Configure Credentials</h3>
+            <p className="text-zinc-450 font-sans text-xs">Define your QueueWatch environment variables in your application .env file.</p>
+            <div className="relative">
+              <pre className="bg-black/55 border border-zinc-900 p-4 rounded text-[9.5px] text-zinc-350 overflow-x-auto whitespace-pre leading-normal">
+                {envExample}
+              </pre>
+              <button
+                onClick={() => handleCopy(envExample, setCopiedEnv)}
+                className="absolute top-3 right-3 p-1.5 rounded bg-zinc-900/80 border border-zinc-850 text-zinc-450 hover:text-white transition-all shadow"
+                title="Copy"
+              >
+                {copiedEnv ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Step 3 */}
+          <div className="bg-zinc-950 border border-zinc-900 p-5 rounded-lg space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="px-2 py-0.5 rounded text-[8px] font-bold bg-zinc-900 border border-zinc-800 text-zinc-400 uppercase">Step 03</span>
               <span className="text-zinc-500 text-[9px]">Queue Telemetry Binding</span>
             </div>
             <h3 className="font-bold text-white text-xs uppercase">Attach Queue Monitor</h3>
@@ -222,10 +252,10 @@ worker.on('failed', (job, err) => {
             </div>
           </div>
 
-          {/* Step 3 */}
+          {/* Step 4 */}
           <div className="bg-zinc-950 border border-zinc-900 p-5 rounded-lg space-y-3">
             <div className="flex items-center justify-between">
-              <span className="px-2 py-0.5 rounded text-[8px] font-bold bg-zinc-900 border border-zinc-800 text-zinc-400 uppercase">Step 03</span>
+              <span className="px-2 py-0.5 rounded text-[8px] font-bold bg-zinc-900 border border-zinc-800 text-zinc-400 uppercase">Step 04</span>
               <span className="text-zinc-500 text-[9px]">Structured Log Streaming</span>
             </div>
             <h3 className="font-bold text-white text-xs uppercase">Instrument Worker Logs</h3>

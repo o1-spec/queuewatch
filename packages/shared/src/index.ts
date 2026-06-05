@@ -300,5 +300,7 @@ export interface Project {
   name: string;
   apiKey: string;
   createdAt: number;
+  hasReceivedTelemetry?: boolean;
+  firstTelemetryAt?: number;
 }
 

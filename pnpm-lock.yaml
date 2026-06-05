@@ -74,6 +74,9 @@ importers:
       nodemailer:
         specifier: ^6.9.13
         version: 6.10.1
+      rxjs:
+        specifier: ^7.8.1
+        version: 7.8.2
       socket.io:
         specifier: ^4.7.4
         version: 4.8.3
@@ -159,14 +162,13 @@ importers:
         version: 5.9.3
 
   packages/node-sdk:
-    dependencies:
-      bullmq:
-        specifier: ^5.4.1
-        version: 5.77.3
     devDependencies:
       '@types/node':
         specifier: ^20.11.24
         version: 20.19.41
+      bullmq:
+        specifier: ^5.4.1
+        version: 5.77.3
       typescript:
         specifier: ^5.3.3
         version: 5.9.3

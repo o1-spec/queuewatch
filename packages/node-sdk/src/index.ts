@@ -1,6 +1,14 @@
-import { Queue, QueueEvents } from 'bullmq';
+import { QueueEvents } from 'bullmq';
+
+type QueueLike = {
+  name: string;
+  opts?: {
+    connection?: any;
+  };
+};
 
 export interface MonitorOptions {
+  projectId: string;
   apiKey: string;
   queueName: string;
   endpoint: string;
@@ -11,9 +19,17 @@ let sdkOptions: MonitorOptions | null = null;
 const eventQueue: any[] = [];
 let batchTimeout: NodeJS.Timeout | null = null;
 
-export function monitorQueue(queue: Queue, options: MonitorOptions) {
+export function monitorQueue(queue: QueueLike, options: MonitorOptions) {
   sdkOptions = options;
-  
+
+  if (!options.projectId || !options.apiKey) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn(
+        `[QueueWatch SDK] WARNING: Missing required configuration parameters. projectId: "${options.projectId}", apiKey: "${options.apiKey ? '***' : ''}". SDK will fail to send telemetry.`
+      );
+    }
+  }
+
   try {
     const endpoint = options.endpoint || 'http://localhost:3001';
     const queueName = options.queueName || queue.name;
@@ -25,6 +41,7 @@ export function monitorQueue(queue: Queue, options: MonitorOptions) {
         queueName: queueName,
         status: 'healthy',
         timestamp: Date.now(),
+        projectId: options.projectId,
       });
     }, 15000).unref?.();
 
@@ -83,7 +100,6 @@ export function monitorQueue(queue: Queue, options: MonitorOptions) {
     queueEvents.on('error', (err) => {
       console.warn(`[QueueWatch SDK] QueueEvents listener warning: ${err.message}`);
     });
-
   } catch (e: any) {
     console.warn(`[QueueWatch SDK] Failed to initialize queue monitoring: ${e.message}`);
   }
@@ -92,6 +108,7 @@ export function monitorQueue(queue: Queue, options: MonitorOptions) {
 function enqueueEvent(event: any) {
   eventQueue.push({
     ...event,
+    projectId: sdkOptions?.projectId,
     timestamp: Date.now(),
   });
 
@@ -109,7 +126,10 @@ async function flushEvents() {
   const eventsToSend = [...eventQueue];
   eventQueue.length = 0; // Clear queue
 
-  await sendPayload('/api/ingest/events', { events: eventsToSend });
+  await sendPayload('/api/ingest/events', { 
+    events: eventsToSend,
+    projectId: sdkOptions.projectId 
+  });
 }
 
 async function sendPayload(path: string, payload: any) {
@@ -119,7 +139,7 @@ async function sendPayload(path: string, payload: any) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${sdkOptions.apiKey}`,
+        Authorization: `Bearer ${sdkOptions.apiKey}`,
       },
       body: JSON.stringify(payload),
     });
@@ -145,7 +165,7 @@ export const queuewatchLogger = {
 
 function logIngest(level: 'info' | 'warn' | 'error', message: string, meta: any) {
   if (!sdkOptions) return;
-  
+
   const payload = {
     level,
     message,
@@ -154,6 +174,7 @@ function logIngest(level: 'info' | 'warn' | 'error', message: string, meta: any)
     traceId: meta.traceId || `tr_${Math.random().toString(36).substr(2, 9)}`,
     metadata: meta,
     timestamp: Date.now(),
+    projectId: sdkOptions.projectId,
   };
 
   sendPayload('/api/ingest/logs', payload);

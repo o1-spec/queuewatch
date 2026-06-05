@@ -14,7 +14,7 @@ export class ProjectsService {
     return this.dbService.getProject(projectId);
   }
 
-  async createProject(name: string, userId: string): Promise<Project> {
+  async createProject(name: string, userId: string): Promise<any> {
     const trimmedName = name.trim();
     if (!trimmedName) {
       throw new BadRequestException('Project name cannot be empty');
@@ -30,12 +30,21 @@ export class ProjectsService {
       name: trimmedName,
       apiKey,
       createdAt: Date.now(),
+      hasReceivedTelemetry: false,
     };
 
     await this.dbService.saveProject(project, userId);
     await this.dbService.saveApiKeyMapping(apiKey, { projectId, userId });
 
-    return project;
+    return {
+      id: project.id,
+      name: project.name,
+      projectId: project.id,
+      apiKey: project.apiKey,
+      projectName: project.name,
+      createdAt: project.createdAt,
+      hasReceivedTelemetry: project.hasReceivedTelemetry,
+    };
   }
 
   async deleteProject(projectId: string, userId: string): Promise<void> {

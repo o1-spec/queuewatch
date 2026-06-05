@@ -562,6 +562,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                     await createProject(newProjectName.trim());
                     setShowCreateProjectModal(false);
                     setNewProjectName('');
+                    router.push('/sdk');
                   } catch (err: any) {
                     alert(err.message || 'Failed to create project');
                   } finally {

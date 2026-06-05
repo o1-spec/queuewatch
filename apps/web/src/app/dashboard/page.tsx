@@ -12,11 +12,13 @@ import { ActivityFeed, LiveEvent } from '../../components/ActivityFeed';
 import { AIInsightPanel, AIAnalysisReport } from '../../components/AIInsightPanel';
 
 import { useAuth } from '../../context/AuthContext';
+import { useRouter } from 'next/navigation';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function DashboardOverview() {
-  const { authFetch, projects, projectsLoaded, createProject, activeProjectId, activeProject } = useAuth();
+  const { authFetch, projects, projectsLoaded, createProject, activeProjectId, activeProject, fetchProjects } = useAuth();
+  const router = useRouter();
   const [projectName, setProjectName] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
@@ -168,6 +170,7 @@ export default function DashboardOverview() {
     if (activeProjectId && !hasTelemetry && !loadingData) {
       interval = setInterval(() => {
         loadData();
+        fetchProjects();
       }, 3000);
     }
     return () => {
@@ -294,7 +297,10 @@ export default function DashboardOverview() {
               try {
                 setCreating(true);
                 setError('');
-                await createProject(projectName.trim());
+                const project = await createProject(projectName.trim());
+                if (project) {
+                  router.push('/sdk');
+                }
               } catch (err: any) {
                 setError(err.message || 'Failed to create project');
               } finally {
@@ -353,16 +359,24 @@ export default function DashboardOverview() {
     );
   }
 
-  const hasTelemetry = metrics.length > 0 || workers.length > 0 || incidents.length > 0;
+  const hasTelemetry =
+    activeProjectId === 'proj_demo' ||
+    (activeProject && activeProject.hasReceivedTelemetry === true);
 
   // 2. SDK Connection Pending wait screen if project exists but has no telemetry
   if (!hasTelemetry) {
     const activeApiKey = activeProject?.apiKey || 'qw_pk_demo_key';
+    const activeProjectIdVal = activeProject?.id || 'proj_demo';
     const installCommand = 'pnpm add @queuewatch/node';
-    const initCode = `import { monitorQueue } from '@queuewatch/node';
+    const envExample = `QUEUEWATCH_PROJECT_ID=${activeProjectIdVal}
+QUEUEWATCH_API_KEY=${activeApiKey}
+QUEUEWATCH_ENDPOINT=http://localhost:3001`;
 
-monitorQueue(emailQueue, {
-  apiKey: "${activeApiKey}"
+    const initCode = `monitorQueue(emailQueue, {
+  apiKey: process.env.QUEUEWATCH_API_KEY,
+  projectId: process.env.QUEUEWATCH_PROJECT_ID,
+  endpoint: process.env.QUEUEWATCH_ENDPOINT,
+  queueName: "email_notifications",
 });`;
 
     return (
@@ -372,31 +386,53 @@ monitorQueue(emailQueue, {
           <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
 
           <div className="space-y-3 text-center relative border-b border-zinc-900 pb-5">
-            <div className="flex items-center justify-center space-x-2.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-3 py-1 rounded-full text-xs font-medium mx-auto w-fit">
+            <div className="flex items-center justify-center space-x-2.5 bg-zinc-900/60 border border-zinc-800 text-zinc-400 px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider mx-auto w-fit">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-              <span>Project Created Successfully</span>
+              <span>Waiting for telemetry</span>
             </div>
             <h1 className="text-white text-xl font-bold tracking-tight mt-2.5">
-              Connect the QueueWatch SDK
+              Connect your application
             </h1>
             <p className="text-zinc-400 leading-relaxed text-sm max-w-md mx-auto">
-              Follow these integration steps to begin transmitting worker and queue telemetry to your console.
+              QueueWatch has not received telemetry for this project yet. Please integrate the SDK to unlock the dashboard.
             </p>
           </div>
 
           <div className="space-y-5 relative">
-            {/* Step 1 */}
+            {/* Checklist */}
+            <div className="space-y-3 bg-zinc-900/20 border border-zinc-900/50 p-4 rounded-lg">
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider font-mono">SDK Setup Checklist</h3>
+              <ul className="space-y-2.5 text-zinc-400 text-xs font-sans">
+                <li className="flex items-start space-x-2">
+                  <span className="w-4 h-4 rounded-full bg-indigo-950 border border-indigo-850 text-indigo-400 text-[9px] font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
+                  <span>Copy your Project ID and API Key into your environment variables.</span>
+                </li>
+                <li className="flex items-start space-x-2">
+                  <span className="w-4 h-4 rounded-full bg-indigo-950 border border-indigo-850 text-indigo-400 text-[9px] font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
+                  <span>Install the QueueWatch Node SDK in your application.</span>
+                </li>
+                <li className="flex items-start space-x-2">
+                  <span className="w-4 h-4 rounded-full bg-indigo-950 border border-indigo-850 text-indigo-400 text-[9px] font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
+                  <span>Call <code>monitorQueue()</code> to instrument your BullMQ queue instances.</span>
+                </li>
+                <li className="flex items-start space-x-2">
+                  <span className="w-4 h-4 rounded-full bg-indigo-950 border border-indigo-850 text-indigo-400 text-[9px] font-bold flex items-center justify-center shrink-0 mt-0.5">4</span>
+                  <span>Trigger a job or worker activity to transmit the first telemetry event.</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Step 1: Install */}
             <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <span className="w-5 h-5 rounded-full bg-zinc-900 border border-zinc-800 text-[10px] font-bold flex items-center justify-center text-zinc-400 font-sans">1</span>
-                <span className="text-xs font-semibold text-white">Install Node.js SDK</span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-white font-mono uppercase tracking-wide">1. Install command</span>
               </div>
-              <div className="flex items-center justify-between bg-zinc-900/40 border border-zinc-900 rounded-md p-3 font-mono text-xs text-zinc-300">
+              <div className="flex items-center justify-between bg-black/60 border border-zinc-900 rounded-md p-3 font-mono text-xs text-zinc-300">
                 <span className="select-all">{installCommand}</span>
                 <button 
                   onClick={() => handleCopy(installCommand, 'npm')}
-                  className="text-zinc-500 hover:text-zinc-350 transition-colors p-1 rounded hover:bg-zinc-900/60"
-                  title="Copy to clipboard"
+                  className="text-zinc-500 hover:text-white transition-colors"
+                  title="Copy"
                 >
                   {copiedText === 'npm' ? (
                     <span className="text-[10px] font-sans font-medium text-emerald-400">Copied!</span>
@@ -409,37 +445,66 @@ monitorQueue(emailQueue, {
               </div>
             </div>
 
-            {/* Step 2 */}
+            {/* Step 2: Env */}
             <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <span className="w-5 h-5 rounded-full bg-zinc-900 border border-zinc-800 text-[10px] font-bold flex items-center justify-center text-zinc-400 font-sans">2</span>
-                <span className="text-xs font-semibold text-white">Monitor your BullMQ instance</span>
-              </div>
-              <div className="relative bg-zinc-900/40 border border-zinc-900 rounded-md p-4 font-mono text-xs text-zinc-300">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-white font-mono uppercase tracking-wide">2. Environment configuration</span>
                 <button 
-                  onClick={() => handleCopy(initCode, 'js')}
-                  className="absolute top-3 right-3 text-zinc-500 hover:text-zinc-350 transition-colors p-1 rounded hover:bg-zinc-900/60"
-                  title="Copy to clipboard"
+                  onClick={() => handleCopy(envExample, 'js')}
+                  className="text-zinc-500 hover:text-white text-[10px] font-sans flex items-center space-x-1"
                 >
                   {copiedText === 'js' ? (
-                    <span className="text-[10px] font-sans font-medium text-emerald-400">Copied!</span>
+                    <span className="text-emerald-400 font-medium">Copied!</span>
                   ) : (
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                    </svg>
+                    <>
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                      </svg>
+                      <span>Copy Config</span>
+                    </>
                   )}
                 </button>
-                <pre className="overflow-x-auto select-all pr-12 text-zinc-350">{initCode}</pre>
               </div>
+              <pre className="bg-black/60 border border-zinc-900 rounded-md p-4 font-mono text-xs text-zinc-350 overflow-x-auto leading-normal">
+                {envExample}
+              </pre>
             </div>
 
-            {/* Waiting Ingestion Status */}
+            {/* Step 3: Example Code */}
+            <div className="space-y-2">
+              <span className="text-xs font-semibold text-white font-mono uppercase tracking-wide">3. Initialization snippet</span>
+              <pre className="bg-black/60 border border-zinc-900 rounded-md p-4 font-mono text-xs text-zinc-350 overflow-x-auto leading-normal">
+                {initCode}
+              </pre>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <button
+                onClick={() => handleCopy(activeApiKey, 'npm')}
+                className="flex-1 py-2.5 rounded-md bg-zinc-900 hover:bg-zinc-850 text-white font-semibold text-xs border border-zinc-800 transition-all flex items-center justify-center space-x-2"
+              >
+                <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                </svg>
+                <span>Copy API Key</span>
+              </button>
+              
+              <Link
+                href="/sdk"
+                className="flex-1 py-2.5 rounded-md bg-white hover:bg-zinc-100 text-black font-semibold text-xs text-center transition-all block"
+              >
+                View setup guide
+              </Link>
+            </div>
+
+            {/* Waiting Status */}
             <div className="flex items-center justify-center space-x-2.5 pt-4 border-t border-zinc-900/60">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              <span className="text-xs text-zinc-500 font-medium animate-pulse">Waiting for telemetry ingestion...</span>
+              <span className="text-[11px] text-zinc-500 font-medium tracking-wide">Waiting for ingestion status...</span>
             </div>
           </div>
         </div>
