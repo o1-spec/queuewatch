@@ -315,8 +315,8 @@ Structure your markdown report to contain the following headers:
   /**
    * Kept for legacy compatibility / system state logs
    */
-  async analyzeSystemState(): Promise<AIAnalysisReport> {
-    const queuesList = await this.queuesService.getQueuesList();
+  async analyzeSystemState(projectId: string): Promise<AIAnalysisReport> {
+    const queuesList = await this.queuesService.getQueuesList(projectId);
     const activeConfig = this.queuesService.simConfig.getConfig();
     
     let dlqCount = 0;

@@ -18,8 +18,8 @@ export class QueuesController {
 
   @Get()
   @ApiOperation({ summary: 'Get overview of all queues' })
-  async getQueues() {
-    return this.queuesService.getQueuesList();
+  async getQueues(@ProjectId() projectId: string) {
+    return this.queuesService.getQueuesList(projectId);
   }
 
   @Get(':name/metrics')

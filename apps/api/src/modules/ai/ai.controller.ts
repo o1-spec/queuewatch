@@ -2,6 +2,7 @@ import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { AiService } from './ai.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ProjectId } from '../auth/project-id.decorator';
 
 @ApiTags('AI Observability & Remediation')
 @ApiBearerAuth()
@@ -13,8 +14,8 @@ export class AiController {
   @Get('analyze')
   @ApiOperation({ summary: 'Trigger a live AI diagnostic review of system health, latencies, and queues' })
   @ApiResponse({ status: 200, description: 'Return AI analysis report containing root cause, severity, impact and copyable code repair blocks.' })
-  async getAnalysis() {
-    return this.aiService.analyzeSystemState();
+  async getAnalysis(@ProjectId() projectId: string) {
+    return this.aiService.analyzeSystemState(projectId);
   }
 
   @Get('timeline')

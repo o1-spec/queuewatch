@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger'
 import { AgentService } from './agent.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { DbService } from '../db/db.service';
+import { ProjectId } from '../auth/project-id.decorator';
 
 @ApiTags('Incident Investigation Agent')
 @ApiBearerAuth()
@@ -17,9 +18,9 @@ export class AgentController {
   @Post(':id/investigate')
   @ApiOperation({ summary: 'Trigger step-by-step SRE AI investigation' })
   @ApiParam({ name: 'id', description: 'Incident ID' })
-  async runInvestigation(@Param('id') id: string) {
+  async runInvestigation(@ProjectId() projectId: string, @Param('id') id: string) {
     try {
-      return await this.agentService.runInvestigation(id);
+      return await this.agentService.runInvestigation(id, projectId);
     } catch (e) {
       throw new NotFoundException(e.message);
     }
@@ -28,8 +29,8 @@ export class AgentController {
   @Get(':id/investigation')
   @ApiOperation({ summary: 'Retrieve investigation report for an incident' })
   @ApiParam({ name: 'id', description: 'Incident ID' })
-  async getInvestigation(@Param('id') id: string) {
-    const report = await this.dbService.getInvestigation(id);
+  async getInvestigation(@ProjectId() projectId: string, @Param('id') id: string) {
+    const report = await this.dbService.getInvestigation(id, projectId);
     if (!report) {
       throw new NotFoundException(`No investigation report found for incident ${id}`);
     }
@@ -39,8 +40,8 @@ export class AgentController {
   @Get(':id/timeline')
   @ApiOperation({ summary: 'Retrieve chronological SRE timeline events for an incident' })
   @ApiParam({ name: 'id', description: 'Incident ID' })
-  async getTimeline(@Param('id') id: string) {
-    const incident = await this.dbService.getIncident(id);
+  async getTimeline(@ProjectId() projectId: string, @Param('id') id: string) {
+    const incident = await this.dbService.getIncident(id, projectId);
     if (!incident) {
       throw new NotFoundException(`Incident ${id} not found`);
     }
@@ -55,10 +56,10 @@ export class AgentController {
       { event: 'worker.slowdown', title: 'Worker Health Degradation', desc: `Thread execution delays measured.`, timestamp: firstTime + 5000 },
     ];
 
-    const report = await this.dbService.getInvestigation(id);
+    const report = await this.dbService.getInvestigation(id, projectId);
     if (report) {
       timeline.push(
-        { event: 'investigation.started', title: 'AI SRE Investigation Started', desc: 'Step-by-step diagnostic agent pooped logs and telemetry.', timestamp: report.timestamp - 1000 },
+        { event: 'investigation.started', title: 'AI SRE Investigation Started', desc: 'Step-by-step diagnostic agent logs and telemetry gathered.', timestamp: report.timestamp - 1000 },
         { event: 'investigation.completed', title: 'Investigation Completed', desc: `Root cause identified with confidence score ${report.confidenceScore}%.`, timestamp: report.timestamp }
       );
     }

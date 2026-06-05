@@ -6,6 +6,7 @@ import Redis from 'ioredis';
 import { QueueWebSocketGateway } from '../websocket/websocket.gateway';
 import { SimulationConfigService } from './simulation-config.service';
 import { TelemetryService } from '../telemetry/telemetry.service';
+import { DbService } from '../db/db.service';
 
 @Injectable()
 export class QueuesService implements OnModuleInit, OnModuleDestroy {
@@ -18,7 +19,8 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
     private wsGateway: QueueWebSocketGateway,
     public simConfig: SimulationConfigService,
     @Inject(forwardRef(() => TelemetryService))
-    private telemetryService: TelemetryService
+    private telemetryService: TelemetryService,
+    private dbService: DbService
   ) {}
 
   async onModuleInit() {
@@ -78,6 +80,22 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
   }
 
   getQueue(name: string): Queue | undefined {
+    if (!this.queues.has(name)) {
+      this.logger.log(`Dynamically initializing BullMQ queue object: "${name}"`);
+      const queue = new Queue(name, {
+        connection: this.redisConnection as any,
+        defaultJobOptions: {
+          attempts: 3, // Retry 3 times
+          backoff: {
+            type: 'exponential',
+            delay: 2000, // Exponential backoff starting at 2s (2s, 4s)
+          },
+          removeOnComplete: { count: 100 },
+          removeOnFail: { count: 500 },
+        },
+      });
+      this.queues.set(name, queue);
+    }
     return this.queues.get(name);
   }
 
@@ -89,17 +107,12 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
     return this.redisConnection;
   }
 
-  async getQueuesList(): Promise<any[]> {
+  async getQueuesList(projectId: string): Promise<any[]> {
     const list: any[] = [];
-    const activeQueueNames = [
-      'email_notifications',
-      'webhook_delivery',
-      'image_processing',
-      'ai_tasks',
-    ];
+    const activeQueueNames = await this.dbService.getProjectQueues(projectId);
 
     for (const name of activeQueueNames) {
-      const queue = this.queues.get(name);
+      const queue = this.getQueue(name);
       if (!queue) continue;
 
       const [waiting, active, completed, failed, delayed] = await Promise.all([
@@ -126,7 +139,7 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
   }
 
   async addJob(queueName: string, jobName: string, data: any, projectId?: string): Promise<any> {
-    const queue = this.queues.get(queueName);
+    const queue = this.getQueue(queueName);
     if (!queue) {
       throw new Error(`Queue ${queueName} not found`);
     }
@@ -153,7 +166,7 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getQueueJobs(queueName: string, limit = 50): Promise<any[]> {
-    const queue = this.queues.get(queueName);
+    const queue = this.getQueue(queueName);
     if (!queue) {
       throw new Error(`Queue ${queueName} not found`);
     }
@@ -165,7 +178,7 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
   }
 
   async pauseQueue(queueName: string): Promise<void> {
-    const queue = this.queues.get(queueName);
+    const queue = this.getQueue(queueName);
     if (queue) {
       await queue.pause();
       this.logger.log(`Paused Queue: ${queueName}`);
@@ -173,7 +186,7 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
   }
 
   async resumeQueue(queueName: string): Promise<void> {
-    const queue = this.queues.get(queueName);
+    const queue = this.getQueue(queueName);
     if (queue) {
       await queue.resume();
       this.logger.log(`Resumed Queue: ${queueName}`);
@@ -186,7 +199,7 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
   async replayJob(jobId: string, projectId?: string): Promise<any> {
     this.logger.log(`Request to replay jobId: ${jobId}`);
 
-    const dlq = this.queues.get('dead_letter_queue');
+    const dlq = this.getQueue('dead_letter_queue');
     if (!dlq) {
       throw new Error('Dead-Letter Queue is not initialized');
     }

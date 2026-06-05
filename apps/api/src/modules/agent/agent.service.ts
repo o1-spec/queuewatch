@@ -24,12 +24,12 @@ export class AgentService {
 
   // --- Step-by-Step Diagnostic Toolset ---
 
-  async getIncident(id: string) {
-    return this.dbService.getIncident(id);
+  async getIncident(id: string, projectId: string) {
+    return this.dbService.getIncident(id, projectId);
   }
 
-  async getQueueMetrics(queueName: string) {
-    const list = await this.queuesService.getQueuesList();
+  async getQueueMetrics(queueName: string, projectId: string) {
+    const list = await this.queuesService.getQueuesList(projectId);
     return list.find(q => q.name === queueName) || null;
   }
 
@@ -38,39 +38,39 @@ export class AgentService {
     return allJobs.filter(j => j.status === 'failed');
   }
 
-  async getRetryHistory(queueName: string) {
-    const allTelemetry = await this.telemetryService.getQueueEvents(queueName as QueueName, 50);
+  async getRetryHistory(queueName: string, projectId: string) {
+    const allTelemetry = await this.telemetryService.getQueueEvents(queueName as QueueName, 50, projectId);
     return allTelemetry.filter(t => t.type === 'job.failed');
   }
 
-  async getWorkerHealth(queueName: string) {
-    const allWorkers = this.workersService.getWorkersList();
+  async getWorkerHealth(queueName: string, projectId: string) {
+    const allWorkers = await this.workersService.getWorkersList(projectId);
     return allWorkers.find(w => w.queueName === queueName) || null;
   }
 
-  async getDeadLetterJobs(queueName: string) {
-    const allDLQ = await this.dbService.getDeadLetterJobs();
+  async getDeadLetterJobs(queueName: string, projectId: string) {
+    const allDLQ = await this.dbService.getDeadLetterJobs(projectId);
     return allDLQ.filter(job => job.queueName === queueName);
   }
 
-  async getRecentLogs(queueName: string) {
-    return this.dbService.getLogs(queueName, 30);
+  async getRecentLogs(queueName: string, projectId: string) {
+    return this.dbService.getLogs(queueName, 30, projectId);
   }
 
-  async getRecentTelemetry(queueName: string) {
-    return this.telemetryService.getQueueEvents(queueName as QueueName, 30);
+  async getRecentTelemetry(queueName: string, projectId: string) {
+    return this.telemetryService.getQueueEvents(queueName as QueueName, 30, projectId);
   }
 
   /**
    * Executes the full diagnostic investigation workflow.
    */
-  async runInvestigation(incidentId: string): Promise<InvestigationReport> {
-    this.logger.log(`[Agent] Initiating step-by-step investigation for incident: ${incidentId}`);
+  async runInvestigation(incidentId: string, projectId: string): Promise<InvestigationReport> {
+    this.logger.log(`[Agent] Initiating step-by-step investigation for incident: ${incidentId} in project ${projectId}`);
     
     // Broadcast progress
     this.wsGateway.broadcast('investigation.progress', { incidentId, status: 'investigating', progress: 10, step: 'GATHERING_INCIDENT_DATA' });
 
-    const incident = await this.getIncident(incidentId);
+    const incident = await this.getIncident(incidentId, projectId);
     if (!incident) {
       throw new Error(`Incident with ID ${incidentId} not found`);
     }
@@ -79,19 +79,19 @@ export class AgentService {
 
     // Step 2: Query tools
     this.wsGateway.broadcast('investigation.progress', { incidentId, status: 'investigating', progress: 30, step: 'QUERYING_METRICS_AND_HEALTH' });
-    const metrics = await this.getQueueMetrics(q);
-    const workerHealth = await this.getWorkerHealth(q);
+    const metrics = await this.getQueueMetrics(q, projectId);
+    const workerHealth = await this.getWorkerHealth(q, projectId);
 
     // Step 3: Query failed states and retries
     this.wsGateway.broadcast('investigation.progress', { incidentId, status: 'investigating', progress: 50, step: 'ANALYZING_RETRYS_AND_DLQ' });
     const failedJobs = await this.getFailedJobs(q);
-    const retryHistory = await this.getRetryHistory(q);
-    const deadLetterJobs = await this.getDeadLetterJobs(q);
+    const retryHistory = await this.getRetryHistory(q, projectId);
+    const deadLetterJobs = await this.getDeadLetterJobs(q, projectId);
 
     // Step 4: Gather logs and telemetry traces
     this.wsGateway.broadcast('investigation.progress', { incidentId, status: 'investigating', progress: 70, step: 'GATHERING_TELEMETRY_LOG_TRACES' });
-    const logs = await this.getRecentLogs(q);
-    const telemetry = await this.getRecentTelemetry(q);
+    const logs = await this.getRecentLogs(q, projectId);
+    const telemetry = await this.getRecentTelemetry(q, projectId);
 
     const context = {
       incident,
@@ -123,7 +123,7 @@ export class AgentService {
       timestamp: Date.now(),
     };
 
-    await this.dbService.saveInvestigation(report);
+    await this.dbService.saveInvestigation(report, projectId);
 
     // Broadcast completion
     this.wsGateway.broadcast('investigation.progress', { incidentId, status: 'completed', progress: 100, step: 'COMPLETED', report });

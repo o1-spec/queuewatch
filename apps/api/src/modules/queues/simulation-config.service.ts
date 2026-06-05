@@ -12,7 +12,7 @@ export interface SimulationConfig {
 @Injectable()
 export class SimulationConfigService {
   private config: SimulationConfig = {
-    generateTraffic: true, // Default to true for out-of-the-box demo traffic
+    generateTraffic: false, // Default to false to ensure a clean, real-data-only experience by default
     simulateSmtpFailure: false,
     simulateWebhookOutage: false,
     simulateWorkerSlowdown: false,

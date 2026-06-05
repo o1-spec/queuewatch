@@ -243,39 +243,8 @@ export class WorkersService implements OnModuleInit, OnModuleDestroy {
     this.wsGateway.broadcast('worker.health.updated', healthReports);
   }
 
-  getWorkersList(): any[] {
-    const queueNames = ['email_notifications', 'webhook_delivery', 'image_processing', 'ai_tasks'];
-    const config = this.simConfig.getConfig();
-
-    return queueNames.map((name) => {
-      let status: 'healthy' | 'overloaded' | 'down' = 'healthy';
-      let cpuUsage = 5 + Math.random() * 15;
-      let memoryUsage = 20 + Math.random() * 25;
-
-      if (config.simulateWorkerSlowdown) {
-        status = 'overloaded';
-        cpuUsage = 85 + Math.random() * 10;
-        memoryUsage = 70 + Math.random() * 15;
-      } else if (
-        (config.simulateSmtpFailure && name === 'email_notifications') ||
-        (config.simulateWebhookOutage && name === 'webhook_delivery') ||
-        config.simulateTimeoutFailure
-      ) {
-        status = 'down';
-        cpuUsage = 2 + Math.random() * 3;
-        memoryUsage = 15 + Math.random() * 5;
-      }
-
-      return {
-        workerId: `worker_${name}_1`,
-        queueName: name,
-        status,
-        concurrency: name === 'email_notifications' ? 2 : 5,
-        cpuUsage: Math.round(cpuUsage),
-        memoryUsage: Math.round(memoryUsage),
-        lastActive: Date.now(),
-      };
-    });
+  async getWorkersList(projectId: string): Promise<any[]> {
+    return this.dbService.getWorkers(projectId);
   }
 
   async onModuleDestroy() {

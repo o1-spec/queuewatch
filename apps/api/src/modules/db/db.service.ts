@@ -515,16 +515,19 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     if (rawList.length > 0) {
       return rawList.map(item => JSON.parse(item));
     }
-    const queueNames: QueueName[] = ['email_notifications', 'webhook_delivery', 'image_processing', 'ai_tasks'];
-    return queueNames.map(name => ({
-      workerId: `worker_${name}_1`,
-      queueName: name,
-      status: 'healthy',
-      concurrency: name === 'email_notifications' ? 2 : 5,
-      cpuUsage: 12,
-      memoryUsage: 25,
-      lastActive: Date.now()
-    }));
+    if (projectId === 'proj_demo') {
+      const queueNames: QueueName[] = ['email_notifications', 'webhook_delivery', 'image_processing', 'ai_tasks'];
+      return queueNames.map(name => ({
+        workerId: `worker_${name}_1`,
+        queueName: name,
+        status: 'healthy',
+        concurrency: name === 'email_notifications' ? 2 : 5,
+        cpuUsage: 12,
+        memoryUsage: 25,
+        lastActive: Date.now()
+      }));
+    }
+    return [];
   }
 
   async saveWorker(worker: WorkerHealth, projectId?: string) {
