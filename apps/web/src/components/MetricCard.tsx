@@ -32,13 +32,13 @@ export function MetricCard({
     : 'bg-zinc-500';
 
   return (
-    <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-4 relative overflow-hidden group transition-all hover:border-zinc-800">
+    <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-5 relative overflow-hidden group transition-all hover:border-zinc-800">
       <div className="flex items-center justify-between">
-        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider font-mono">{title}</p>
-        <Icon className={`w-3.5 h-3.5 text-zinc-500 group-hover:${iconColor} transition-colors`} />
+        <p className="text-sm text-zinc-400 font-medium font-sans">{title}</p>
+        <Icon className={`w-4 h-4 text-zinc-500 group-hover:${iconColor} transition-colors`} />
       </div>
-      <p className="text-2xl font-semibold text-white mt-2.5 font-mono tracking-tight leading-none">{value}</p>
-      <div className="flex items-center space-x-1.5 text-[10px] mt-2.5 text-zinc-400 font-mono">
+      <p className="text-3xl font-bold text-white mt-3 font-sans tracking-tight leading-none">{value}</p>
+      <div className="flex items-center space-x-1.5 text-xs mt-3 text-zinc-400 font-sans">
         {pulseActive && (
           <span className={`w-1.5 h-1.5 rounded-full ${dotColor} shrink-0`}></span>
         )}

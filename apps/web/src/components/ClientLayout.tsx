@@ -4,24 +4,21 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { AuthProvider, useAuth } from '../context/AuthContext';
-import { 
-  LayoutDashboard, 
-  Layers, 
-  AlertCircle, 
-  Inbox, 
-  Sliders, 
-  LogOut, 
-  Terminal, 
-  User,
+import {
+  LayoutDashboard,
+  Layers,
+  AlertCircle,
+  Inbox,
+  Sliders,
+  LogOut,
+  Terminal,
   Loader2,
   ChevronDown,
   Search,
-  Server,
   Menu,
   X,
   GitCommit,
   Bell,
-  ShieldAlert,
   Sparkles,
   BookOpen,
   History,
@@ -38,9 +35,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading, isAuthenticated, logout, projects, activeProject, setActiveProjectId, createProject } = useAuth();
-  
-  const [env, setEnv] = useState<'production' | 'staging'>('production');
+
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
   const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
@@ -68,7 +65,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     { name: 'Simulation Control Sandbox', path: '/settings', desc: 'Inject synthetic traffic and simulate SMTP/Stripe bottlenecks', icon: Sliders },
   ];
 
-  const filteredRoutes = commandRoutes.filter(route => 
+  const filteredRoutes = commandRoutes.filter(route =>
     route.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     route.desc.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -160,249 +157,225 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
   const navItemClass = (path: string) => {
     const active = isActive(path);
-    return `flex items-center space-x-2.5 px-3 py-2 rounded text-[11px] font-mono transition-all font-semibold ${
-      active 
-        ? 'bg-zinc-900 text-white border-l border-zinc-400 pl-2.5' 
-        : 'text-zinc-400 hover:text-white hover:bg-zinc-900/60'
-    }`;
+    return `flex items-center space-x-3 px-3 py-2 rounded-md text-[13px] font-sans font-medium transition-all ${active
+        ? 'bg-zinc-900 text-white font-semibold'
+        : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40'
+      }`;
   };
 
   const navIconClass = (path: string) => {
     const active = isActive(path);
-    return `w-3.5 h-3.5 ${
-      active ? 'text-white' : 'text-zinc-500'
-    }`;
+    return `w-4 h-4 shrink-0 ${active ? 'text-zinc-200' : 'text-zinc-500'
+      }`;
   };
+
+  const sectionHeaderClass = "px-3 mt-4 mb-1.5 text-[10px] font-bold text-zinc-500 uppercase tracking-widest font-sans";
 
   // ── Shared sidebar content ───────────────────────────────────────────────
   const SidebarContent = () => (
     <>
-      <div>
-        {/* Workspace selector SRE style */}
-        <div className="p-4 border-b border-zinc-900 relative">
-          <div 
-            onClick={() => setShowProjectDropdown(prev => !prev)}
-            className="flex items-center justify-between bg-zinc-900/40 border border-zinc-900 rounded px-2.5 py-1.5 cursor-pointer hover:bg-zinc-900 transition-all"
-          >
-            <div className="flex items-center space-x-2 min-w-0">
-              <div className="w-4 h-4 rounded bg-zinc-700 flex items-center justify-center font-bold text-[10px] text-white shrink-0">
-                P
-              </div>
-              <span className="text-[11px] font-bold text-white font-mono truncate">
-                {activeProject ? activeProject.name : 'No Active Project'}
-              </span>
+      <div className="flex flex-col h-full justify-between">
+        <div>
+          {/* Brand Header */}
+          <div className="px-5 py-4 flex items-center space-x-2.5 border-b border-zinc-900">
+            <div className="w-5 h-5 rounded bg-zinc-100 flex items-center justify-center font-bold text-[11px] text-black font-sans shrink-0">
+              Q
             </div>
-            <ChevronDown className="w-3 h-3 text-zinc-500 shrink-0" />
+            <span className="text-[13px] font-bold text-white uppercase tracking-wider font-sans">QueueWatch</span>
           </div>
 
-          {/* Project selection dropdown */}
-          {showProjectDropdown && (
-            <>
-              <div 
-                className="fixed inset-0 z-40" 
-                onClick={() => setShowProjectDropdown(false)} 
-              />
-              <div className="absolute top-[52px] left-4 right-4 bg-zinc-950 border border-zinc-900 rounded shadow-2xl z-50 py-1 font-mono text-[10px] space-y-0.5 max-h-48 overflow-y-auto">
-                <div className="px-2.5 py-1 text-[8px] text-zinc-550 uppercase tracking-widest font-bold border-b border-zinc-900/60 mb-1">
-                  Select Project
-                </div>
-                {projects.map((p) => (
+          {/* Project selector dropdown */}
+          <div className="px-4 py-3 border-b border-zinc-900 relative">
+            <div
+              onClick={() => setShowProjectDropdown(prev => !prev)}
+              className="flex items-center justify-between bg-zinc-900/20 hover:bg-zinc-900/50 border border-zinc-900 rounded-md px-3 py-2 cursor-pointer transition-all"
+            >
+              <div className="flex flex-col min-w-0 text-left font-sans">
+                <span className="text-[9px] text-zinc-550 font-bold uppercase tracking-wider leading-none mb-1">Project</span>
+                <span className="text-xs font-semibold text-zinc-200 truncate">
+                  {activeProject ? activeProject.name : 'Select Project'}
+                </span>
+              </div>
+              <ChevronDown className="w-3.5 h-3.5 text-zinc-500 shrink-0 ml-2" />
+            </div>
+
+            {/* Project selection dropdown */}
+            {showProjectDropdown && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowProjectDropdown(false)}
+                />
+                <div className="absolute top-[56px] left-4 right-4 bg-zinc-950 border border-zinc-900 rounded-md shadow-2xl z-50 py-1 font-sans text-xs space-y-0.5 max-h-48 overflow-y-auto">
+                  <div className="px-3 py-1.5 text-[9px] text-zinc-550 uppercase tracking-widest font-bold border-b border-zinc-900/60 mb-1">
+                    Select Project
+                  </div>
+                  {projects.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        setActiveProjectId(p.id);
+                        setShowProjectDropdown(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 transition-colors flex items-center justify-between ${p.id === (activeProject?.id)
+                          ? 'bg-zinc-900 text-white font-semibold'
+                          : 'text-zinc-400 hover:bg-zinc-900/50 hover:text-white'
+                        }`}
+                    >
+                      <span className="truncate">{p.name}</span>
+                      {p.id === (activeProject?.id) && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 ml-1.5" />
+                      )}
+                    </button>
+                  ))}
+                  {projects.length === 0 && (
+                    <div className="px-3 py-2 text-zinc-500 text-xs">
+                      No active projects.
+                    </div>
+                  )}
+                  <div className="h-px bg-zinc-900 my-1" />
                   <button
-                    key={p.id}
                     onClick={() => {
-                      setActiveProjectId(p.id);
+                      setShowCreateProjectModal(true);
                       setShowProjectDropdown(false);
                     }}
-                    className={`w-full text-left px-2.5 py-1.5 transition-colors flex items-center justify-between ${
-                      p.id === (activeProject?.id) 
-                        ? 'bg-zinc-900 text-white font-bold' 
-                        : 'text-zinc-400 hover:bg-zinc-900/55 hover:text-white'
-                    }`}
+                    className="w-full text-left px-3 py-2 text-zinc-300 hover:bg-zinc-900/50 hover:text-white transition-colors font-semibold flex items-center space-x-1.5"
                   >
-                    <span className="truncate">{p.name}</span>
-                    {p.id === (activeProject?.id) && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 ml-1.5" />
-                    )}
+                    <span>+ Create Project</span>
                   </button>
-                ))}
-                {projects.length === 0 && (
-                  <div className="px-2.5 py-2 text-zinc-500 text-[9px]">
-                    No active projects.
-                  </div>
-                )}
-                <div className="h-px bg-zinc-900 my-1" />
-                <button
-                  onClick={() => {
-                    setShowCreateProjectModal(true);
-                    setShowProjectDropdown(false);
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 text-zinc-400 hover:bg-zinc-900/55 hover:text-white transition-colors font-bold flex items-center space-x-1.5"
-                >
-                  <span>+ Create Project</span>
-                </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Search Input */}
+          <div className="px-4 py-2 border-b border-zinc-900/60">
+            <button
+              onClick={() => setShowCommandPalette(true)}
+              className="w-full flex items-center justify-between bg-zinc-900/20 border border-zinc-900 px-3 py-1.5 rounded-md text-xs font-sans text-zinc-500 hover:bg-zinc-900/40 hover:text-zinc-350 transition-colors focus:outline-none"
+            >
+              <div className="flex items-center space-x-1.5">
+                <Search className="w-3.5 h-3.5" />
+                <span>Search pages...</span>
               </div>
-            </>
+              <span className="bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-800 text-[9px] text-zinc-650 font-sans font-bold">⌘K</span>
+            </button>
+          </div>
+
+          {/* Grouped Nav Links */}
+          <nav className="p-3 space-y-4 overflow-y-auto max-h-[calc(100vh-220px)]">
+            {/* Overview */}
+            <div>
+              <div className={sectionHeaderClass}>Overview</div>
+              <div className="space-y-0.5">
+                <Link href="/dashboard" className={navItemClass('/dashboard')}>
+                  <LayoutDashboard className={navIconClass('/dashboard')} />
+                  <span>Dashboard</span>
+                </Link>
+              </div>
+            </div>
+
+            {/* Monitor */}
+            <div>
+              <div className={sectionHeaderClass}>Monitor</div>
+              <div className="space-y-0.5">
+                <Link href="/queues" className={navItemClass('/queues')}>
+                  <Layers className={navIconClass('/queues')} />
+                  <span>Queues</span>
+                </Link>
+                <Link href="/workers" className={navItemClass('/workers')}>
+                  <Cpu className={navIconClass('/workers')} />
+                  <span>Workers</span>
+                </Link>
+                <Link href="/logs" className={navItemClass('/logs')}>
+                  <Terminal className={navIconClass('/logs')} />
+                  <span>Logs</span>
+                </Link>
+              </div>
+            </div>
+
+            {/* Investigate */}
+            <div>
+              <div className={sectionHeaderClass}>Investigate</div>
+              <div className="space-y-0.5">
+                <Link href="/incidents" className={navItemClass('/incidents')}>
+                  <AlertCircle className={navIconClass('/incidents')} />
+                  <span>Incidents</span>
+                </Link>
+                <Link href="/dead-letter" className={navItemClass('/dead-letter')}>
+                  <Inbox className={navIconClass('/dead-letter')} />
+                  <span>Dead Letter</span>
+                </Link>
+                <Link href="/deployments" className={navItemClass('/deployments')}>
+                  <GitCommit className={navIconClass('/deployments')} />
+                  <span>Deployments</span>
+                </Link>
+              </div>
+            </div>
+
+            {/* Intelligence */}
+            <div>
+              <div className={sectionHeaderClass}>Intelligence</div>
+              <div className="space-y-0.5">
+                <Link href="/copilot" className={navItemClass('/copilot')}>
+                  <Sparkles className={navIconClass('/copilot')} />
+                  <span>Copilot</span>
+                </Link>
+                <Link href="/reliability" className={navItemClass('/reliability')}>
+                  <ShieldCheck className={navIconClass('/reliability')} />
+                  <span>Reliability</span>
+                </Link>
+                <Link href="/predictions" className={navItemClass('/predictions')}>
+                  <TrendingUp className={navIconClass('/predictions')} />
+                  <span>Predictions</span>
+                </Link>
+                <Link href="/knowledge-base" className={navItemClass('/knowledge-base')}>
+                  <BookOpen className={navIconClass('/knowledge-base')} />
+                  <span>Knowledge Base</span>
+                </Link>
+              </div>
+            </div>
+
+            {/* Platform */}
+            <div>
+              <div className={sectionHeaderClass}>Platform</div>
+              <div className="space-y-0.5">
+                <Link href="/sdk" className={navItemClass('/sdk')}>
+                  <Sliders className={navIconClass('/sdk')} />
+                  <span>SDK Setup & Keys</span>
+                </Link>
+                <Link href="/settings" className={navItemClass('/settings')}>
+                  <Sliders className={navIconClass('/settings')} />
+                  <span>Settings</span>
+                </Link>
+              </div>
+            </div>
+          </nav>
+        </div>
+
+        {/* User Identity and Session Management */}
+        <div className="border-t border-zinc-900 bg-zinc-950/20 flex flex-col mt-auto">
+          {user && (
+            <div className="px-4 py-3.5 flex items-center justify-between bg-zinc-950/45">
+              <div className="flex items-center space-x-2.5 min-w-0 font-sans">
+                <div className="w-7 h-7 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0 font-bold text-zinc-300">
+                  {user.name.substring(0, 1).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <h4 className="text-[12px] font-bold text-white truncate leading-none mb-1">{user.name}</h4>
+                  <p className="text-[10px] text-zinc-500 truncate">{user.email}</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowLogoutModal(true)}
+                className="p-1.5 rounded hover:bg-rose-500/10 text-zinc-550 hover:text-rose-400 transition-colors"
+                title="Logout"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
           )}
-
-          {/* Environment selector */}
-          <div className="flex mt-3 gap-1 p-0.5 bg-zinc-900/50 rounded border border-zinc-900/60 font-mono text-[9px]">
-            <button
-              onClick={() => setEnv('production')}
-              className={`flex-1 py-1 text-center rounded font-bold uppercase transition-all ${env === 'production' ? 'bg-zinc-800 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}
-            >
-              production
-            </button>
-            <button
-              onClick={() => setEnv('staging')}
-              className={`flex-1 py-1 text-center rounded font-bold uppercase transition-all ${env === 'staging' ? 'bg-zinc-800 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}
-            >
-              staging
-            </button>
-          </div>
-        </div>
-
-        {/* Quick Find (Cmd + K) */}
-        <div className="px-4 py-2 border-b border-zinc-900/60">
-          <button 
-            onClick={() => setShowCommandPalette(true)}
-            className="w-full flex items-center justify-between bg-zinc-900/10 border border-zinc-900 px-2 py-1 rounded text-[10px] font-mono text-zinc-500 hover:bg-zinc-900/40 hover:text-zinc-350 transition-colors focus:outline-none"
-          >
-            <div className="flex items-center space-x-1.5">
-              <Search className="w-3 h-3" />
-              <span>Quick jump...</span>
-            </div>
-            <span className="bg-zinc-900 px-1 py-0.5 rounded border border-zinc-800 text-[8px]">⌘K</span>
-          </button>
-        </div>
-
-        {/* Nav links */}
-        <nav className="p-3 space-y-1">
-          <Link href="/dashboard" className={navItemClass('/dashboard')}>
-            <LayoutDashboard className={navIconClass('/dashboard')} />
-            <span>Overview</span>
-          </Link>
-          <Link href="/services" className={navItemClass('/services')}>
-            <Cpu className={navIconClass('/services')} />
-            <span>Services Registry</span>
-          </Link>
-          <Link href="/dependencies" className={navItemClass('/dependencies')}>
-            <Network className={navIconClass('/dependencies')} />
-            <span>Dependency Graph</span>
-          </Link>
-          <Link href="/reliability" className={navItemClass('/reliability')}>
-            <ShieldCheck className={navIconClass('/reliability')} />
-            <span>Reliability Center</span>
-          </Link>
-          <Link href="/predictions" className={navItemClass('/predictions')}>
-            <TrendingUp className={navIconClass('/predictions')} />
-            <span>Predictive Warnings</span>
-          </Link>
-          <Link href="/health" className={navItemClass('/health')}>
-            <Activity className={navIconClass('/health')} />
-            <span>Health Center</span>
-          </Link>
-          <Link href="/analytics" className={navItemClass('/analytics')}>
-            <LineChart className={navIconClass('/analytics')} />
-            <span>SRE Analytics</span>
-          </Link>
-          <div className="h-px bg-zinc-900 my-2" />
-          <Link href="/queues" className={navItemClass('/queues')}>
-            <Layers className={navIconClass('/queues')} />
-            <span>Queues Registry</span>
-          </Link>
-          <Link href="/incidents" className={navItemClass('/incidents')}>
-            <AlertCircle className={navIconClass('/incidents')} />
-            <span>Incident Logs</span>
-          </Link>
-          <Link href="/dead-letter" className={navItemClass('/dead-letter')}>
-            <Inbox className={navIconClass('/dead-letter')} />
-            <span>Dead Letter</span>
-          </Link>
-          <Link href="/copilot" className={navItemClass('/copilot')}>
-            <Sparkles className={navIconClass('/copilot')} />
-            <span>Reliability Copilot</span>
-          </Link>
-          <Link href="/recurring-incidents" className={navItemClass('/recurring-incidents')}>
-            <History className={navIconClass('/recurring-incidents')} />
-            <span>Recurring Failures</span>
-          </Link>
-          <Link href="/runbooks" className={navItemClass('/runbooks')}>
-            <FileText className={navIconClass('/runbooks')} />
-            <span>Recovery Runbooks</span>
-          </Link>
-          <Link href="/knowledge-base" className={navItemClass('/knowledge-base')}>
-            <BookOpen className={navIconClass('/knowledge-base')} />
-            <span>Knowledge Base</span>
-          </Link>
-          <Link href="/deployments" className={navItemClass('/deployments')}>
-            <GitCommit className={navIconClass('/deployments')} />
-            <span>Deployments Correlation</span>
-          </Link>
-          <Link href="/notifications" className={navItemClass('/notifications')}>
-            <Bell className={navIconClass('/notifications')} />
-            <span>Alert Logs Ledger</span>
-          </Link>
-          <Link href="/escalation-rules" className={navItemClass('/escalation-rules')}>
-            <ShieldAlert className={navIconClass('/escalation-rules')} />
-            <span>Escalation Rules</span>
-          </Link>
-          <Link href="/notification-settings" className={navItemClass('/notification-settings')}>
-            <Sliders className={navIconClass('/notification-settings')} />
-            <span>Notification Settings</span>
-          </Link>
-          <Link href="/logs" className={navItemClass('/logs')}>
-            <Terminal className={navIconClass('/logs')} />
-            <span>Logs Explorer</span>
-          </Link>
-          <Link href="/alerts" className={navItemClass('/alerts')}>
-            <Sliders className={navIconClass('/alerts')} />
-            <span>Alert Rules</span>
-          </Link>
-          <Link href="/sdk" className={navItemClass('/sdk')}>
-            <Sliders className={navIconClass('/sdk')} />
-            <span>SDK Integration</span>
-          </Link>
-          <Link href="/settings" className={navItemClass('/settings')}>
-            <Sliders className={navIconClass('/settings')} />
-            <span>Simulation Sandbox</span>
-          </Link>
-        </nav>
-      </div>
-
-      {/* User Identity and Session Management */}
-      <div className="border-t border-zinc-900 bg-zinc-950/20 flex flex-col">
-        {user && (
-          <div className="px-4 py-3 border-b border-zinc-900 flex items-center justify-between bg-zinc-950/40">
-            <div className="flex items-center space-x-2 min-w-0">
-              <div className="w-6 h-6 rounded bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0">
-                <User className="w-3.5 h-3.5 text-zinc-400" />
-              </div>
-              <div className="min-w-0">
-                <h4 className="text-[10px] font-bold text-white truncate leading-none mb-0.5">{user.name}</h4>
-                <p className="text-[9px] text-zinc-500 font-mono truncate">{user.email}</p>
-              </div>
-            </div>
-            
-            <button
-              onClick={() => setShowLogoutModal(true)}
-              className="p-1 rounded hover:bg-rose-500/10 text-zinc-500 hover:text-rose-400 transition-colors"
-              title="Logout"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-        
-        <div className="p-3.5 flex items-center justify-between font-mono text-[9px] text-zinc-500">
-          <div className="flex items-center space-x-1.5">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-            </span>
-            <span className="font-bold uppercase tracking-wider text-zinc-400">broker connected</span>
-          </div>
-          
-          <span>v1.0.0</span>
         </div>
       </div>
     </>
@@ -442,10 +415,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
       {/* ── Main Content Area ─────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0 min-h-screen">
-        <header className="h-14 border-b border-zinc-900 px-4 md:px-6 flex items-center justify-between bg-zinc-950/40 backdrop-blur-md sticky top-0 z-30 font-mono">
-          
-          {/* Left: hamburger (mobile) + breadcrumb */}
-          <div className="flex items-center space-x-3">
+        <header className="h-14 border-b border-zinc-900 px-4 md:px-6 flex items-center justify-between bg-zinc-950/40 backdrop-blur-md sticky top-0 z-30 font-sans">
+
+          {/* Left: Hamburger + Project Name + Health Status */}
+          <div className="flex items-center space-x-4">
             {/* Hamburger — only on mobile */}
             <button
               onClick={() => setSidebarOpen(true)}
@@ -455,19 +428,83 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               <Menu className="w-4 h-4" />
             </button>
 
-            <div className="flex items-center space-x-2 md:space-x-3 text-[10px]">
-              <span className="text-zinc-500 uppercase font-bold hidden sm:block">telemetry node:</span>
-              <span className="bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800 text-zinc-300 font-bold">
-                127.0.0.1:6379
+            <div className="flex items-center space-x-2.5">
+              <span className="text-xs font-semibold text-white tracking-tight">
+                {activeProject ? activeProject.name : 'Select Project'}
               </span>
+              {activeProject && (
+                <span className="flex items-center space-x-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full text-[10px] font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse active-pulse-emerald" />
+                  <span>Healthy</span>
+                </span>
+              )}
             </div>
           </div>
-          
-          <div className="flex items-center space-x-3">
-            <div className="hidden sm:flex items-center space-x-1.5 text-[10px] text-zinc-400 bg-zinc-900/40 px-2.5 py-1 rounded border border-zinc-900">
-              <Server className="w-3.5 h-3.5 text-zinc-500" />
-              <span>Redis: 4 indices</span>
-            </div>
+
+          {/* Right: Search Box + Bell + Avatar */}
+          <div className="flex items-center space-x-4">
+            {/* Vercel-like Search Button */}
+            <button
+              onClick={() => setShowCommandPalette(true)}
+              className="hidden md:flex items-center space-x-2 bg-zinc-900/40 border border-zinc-900/80 hover:border-zinc-800 px-3 py-1.5 rounded-md text-xs text-zinc-400 hover:text-zinc-300 transition-all focus:outline-none w-44 lg:w-56 justify-between"
+            >
+              <div className="flex items-center space-x-2">
+                <Search className="w-3.5 h-3.5 text-zinc-500" />
+                <span className="font-sans">Search...</span>
+              </div>
+              <kbd className="bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-855 text-[9px] text-zinc-550 font-sans font-bold">⌘K</kbd>
+            </button>
+
+            {/* Notification Bell */}
+            <button className="relative p-1.5 rounded-md hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 transition-colors">
+              <Bell className="w-4 h-4" />
+              {activeProject && (
+                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-indigo-500 rounded-full" />
+              )}
+            </button>
+
+            {/* User Avatar / Profile Dropdown */}
+            {user && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowUserDropdown(prev => !prev)}
+                  className="w-7 h-7 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center font-bold text-xs text-zinc-300 hover:border-zinc-700 transition-colors select-none focus:outline-none"
+                >
+                  {user.name.substring(0, 1).toUpperCase()}
+                </button>
+
+                {showUserDropdown && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowUserDropdown(false)}
+                    />
+                    <div className="absolute right-0 mt-2 w-48 bg-zinc-950 border border-zinc-900 rounded-md shadow-2xl z-50 py-1 font-sans text-xs">
+                      <div className="px-3 py-2 border-b border-zinc-900/60 mb-1">
+                        <p className="font-semibold text-white truncate">{user.name}</p>
+                        <p className="text-[10px] text-zinc-550 truncate">{user.email}</p>
+                      </div>
+                      <Link
+                        href="/settings"
+                        onClick={() => setShowUserDropdown(false)}
+                        className="flex items-center px-3 py-2 text-zinc-400 hover:bg-zinc-900 hover:text-white transition-colors"
+                      >
+                        Settings
+                      </Link>
+                      <button
+                        onClick={() => {
+                          setShowUserDropdown(false);
+                          setShowLogoutModal(true);
+                        }}
+                        className="w-full text-left flex items-center px-3 py-2 text-rose-455 hover:bg-rose-500/10 transition-colors font-medium border-t border-zinc-900/40 mt-1"
+                      >
+                        Sign Out
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </header>
 
@@ -478,40 +515,42 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
       {/* ── Create project confirmation modal ─────────────────────────────────────── */}
       {showCreateProjectModal && (
-        <>
-          <div 
-            onClick={() => {
-              setShowCreateProjectModal(false);
-              setNewProjectName('');
-            }}
-            className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 transition-opacity animate-fade-in"
-          ></div>
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-zinc-950 border border-zinc-900 p-5 rounded-lg w-[calc(100%-2rem)] max-w-sm shadow-2xl z-50 font-mono text-[10px] space-y-4 animate-slide-up text-zinc-300">
-            <div className="flex items-center space-x-2 border-b border-zinc-900 pb-2.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 shrink-0"></span>
-              <span className="text-[11px] font-bold text-white uppercase">Create New Project</span>
+        <div
+          onClick={() => {
+            setShowCreateProjectModal(false);
+            setNewProjectName('');
+          }}
+          className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 flex items-center justify-center p-4 transition-opacity animate-fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-zinc-950 border border-zinc-900 p-6 rounded-lg w-full max-w-sm shadow-2xl font-sans text-sm space-y-4 animate-slide-up text-zinc-300"
+          >
+            <div className="flex items-center space-x-2 border-b border-zinc-900 pb-3">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0"></span>
+              <span className="text-sm font-semibold text-white">Create New Project</span>
             </div>
-            
+
             <div className="space-y-1.5">
-              <label className="text-[9px] uppercase tracking-wider text-zinc-405 font-bold">Project Name</label>
+              <label className="text-xs text-zinc-400 font-medium">Project Name</label>
               <input
                 autoFocus
                 type="text"
                 value={newProjectName}
                 onChange={(e) => setNewProjectName(e.target.value)}
                 placeholder="e.g. Production Web Service"
-                className="w-full bg-zinc-900/40 border border-zinc-900 rounded px-2.5 py-2 focus:outline-none focus:border-zinc-700 text-[11px] text-white"
+                className="w-full bg-zinc-900/40 border border-zinc-900 rounded-md px-3 py-2 focus:outline-none focus:border-zinc-700 text-sm text-white"
               />
             </div>
 
-            <div className="flex space-x-2 pt-1.5">
+            <div className="flex space-x-3 pt-1.5">
               <button
                 disabled={creatingProject}
                 onClick={() => {
                   setShowCreateProjectModal(false);
                   setNewProjectName('');
                 }}
-                className="flex-1 py-1.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 font-bold transition-all disabled:opacity-50"
+                className="flex-1 py-2 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-850 text-xs font-semibold transition-all disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -529,11 +568,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                     setCreatingProject(false);
                   }
                 }}
-                className="flex-1 py-1.5 rounded bg-zinc-900 hover:bg-zinc-850 text-white border border-zinc-750 font-bold transition-all disabled:opacity-50 flex items-center justify-center space-x-1.5"
+                className="flex-1 py-2 rounded-md bg-white hover:bg-zinc-100 text-black text-xs font-semibold transition-all disabled:opacity-50 flex items-center justify-center space-x-1.5"
               >
                 {creatingProject ? (
                   <>
-                    <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
+                    <Loader2 className="w-3.5 h-3.5 text-black animate-spin" />
                     <span>Creating...</span>
                   </>
                 ) : (
@@ -542,70 +581,72 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* ── Logout confirmation modal ─────────────────────────────────────── */}
       {showLogoutModal && (
-        <>
-          <div 
-            onClick={() => setShowLogoutModal(false)}
-            className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 transition-opacity animate-fade-in"
-          ></div>
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-zinc-950 border border-zinc-900 p-5 rounded-lg w-[calc(100%-2rem)] max-w-xs shadow-2xl z-50 font-mono text-[10px] space-y-4 animate-slide-up text-zinc-300">
-            <div className="flex items-center space-x-2 border-b border-zinc-900 pb-2.5">
+        <div
+          onClick={() => setShowLogoutModal(false)}
+          className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 flex items-center justify-center p-4 transition-opacity animate-fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-zinc-950 border border-zinc-900 p-6 rounded-lg w-full max-w-xs shadow-2xl font-sans text-xs space-y-4 animate-slide-up text-zinc-300"
+          >
+            <div className="flex items-center space-x-2 border-b border-zinc-900 pb-3">
               <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
-              <span className="text-[11px] font-bold text-white uppercase">Disconnect Session?</span>
+              <span className="text-sm font-semibold text-white">Disconnect Session?</span>
             </div>
-            <p className="font-sans leading-relaxed text-zinc-400 text-[11px]">
+            <p className="leading-relaxed text-zinc-400 text-xs">
               Are you sure you want to securely terminate your active SRE background telemetry session?
             </p>
-            <div className="flex space-x-2 pt-1.5">
+            <div className="flex space-x-3 pt-1.5">
               <button
                 onClick={() => setShowLogoutModal(false)}
-                className="flex-1 py-1.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 font-bold transition-all"
+                className="flex-1 py-2 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 text-xs font-semibold transition-all"
               >
                 Cancel
               </button>
               <button
                 onClick={() => {
-                  setShowLogoutModal(false);
                   logout();
+                  setShowLogoutModal(false);
                   router.push('/login');
                 }}
-                className="flex-1 py-1.5 rounded bg-rose-950/20 hover:bg-rose-950/40 text-rose-400 border border-rose-900/30 font-bold transition-all"
+                className="flex-1 py-2 rounded-md bg-rose-500 hover:bg-rose-400 text-white text-xs font-semibold transition-all"
               >
-                Disconnect
+                Sign Out
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* ── Command Palette ───────────────────────────────────────────────── */}
       {showCommandPalette && (
-        <>
-          <div 
-            onClick={() => {
-              setShowCommandPalette(false);
-              setSearchQuery('');
-            }}
-            className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 transition-opacity animate-fade-in"
-          ></div>
-          
-          <div className="fixed top-[15%] left-1/2 -translate-x-1/2 bg-zinc-950 border border-zinc-900 w-[calc(100%-2rem)] max-w-lg rounded-lg shadow-2xl z-50 overflow-hidden font-mono text-[10px] animate-slide-up mx-4">
-            
+        <div
+          onClick={() => {
+            setShowCommandPalette(false);
+            setSearchQuery('');
+          }}
+          className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 flex justify-center pt-[12vh] px-4 transition-opacity animate-fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-zinc-950 border border-zinc-900 w-full max-w-lg rounded-lg shadow-2xl overflow-hidden font-sans text-xs animate-slide-up h-fit"
+          >
             <div className="flex items-center space-x-3 px-4 py-3 border-b border-zinc-900 bg-zinc-950">
               <Search className="w-4 h-4 text-zinc-500 shrink-0" />
               <input
                 autoFocus
                 type="text"
-                placeholder="Search console menus, views, nodes..."
+                placeholder="Search pages, tools, and actions..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-transparent text-[11px] text-white focus:outline-none placeholder-zinc-650"
+                className="w-full bg-transparent text-sm text-white focus:outline-none placeholder-zinc-500 py-1"
               />
-              <span className="text-[8px] bg-zinc-900 border border-zinc-800 px-1.5 py-0.5 rounded text-zinc-550 shrink-0">ESC</span>
+              <span className="text-[10px] bg-zinc-900 border border-zinc-800 px-1.5 py-0.5 rounded text-zinc-400 shrink-0">ESC</span>
             </div>
 
             <div className="max-h-64 overflow-y-auto p-2 space-y-1">
@@ -621,23 +662,22 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                       setSearchQuery('');
                     }}
                     onMouseEnter={() => setPaletteIndex(index)}
-                    className={`flex items-start space-x-3 px-3 py-2.5 rounded cursor-pointer transition-colors ${
-                      isSelected 
-                        ? 'bg-zinc-900 border-l border-zinc-400 pl-2.5 text-white' 
+                    className={`flex items-start space-x-3 px-4 py-3 rounded-md cursor-pointer transition-colors ${isSelected
+                        ? 'bg-zinc-900 text-white'
                         : 'text-zinc-400 hover:bg-zinc-900/40 hover:text-white'
-                    }`}
+                      }`}
                   >
                     <IconComponent className={`w-4 h-4 shrink-0 mt-0.5 ${isSelected ? 'text-white' : 'text-zinc-500'}`} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-[11px] truncate">{route.name}</span>
+                        <span className="font-semibold text-xs">{route.name}</span>
                         {isSelected && (
-                          <span className="text-[8px] text-zinc-500 font-bold bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-850 shrink-0 ml-2">
-                            ENTER
+                          <span className="text-[10px] text-zinc-400 bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-800 shrink-0 ml-2">
+                            Enter
                           </span>
                         )}
                       </div>
-                      <p className="text-[9px] text-zinc-500 mt-0.5 font-sans leading-normal">
+                      <p className="text-[11px] text-zinc-500 mt-0.5 leading-normal">
                         {route.desc}
                       </p>
                     </div>
@@ -646,19 +686,18 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               })}
 
               {filteredRoutes.length === 0 && (
-                <div className="py-6 text-center text-zinc-600 font-bold">
+                <div className="py-6 text-center text-zinc-555 font-semibold">
                   No active console destinations matched query.
                 </div>
               )}
             </div>
 
-            <div className="bg-zinc-950 border-t border-zinc-900/60 px-4 py-2 flex items-center justify-between text-[8px] text-zinc-500 uppercase tracking-widest font-bold">
-              <span>Quick Navigator Gateway</span>
-              <span className="hidden sm:block">↑↓ to navigate • ↵ to select • esc to close</span>
+            <div className="bg-zinc-950 border-t border-zinc-900/60 px-4 py-2.5 flex items-center justify-between text-[10px] text-zinc-555 font-medium">
+              <span>Quick Navigation</span>
+              <span className="hidden sm:block">Use ↑↓ keys to navigate • Enter to select • Esc to dismiss</span>
             </div>
-
           </div>
-        </>
+        </div>
       )}
     </div>
   );

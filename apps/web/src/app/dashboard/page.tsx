@@ -16,7 +16,7 @@ import { useAuth } from '../../context/AuthContext';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function DashboardOverview() {
-  const { authFetch, projects, projectsLoaded, createProject, activeProjectId } = useAuth();
+  const { authFetch, projects, projectsLoaded, createProject, activeProjectId, activeProject } = useAuth();
   const [projectName, setProjectName] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
@@ -34,6 +34,44 @@ export default function DashboardOverview() {
   
   const [aiReport, setAiReport] = useState<AIAnalysisReport | null>(null);
   const [aiLoading, setAiLoading] = useState(true);
+  const [loadingData, setLoadingData] = useState(true);
+  const [copiedText, setCopiedText] = useState<'npm' | 'js' | null>(null);
+
+  const copyTextToClipboard = (text: string) => {
+    if (typeof window === 'undefined') return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).catch((err) => {
+        console.error('Failed to copy text: ', err);
+        fallbackCopyText(text);
+      });
+    } else {
+      fallbackCopyText(text);
+    }
+  };
+
+  const fallbackCopyText = (text: string) => {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.opacity = "0";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+      document.execCommand('copy');
+    } catch (err) {
+      console.error('Fallback copy failed: ', err);
+    }
+    document.body.removeChild(textArea);
+  };
+
+  const handleCopy = (text: string, type: 'npm' | 'js') => {
+    copyTextToClipboard(text);
+    setCopiedText(type);
+    setTimeout(() => setCopiedText(null), 2000);
+  };
 
   const loadData = async () => {
     try {
@@ -111,12 +149,31 @@ export default function DashboardOverview() {
     }
   };
 
+  // Run on project switch
   useEffect(() => {
     if (activeProjectId) {
-      loadData();
-      loadAiReport();
+      setLoadingData(true);
+      Promise.all([loadData(), loadAiReport()]).finally(() => {
+        setLoadingData(false);
+      });
+    } else {
+      setLoadingData(false);
     }
   }, [activeProjectId]);
+
+  // Polling loop for active connection when telemetry is pending
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    const hasTelemetry = metrics.length > 0 || workers.length > 0 || incidents.length > 0;
+    if (activeProjectId && !hasTelemetry && !loadingData) {
+      interval = setInterval(() => {
+        loadData();
+      }, 3000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [activeProjectId, metrics.length, workers.length, incidents.length, loadingData]);
 
   const socketListeners = {
     'metrics.updated': (data: QueueMetrics[]) => {
@@ -201,32 +258,32 @@ export default function DashboardOverview() {
     ? Math.round(averageLatencies.reduce((a, b) => a + b, 0) / averageLatencies.length)
     : 0;
 
-  if (!projectsLoaded) {
+  if (!projectsLoaded || loadingData) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4 font-mono">
+      <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4 font-sans text-zinc-400">
         <Loader2 className="w-6 h-6 text-zinc-500 animate-spin" />
-        <span className="text-[10px] text-zinc-500 uppercase tracking-widest">Loading Telemetry Projects...</span>
+        <span className="text-xs uppercase tracking-widest font-semibold text-zinc-500">Loading Telemetry Project Data...</span>
       </div>
     );
   }
 
+  // 1. Onboarding Screen if 0 projects exist
   if (projects.length === 0) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center font-mono text-zinc-350">
-        <div className="w-full max-w-md bg-zinc-950/80 border border-zinc-900 rounded-lg p-6 md:p-8 space-y-6 shadow-2xl relative overflow-hidden backdrop-blur-md">
-          {/* Subtle neon glow */}
-          <div className="absolute -top-20 -left-20 w-40 h-40 bg-zinc-800/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-zinc-850/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="min-h-[75vh] flex flex-col items-center justify-center font-sans text-zinc-300 px-4">
+        <div className="w-full max-w-md bg-zinc-950 border border-zinc-900 rounded-xl p-8 space-y-6 shadow-2xl relative overflow-hidden">
+          <div className="absolute -top-20 -left-20 w-40 h-40 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="space-y-2.5 text-center relative">
-            <div className="w-10 h-10 rounded border border-zinc-850 bg-zinc-900 flex items-center justify-center mx-auto mb-2 text-zinc-400">
-              <Activity className="w-5 h-5 animate-pulse text-zinc-500" />
+          <div className="space-y-3 text-center relative font-sans">
+            <div className="w-12 h-12 rounded-lg border border-zinc-800 bg-zinc-900 flex items-center justify-center mx-auto mb-3 text-zinc-350">
+              <Activity className="w-6 h-6 text-zinc-400 animate-pulse" />
             </div>
-            <h1 className="text-white text-[13px] font-bold uppercase tracking-wider">
-              Welcome to QueueWatch SRE Console
+            <h1 className="text-white text-xl font-bold tracking-tight">
+              Welcome to QueueWatch
             </h1>
-            <p className="text-zinc-400 font-sans leading-relaxed text-[11px]">
-              To begin observing your background workers and BullMQ queues, create your first project.
+            <p className="text-zinc-400 leading-relaxed text-sm">
+              Create a project to begin monitoring asynchronous systems, investigate incidents, and improve operational reliability.
             </p>
           </div>
 
@@ -244,42 +301,147 @@ export default function DashboardOverview() {
                 setCreating(false);
               }
             }}
-            className="space-y-4 relative"
+            className="space-y-4 relative font-sans"
           >
-            <div className="space-y-1.5">
-              <label className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold block font-mono">Project Name</label>
+            <div className="space-y-2">
+              <label className="text-xs text-zinc-400 font-medium block">Project Name</label>
               <input
                 autoFocus
                 type="text"
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
                 placeholder="e.g. Production Web Service"
-                className="w-full bg-zinc-900/40 border border-zinc-900 rounded px-3 py-2 focus:outline-none focus:border-zinc-700 text-[11px] text-white placeholder-zinc-750 font-mono transition-colors"
+                className="w-full bg-zinc-900/40 border border-zinc-900 rounded-md px-3.5 py-2.5 focus:outline-none focus:border-zinc-700 text-sm text-white placeholder-zinc-650 transition-colors"
                 disabled={creating}
               />
             </div>
 
             {error && (
-              <div className="text-rose-500 text-[10px] bg-rose-950/10 border border-rose-950 p-2.5 rounded">
+              <div className="text-rose-400 text-xs bg-rose-950/10 border border-rose-900/30 p-3 rounded-md">
                 {error}
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={creating || !projectName.trim()}
-              className="w-full py-2.5 rounded bg-zinc-900 hover:bg-zinc-850 text-white font-bold transition-all border border-zinc-800 hover:border-zinc-700 disabled:opacity-50 flex items-center justify-center space-x-2 text-[11px] uppercase tracking-wider"
-            >
-              {creating ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Creating...</span>
-                </>
-              ) : (
-                <span>Create Project</span>
-              )}
-            </button>
+            <div className="flex flex-col space-y-3 pt-2">
+              <button
+                type="submit"
+                disabled={creating || !projectName.trim()}
+                className="w-full py-2.5 rounded-md bg-white hover:bg-zinc-100 text-black font-semibold transition-all disabled:opacity-50 flex items-center justify-center space-x-2 text-sm"
+              >
+                {creating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-black" />
+                    <span>Creating Project...</span>
+                  </>
+                ) : (
+                  <span>Create Project</span>
+                )}
+              </button>
+              
+              <a
+                href="https://docs.queuewatch.dev"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2.5 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-350 border border-zinc-800 text-center font-semibold transition-all text-sm block"
+              >
+                Read Documentation
+              </a>
+            </div>
           </form>
+        </div>
+      </div>
+    );
+  }
+
+  const hasTelemetry = metrics.length > 0 || workers.length > 0 || incidents.length > 0;
+
+  // 2. SDK Connection Pending wait screen if project exists but has no telemetry
+  if (!hasTelemetry) {
+    const activeApiKey = activeProject?.apiKey || 'qw_pk_demo_key';
+    const installCommand = 'pnpm add @queuewatch/node';
+    const initCode = `import { monitorQueue } from '@queuewatch/node';
+
+monitorQueue(emailQueue, {
+  apiKey: "${activeApiKey}"
+});`;
+
+    return (
+      <div className="min-h-[75vh] flex flex-col items-center justify-center font-sans text-zinc-300 px-4">
+        <div className="w-full max-w-xl bg-zinc-950 border border-zinc-900 rounded-xl p-8 space-y-6 shadow-2xl relative overflow-hidden">
+          <div className="absolute -top-20 -left-20 w-40 h-40 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="space-y-3 text-center relative border-b border-zinc-900 pb-5">
+            <div className="flex items-center justify-center space-x-2.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-3 py-1 rounded-full text-xs font-medium mx-auto w-fit">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+              <span>Project Created Successfully</span>
+            </div>
+            <h1 className="text-white text-xl font-bold tracking-tight mt-2.5">
+              Connect the QueueWatch SDK
+            </h1>
+            <p className="text-zinc-400 leading-relaxed text-sm max-w-md mx-auto">
+              Follow these integration steps to begin transmitting worker and queue telemetry to your console.
+            </p>
+          </div>
+
+          <div className="space-y-5 relative">
+            {/* Step 1 */}
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <span className="w-5 h-5 rounded-full bg-zinc-900 border border-zinc-800 text-[10px] font-bold flex items-center justify-center text-zinc-400 font-sans">1</span>
+                <span className="text-xs font-semibold text-white">Install Node.js SDK</span>
+              </div>
+              <div className="flex items-center justify-between bg-zinc-900/40 border border-zinc-900 rounded-md p-3 font-mono text-xs text-zinc-300">
+                <span className="select-all">{installCommand}</span>
+                <button 
+                  onClick={() => handleCopy(installCommand, 'npm')}
+                  className="text-zinc-500 hover:text-zinc-350 transition-colors p-1 rounded hover:bg-zinc-900/60"
+                  title="Copy to clipboard"
+                >
+                  {copiedText === 'npm' ? (
+                    <span className="text-[10px] font-sans font-medium text-emerald-400">Copied!</span>
+                  ) : (
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Step 2 */}
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <span className="w-5 h-5 rounded-full bg-zinc-900 border border-zinc-800 text-[10px] font-bold flex items-center justify-center text-zinc-400 font-sans">2</span>
+                <span className="text-xs font-semibold text-white">Monitor your BullMQ instance</span>
+              </div>
+              <div className="relative bg-zinc-900/40 border border-zinc-900 rounded-md p-4 font-mono text-xs text-zinc-300">
+                <button 
+                  onClick={() => handleCopy(initCode, 'js')}
+                  className="absolute top-3 right-3 text-zinc-500 hover:text-zinc-350 transition-colors p-1 rounded hover:bg-zinc-900/60"
+                  title="Copy to clipboard"
+                >
+                  {copiedText === 'js' ? (
+                    <span className="text-[10px] font-sans font-medium text-emerald-400">Copied!</span>
+                  ) : (
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                    </svg>
+                  )}
+                </button>
+                <pre className="overflow-x-auto select-all pr-12 text-zinc-350">{initCode}</pre>
+              </div>
+            </div>
+
+            {/* Waiting Ingestion Status */}
+            <div className="flex items-center justify-center space-x-2.5 pt-4 border-t border-zinc-900/60">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="text-xs text-zinc-500 font-medium animate-pulse">Waiting for telemetry ingestion...</span>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -290,39 +452,86 @@ export default function DashboardOverview() {
   const workerHealthScore = Math.round((workersHealthyCount / workersTotalCount) * 100);
 
   return (
-    <div className="space-y-5 font-mono text-[10px]">
+    <div className="space-y-6 font-sans text-sm text-zinc-300">
       
-      {/* 1. INCIDENT-FIRST EMERGENCY OVERVIEW */}
+      {/* 1. Metrics Grid (Reliability, Incidents, Risks, Services) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <MetricCard
+          title="Reliability Score"
+          value={activeIncidents.length === 0 ? '100%' : `${Math.max(60, 100 - activeIncidents.length * 15)}%`}
+          subtext={activeIncidents.length === 0 ? 'Optimal operational reliability' : 'Degraded reliability signals'}
+          icon={CheckCircle2}
+          iconColor={activeIncidents.length === 0 ? 'text-emerald-400' : 'text-rose-500'}
+          pulseActive={activeIncidents.length > 0}
+          pulseColor="bg-rose-500"
+        />
+
+        <MetricCard
+          title="Active Incidents"
+          value={activeIncidents.length}
+          subtext="Current open alerts"
+          icon={AlertTriangle}
+          iconColor={activeIncidents.length > 0 ? 'text-rose-500' : 'text-zinc-500'}
+          pulseActive={activeIncidents.length > 0}
+          pulseColor="bg-rose-500"
+        />
+
+        <MetricCard
+          title="Predicted Risks"
+          value={recurringCount}
+          subtext="Anticipated system bottlenecks"
+          icon={Activity}
+          iconColor={recurringCount > 0 ? 'text-amber-500' : 'text-zinc-550'}
+          pulseActive={recurringCount > 0}
+          pulseColor="bg-amber-500"
+        />
+
+        <MetricCard
+          title="Affected Services"
+          value={metrics.length}
+          subtext="Connected background processes"
+          icon={Server}
+          iconColor="text-zinc-400"
+        />
+      </div>
+
+      {/* 2. Copilot Insights (AI Diagnostic Panel) */}
+      <AIInsightPanel 
+        report={aiReport} 
+        loading={aiLoading} 
+      />
+
+      {/* 3. Active Incidents (Details card list if any exist) */}
       {activeIncidents.length > 0 && (
-        <div className="bg-red-950/15 border border-rose-950 rounded-lg p-5 space-y-4">
-          <div className="flex items-center space-x-2 border-b border-rose-950 pb-2.5">
-            <AlertTriangle className="w-4 h-4 text-rose-500 animate-pulse" />
-            <h2 className="font-extrabold text-white text-xs uppercase tracking-wider">Active System Incidents ({activeIncidents.length})</h2>
+        <div className="bg-rose-950/10 border border-rose-900/40 rounded-lg p-6 space-y-4">
+          <div className="flex items-center space-x-2.5 pb-2.5 border-b border-rose-900/20">
+            <AlertTriangle className="w-5 h-5 text-rose-455 animate-pulse" />
+            <h2 className="font-semibold text-white text-base">Active Operational Incidents ({activeIncidents.length})</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {activeIncidents.map((inc) => (
-              <div key={inc.id} className="bg-black/40 border border-rose-950/40 p-4 rounded space-y-2.5">
+              <div key={inc.id} className="bg-zinc-900/30 border border-rose-905/40 p-5 rounded-lg space-y-3">
                 <div className="flex items-start justify-between">
                   <div>
-                    <span className="px-2 py-0.5 rounded bg-rose-950/50 text-rose-400 border border-rose-900/60 font-bold uppercase tracking-wider text-[8px]">
+                    <span className="px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 font-medium text-[10px] uppercase">
                       {inc.severity}
                     </span>
-                    <h3 className="font-extrabold text-white text-sm mt-1">{inc.title}</h3>
-                    <p className="text-zinc-500 text-[9px] mt-0.5">Affected channel: <span className="text-zinc-300 font-bold">{inc.affectedQueue}</span></p>
+                    <h3 className="font-bold text-white text-base mt-2">{inc.title}</h3>
+                    <p className="text-zinc-550 text-xs mt-1">Affected queue: <span className="text-zinc-300 font-semibold">{inc.affectedQueue}</span></p>
                   </div>
                 </div>
 
-                <div className="space-y-1.5 text-zinc-400 leading-relaxed font-sans text-xs">
+                <div className="space-y-2 text-zinc-405 leading-relaxed text-sm">
                   <p><strong>Impact:</strong> {inc.impact}</p>
                   <p><strong>Suspected Cause:</strong> {inc.suspectedRootCause}</p>
                 </div>
 
                 {inc.recommendation && (
-                  <div className="p-2.5 bg-indigo-950/20 border border-indigo-950 rounded text-zinc-300 font-sans leading-normal text-[11px] flex items-start space-x-1.5">
+                  <div className="p-3 bg-indigo-500/5 border border-indigo-500/10 rounded-md text-zinc-300 text-xs flex items-start space-x-2">
                     <Sparkles className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
                     <div>
-                      <strong className="font-mono text-[9px] uppercase tracking-wider text-indigo-400 block mb-0.5">Remediation Action</strong>
+                      <strong className="text-[10px] uppercase tracking-wider text-indigo-400 block mb-0.5 font-semibold">Remediation Action</strong>
                       {inc.recommendation}
                     </div>
                   </div>
@@ -333,94 +542,15 @@ export default function DashboardOverview() {
         </div>
       )}
 
-      {/* Metrics Console Summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          title="System Health Score"
-          value={activeIncidents.length === 0 ? '100%' : `${100 - activeIncidents.length * 25}%`}
-          subtext={activeIncidents.length === 0 ? 'all subsystems reporting normal' : 'elevated incident rates'}
-          icon={CheckCircle2}
-          iconColor={activeIncidents.length === 0 ? 'text-emerald-400' : 'text-rose-500'}
-          pulseActive={activeIncidents.length > 0}
-          pulseColor="bg-rose-500"
-        />
-
-        <MetricCard
-          title="Max Queue Failure Rate"
-          value={`${maxFailureRate}%`}
-          subtext="rolling execution failures"
-          icon={Skull}
-          iconColor="text-rose-500"
-          pulseActive={maxFailureRate > 15}
-          pulseColor="bg-rose-500"
-        />
-
-        <MetricCard
-          title="Max Backlog Growth"
-          value={`+${maxBacklogGrowth} jobs`}
-          subtext="waiting queue accumulation"
-          icon={Activity}
-          iconColor="text-blue-400"
-          pulseActive={maxBacklogGrowth > 10}
-          pulseColor="bg-blue-500"
-        />
-
-        <MetricCard
-          title="Average Latency"
-          value={`${runningAverageLatency} ms`}
-          subtext="average worker execution delay"
-          icon={Clock}
-          iconColor="text-zinc-400"
-        />
-      </div>
-
-      {/* Reliability Insights Widget */}
-      <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-5 space-y-3">
-        <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
-          <div>
-            <h3 className="font-bold text-xs font-mono text-white tracking-tight uppercase flex items-center space-x-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Reliability Insights & Signal Correlation</span>
-            </h3>
-            <p className="text-[10px] text-zinc-555 font-mono">Cross-signal correlation timelines and chronic failure patterns</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Link href="/deployments" className="bg-zinc-905 border border-zinc-900 p-4 rounded hover:border-zinc-800 transition-all flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-zinc-555 uppercase text-[9px] font-bold block">Active Deployments</span>
-              <span className="text-xl font-bold text-white">{deploymentsCount} releases</span>
-            </div>
-            <GitCommit className="w-6 h-6 text-indigo-400 shrink-0" />
-          </Link>
-
-          <Link href="/recurring-incidents" className="bg-zinc-905 border border-zinc-900 p-4 rounded hover:border-zinc-800 transition-all flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-zinc-555 uppercase text-[9px] font-bold block">Recurring failure spikes</span>
-              <span className="text-xl font-bold text-white">{recurringCount} signature groups</span>
-            </div>
-            <AlertTriangle className="w-6 h-6 text-amber-500 shrink-0" />
-          </Link>
-
-          <Link href="/notifications" className="bg-zinc-905 border border-zinc-900 p-4 rounded hover:border-zinc-800 transition-all flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-zinc-555 uppercase text-[9px] font-bold block">Memory & SLA Alerts</span>
-              <span className="text-xl font-bold text-white">{notificationsCount} dispatched</span>
-            </div>
-            <BellRing className="w-6 h-6 text-rose-450 shrink-0" />
-          </Link>
-        </div>
-      </div>
-
-      {/* Main Dual Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* 4 & 5. Queue Health and Connected Workers Side-by-Side */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Queue Health */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-5">
+          <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-6">
             <div className="flex items-center justify-between mb-4 border-b border-zinc-900 pb-3">
               <div>
-                <h3 className="font-bold text-xs font-mono text-white tracking-tight uppercase">Active Queue Telemetry Indices</h3>
-                <p className="text-[10px] text-zinc-500 font-mono">Telemetry indices enqueued in Redis memory pools</p>
+                <h3 className="font-semibold text-white text-base tracking-tight">Queue Health</h3>
+                <p className="text-xs text-zinc-400 font-sans">Active queues and worker execution telemetry</p>
               </div>
             </div>
 
@@ -447,30 +577,25 @@ export default function DashboardOverview() {
               })}
 
               {metrics.length === 0 && (
-                <div className="col-span-2 text-center py-10 text-zinc-600 font-mono text-[10px]">
-                  loading telemetry queue metrics...
+                <div className="col-span-2 text-center py-10 text-zinc-500 font-sans text-xs">
+                  Loading queue telemetry metrics...
                 </div>
               )}
             </div>
           </div>
-
-          <AIInsightPanel 
-            report={aiReport} 
-            loading={aiLoading} 
-          />
         </div>
 
-        {/* Right Side: Workers & Console Activity Feed */}
+        {/* Connected Workers */}
         <div className="space-y-4">
-          <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-5">
+          <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-6">
             <div className="flex items-center justify-between mb-4 border-b border-zinc-900 pb-3">
               <div>
-                <h3 className="font-bold text-white text-xs font-mono uppercase tracking-tight">Connected Workers</h3>
-                <p className="text-[10px] text-zinc-500 font-mono">Redis consumer client connections</p>
+                <h3 className="font-semibold text-white text-base tracking-tight">Connected Workers</h3>
+                <p className="text-xs text-zinc-400 font-sans">Redis consumer client connections</p>
               </div>
-              <div className="bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800 text-[9px] text-white font-bold font-mono">
+              <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full text-xs font-medium">
                 {workerHealthScore}% healthy
-              </div>
+              </span>
             </div>
 
             <div className="space-y-3">
@@ -479,17 +604,20 @@ export default function DashboardOverview() {
               ))}
 
               {workers.length === 0 && (
-                <div className="text-center py-6 text-[10px] text-zinc-600 font-mono">
-                  waiting for worker heartbeat tokens...
+                <div className="text-center py-6 text-xs text-zinc-550 font-sans">
+                  Waiting for worker heartbeat tokens...
                 </div>
               )}
             </div>
           </div>
-
-          <ActivityFeed events={liveEvents} />
         </div>
-
       </div>
+
+      {/* 6. Logs (Live Event Activity Feed) */}
+      <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-6">
+        <ActivityFeed events={liveEvents} />
+      </div>
+
     </div>
   );
 }
