@@ -5,7 +5,6 @@ import { AiModule } from '../ai/ai.module';
 import { WebSocketModule } from '../websocket/websocket.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { DbModule } from '../db/db.module';
-import { TelemetryModule } from '../telemetry/telemetry.module';
 import { GitHubService } from '../integrations/github.service';
 import { JiraService } from '../integrations/jira.service';
 
@@ -15,7 +14,6 @@ import { JiraService } from '../integrations/jira.service';
     forwardRef(() => AiModule),
     NotificationsModule,
     DbModule,
-    TelemetryModule,
   ],
   controllers: [IncidentsController],
   providers: [IncidentsService, GitHubService, JiraService],

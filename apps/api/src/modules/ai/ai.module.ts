@@ -5,7 +5,6 @@ import { AiService } from './ai.service';
 import { QueuesModule } from '../queues/queues.module';
 import { MetricsModule } from '../metrics/metrics.module';
 import { AuthModule } from '../auth/auth.module';
-import { TelemetryModule } from '../telemetry/telemetry.module';
 
 @Module({
   imports: [
@@ -13,7 +12,6 @@ import { TelemetryModule } from '../telemetry/telemetry.module';
     forwardRef(() => QueuesModule),
     forwardRef(() => MetricsModule),
     AuthModule,
-    TelemetryModule,
   ],
   controllers: [AiController],
   providers: [AiService],

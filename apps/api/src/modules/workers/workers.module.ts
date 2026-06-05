@@ -5,7 +5,6 @@ import { WorkersController } from './workers.controller';
 import { QueuesModule } from '../queues/queues.module';
 import { WebSocketModule } from '../websocket/websocket.module';
 import { MetricsModule } from '../metrics/metrics.module';
-import { TelemetryModule } from '../telemetry/telemetry.module';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
@@ -14,7 +13,6 @@ import { AuthModule } from '../auth/auth.module';
     forwardRef(() => QueuesModule),
     WebSocketModule,
     forwardRef(() => MetricsModule),
-    TelemetryModule,
     AuthModule,
   ],
   controllers: [WorkersController],
