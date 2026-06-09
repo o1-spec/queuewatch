@@ -116,7 +116,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('keydown', handlePaletteKeys);
   }, [showCommandPalette, filteredRoutes, paletteIndex, router]);
 
-  const publicPaths = ['/', '/login', '/register', '/pricing', '/docs', '/blog', '/contact', '/about'];
+  const publicPaths = ['/', '/login', '/register', '/pricing', '/docs', '/blog', '/contact', '/about', '/privacy', '/terms'];
   const isPublicPath = publicPaths.includes(pathname);
 
   useEffect(() => {

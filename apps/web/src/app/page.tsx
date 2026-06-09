@@ -138,8 +138,8 @@ monitorQueue(checkoutQueue, {
       {/* Background SRE Grids */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f0f11_1px,transparent_1px),linear-gradient(to_bottom,#0f0f11_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
 
-      {/* Top sticky navbar */}
-      <header className="border-b border-zinc-900/80 bg-zinc-950/70 backdrop-blur-md sticky top-0 z-50 px-4 md:px-8 lg:px-12 h-14 flex items-center justify-between">
+      {/* Top fixed navbar */}
+      <header className="border-b border-zinc-900/80 bg-zinc-950/70 backdrop-blur-md fixed top-0 left-0 right-0 z-50 px-4 md:px-8 lg:px-12 h-14 flex items-center justify-between">
         <div className="flex items-center space-x-2.5">
           <div className="w-5.5 h-5.5 rounded bg-zinc-100 flex items-center justify-center font-bold text-xs text-black shadow-md font-mono shrink-0">
             Q
@@ -189,7 +189,7 @@ monitorQueue(checkoutQueue, {
       </header>
 
       {/* SECTION 1: HERO */}
-      <section className="relative px-4 md:px-8 lg:px-12 pt-20 pb-28 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+      <section className="relative px-4 md:px-8 lg:px-12 pt-36 pb-28 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
         <div className="lg:col-span-6 space-y-6 animate-slide-up">
           <div className="inline-flex items-center space-x-2 bg-zinc-900/60 border border-zinc-800/80 px-2.5 py-1 rounded text-indigo-400 text-[10px] font-mono font-bold uppercase tracking-wider shadow-inner">
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
@@ -250,15 +250,13 @@ monitorQueue(checkoutQueue, {
               return (
                 <div
                   key={idx}
-                  className={`flex items-start space-x-3.5 border p-3 rounded-lg transition-all duration-500 ${
-                    isActive
-                      ? `${step.color} scale-[1.02] shadow-md`
-                      : 'border-zinc-900/40 text-zinc-500 bg-zinc-950 opacity-40'
-                  }`}
+                  className={`flex items-start space-x-3.5 border p-3 rounded-lg transition-all duration-500 ${isActive
+                    ? `${step.color} scale-[1.02] shadow-md`
+                    : 'border-zinc-900/40 text-zinc-500 bg-zinc-950 opacity-40'
+                    }`}
                 >
-                  <div className={`w-5.5 h-5.5 rounded-full flex items-center justify-center font-mono text-[10px] font-bold border ${
-                    isActive ? 'border-current bg-zinc-950 shadow-inner' : 'border-zinc-800'
-                  }`}>
+                  <div className={`w-5.5 h-5.5 rounded-full flex items-center justify-center font-mono text-[10px] font-bold border ${isActive ? 'border-current bg-zinc-950 shadow-inner' : 'border-zinc-800'
+                    }`}>
                     {idx + 1}
                   </div>
                   <div className="text-[11.5px] font-mono">
@@ -489,11 +487,10 @@ monitorQueue(checkoutQueue, {
               <button
                 key={idx}
                 onClick={() => setInvestigationStep(idx)}
-                className={`w-full text-left p-3.5 rounded-lg border transition-all flex items-start space-x-3 ${
-                  investigationStep === idx
-                    ? 'bg-zinc-900 border-zinc-700 text-white'
-                    : 'bg-zinc-950 border-zinc-900 text-zinc-500 hover:text-zinc-350'
-                }`}
+                className={`w-full text-left p-3.5 rounded-lg border transition-all flex items-start space-x-3 ${investigationStep === idx
+                  ? 'bg-zinc-900 border-zinc-700 text-white'
+                  : 'bg-zinc-950 border-zinc-900 text-zinc-500 hover:text-zinc-350'
+                  }`}
               >
                 <span className="w-5 h-5 rounded-full bg-zinc-950 border border-zinc-800 flex items-center justify-center font-bold font-mono text-[9.5px]">
                   {idx + 1}
@@ -570,7 +567,7 @@ monitorQueue(checkoutQueue, {
                   <p className="text-[9.5px] text-emerald-400 font-bold">SRE RECOVERY RECIPE</p>
                   <p className="text-zinc-300">Deploy this pre-enqueue validation schema in your checkout middleware to cast postal code types safely:</p>
                   <pre className="bg-black/60 border border-zinc-900 p-2.5 rounded text-cyan-400 text-[9.5px] overflow-x-auto">
-{`const payloadSchema = z.object({
+                    {`const payloadSchema = z.object({
   postalCode: z.string().or(z.number().transform(val => val.toString())),
 });`}
                   </pre>
@@ -603,11 +600,10 @@ monitorQueue(checkoutQueue, {
                 <button
                   key={idx}
                   onClick={() => setActiveCopilotQuery(idx)}
-                  className={`w-full text-left p-3 rounded-lg border transition-colors flex items-center justify-between font-semibold ${
-                    activeCopilotQuery === idx
-                      ? 'bg-zinc-900 border-zinc-700 text-white'
-                      : 'bg-zinc-950 border-zinc-900 text-zinc-500 hover:text-zinc-200'
-                  }`}
+                  className={`w-full text-left p-3 rounded-lg border transition-colors flex items-center justify-between font-semibold ${activeCopilotQuery === idx
+                    ? 'bg-zinc-900 border-zinc-700 text-white'
+                    : 'bg-zinc-950 border-zinc-900 text-zinc-500 hover:text-zinc-200'
+                    }`}
                 >
                   <span>{item.question}</span>
                   <ChevronRight className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
@@ -666,7 +662,7 @@ monitorQueue(checkoutQueue, {
               </button>
             </div>
             <pre className="text-cyan-455 select-all overflow-x-auto whitespace-pre leading-relaxed p-2.5 bg-black/60 rounded">
-{sdkCodeText}
+              {sdkCodeText}
             </pre>
           </div>
 
@@ -690,7 +686,7 @@ monitorQueue(checkoutQueue, {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
           <Link
             href={isAuthenticated() ? "/dashboard" : "/register"}
-            className="w-full sm:w-auto px-6 py-3 rounded bg-zinc-100 hover:bg-zinc-200 text-zinc-955 font-extrabold text-sm transition-all shadow-md flex items-center justify-center space-x-2 font-mono"
+            className="w-full sm:w-auto px-6 py-3 rounded bg-zinc-100 hover:bg-zinc-200 text-black font-extrabold text-sm transition-all shadow-md flex items-center justify-center space-x-2 font-mono"
           >
             <span>{isAuthenticated() ? "Go to Dashboard" : "Get Started"}</span>
             <ArrowRight className="w-4 h-4" />

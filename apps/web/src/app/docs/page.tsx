@@ -177,9 +177,8 @@ worker.on('active', (job) => {
 
   // Scroll Spy Observer to highlight active sidebar section
   useEffect(() => {
-    const container = document.getElementById('docs-content-container');
     const observerOptions = {
-      root: container,
+      root: null,
       rootMargin: '-10% 0px -60% 0px',
       threshold: 0,
     };
@@ -236,7 +235,15 @@ worker.on('active', (job) => {
   const navigateToSection = (id: string) => {
     const el = document.getElementById(id);
     if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
+      const headerOffset = 80;
+      const elementPosition = el.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.scrollY - headerOffset;
+      
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      });
+      
       setActiveSection(id);
       setHighlightedSection(id);
       setTimeout(() => setHighlightedSection(null), 1500);
@@ -378,7 +385,7 @@ worker.on('active', (job) => {
   };
 
   return (
-    <div className="bg-zinc-950 text-zinc-200 h-screen max-h-screen overflow-hidden flex flex-col relative font-sans antialiased">
+    <div className="bg-zinc-950 text-zinc-200 min-h-screen relative overflow-x-hidden w-full font-sans antialiased">
       {/* Background SRE Grids */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f0f11_1px,transparent_1px),linear-gradient(to_bottom,#0f0f11_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
 
@@ -454,7 +461,7 @@ worker.on('active', (job) => {
       )}
 
       {/* Docs Header */}
-      <header className="border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-md h-14 shrink-0 flex items-center justify-between px-6 relative z-40">
+      <header className="border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-md fixed top-0 left-0 right-0 z-40 px-6 h-14 flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <Link href="/" className="w-5.5 h-5.5 rounded bg-zinc-100 flex items-center justify-center font-bold text-[11px] text-black font-mono shrink-0 shadow-md">
             Q
@@ -466,13 +473,13 @@ worker.on('active', (job) => {
         {/* Center search button */}
         <button
           onClick={() => setShowSearch(true)}
-          className="hidden md:flex items-center space-x-2 bg-zinc-900/40 hover:bg-zinc-900/60 border border-zinc-850/60 px-3 py-1.5 rounded-md text-xs text-zinc-450 hover:text-zinc-300 transition-all focus:outline-none w-56 lg:w-72 justify-between"
+          className="hidden md:flex items-center space-x-2 bg-zinc-900/40 hover:bg-zinc-900/60 border border-zinc-850/60 px-3 py-1.5 rounded-md text-xs text-zinc-450 hover:text-zinc-355 transition-all focus:outline-none w-56 lg:w-72 justify-between"
         >
           <div className="flex items-center space-x-2">
             <Search className="w-3.5 h-3.5 text-zinc-500" />
             <span className="font-sans">Search docs...</span>
           </div>
-          <kbd className="bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-800 text-[9px] text-zinc-500 font-sans font-bold">⌘K</kbd>
+          <kbd className="bg-zinc-955 px-1.5 py-0.5 rounded border border-zinc-800 text-[9px] text-zinc-500 font-sans font-bold">⌘K</kbd>
         </button>
 
         <div className="flex items-center space-x-4">
@@ -496,7 +503,7 @@ worker.on('active', (job) => {
       </header>
 
       {/* Mobile outlines sticky sub-header */}
-      <div className="lg:hidden border-b border-zinc-900 bg-zinc-950/90 backdrop-blur-md shrink-0 px-6 py-2.5 flex items-center justify-between text-xs relative z-30">
+      <div className="lg:hidden border-b border-zinc-900 bg-zinc-950/90 backdrop-blur-md sticky top-14 z-30 px-6 py-2.5 flex items-center justify-between text-xs">
         <span className="text-zinc-450 font-medium">
           Section: <span className="text-zinc-200 font-semibold">{
             docsItems.find(item => item.id === activeSection)?.title || 'Introduction'
@@ -530,13 +537,13 @@ worker.on('active', (job) => {
 
       {/* Mobile outline drawer content */}
       <aside 
-        className={`fixed inset-y-0 right-0 z-50 w-64 bg-zinc-950 border-l border-zinc-900 p-6 transform transition-transform duration-300 ease-in-out lg:hidden flex flex-col justify-between ${
+        className={`fixed inset-y-0 right-0 z-50 w-64 bg-zinc-955 border-l border-zinc-900 p-6 transform transition-transform duration-300 ease-in-out lg:hidden flex flex-col justify-between ${
           showMobileSidebar ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         <div className="space-y-6">
           <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
-            <span className="font-mono font-bold text-[10px] text-zinc-450 uppercase tracking-widest">Documentation Outline</span>
+            <span className="font-mono font-bold text-[10px] text-zinc-455 uppercase tracking-widest">Documentation Outline</span>
             <button 
               onClick={() => setShowMobileSidebar(false)}
               className="text-zinc-400 hover:text-white"
@@ -577,9 +584,9 @@ worker.on('active', (job) => {
       </aside>
 
       {/* Main Flex Wrapper */}
-      <div className="flex-1 flex w-full max-w-7xl mx-auto px-6 md:px-8 overflow-hidden relative z-20">
+      <div className="max-w-7xl mx-auto px-6 md:px-8 flex items-start gap-8 lg:gap-12 relative w-full pt-24 lg:pt-28">
         {/* Desktop Sidebar Navigation */}
-        <aside className="hidden lg:block w-80 shrink-0 h-full overflow-y-auto py-10 pr-6 border-r border-zinc-900/80 select-none scrollbar-thin">
+        <aside data-scroll-native className="hidden lg:block w-80 shrink-0 sticky top-20 h-[calc(100vh-6rem)] overflow-y-auto pr-6 border-r border-zinc-900/80 select-none scrollbar-thin">
           <nav className="space-y-8">
             {sidebarCategories.map((category) => (
               <div key={category.title} className="space-y-3">
@@ -611,243 +618,250 @@ worker.on('active', (job) => {
         </aside>
 
         {/* Documentation Content Panel */}
-        <main id="docs-content-container" className="flex-1 min-w-0 overflow-y-auto py-10 lg:py-14 pr-2 scroll-smooth">
-          <div className="max-w-3xl space-y-16 pb-24">
+        <main className="flex-1 min-w-0 space-y-16 pb-24 max-w-3xl">
+          
+          {/* Section 1: Introduction */}
+          <section 
+            id="intro" 
+            className={`scroll-mt-20 space-y-4 transition-all duration-700 rounded-lg p-1.5 ${
+              highlightedSection === 'intro' ? 'bg-indigo-500/10 ring-1 ring-indigo-500/30' : 'bg-transparent'
+            }`}
+          >
+            <h1 className="text-3xl font-extrabold text-zinc-100 tracking-tight flex items-center gap-2.5">
+              <Book className="w-7 h-7 text-indigo-400" /> Platform Introduction
+            </h1>
+            <p className="text-zinc-350 text-[15px] leading-7 font-sans">
+              QueueWatch is an operational reliability and SRE diagnostics platform built to monitor, investigate, and triage distributed asynchronous processes. By hooking directly into your background queues and worker runtimes, QueueWatch extracts real-time event logs, stack traces, and worker processing metrics. It generates active dependency topology maps and detects incident bottlenecks automatically, providing SREs with actionable resolution runbooks.
+            </p>
+          </section>
+
+          {/* Section 2: Installation */}
+          <section 
+            id="installation" 
+            className={`scroll-mt-20 space-y-4 transition-all duration-700 rounded-lg p-1.5 ${
+              highlightedSection === 'installation' ? 'bg-indigo-500/10 ring-1 ring-indigo-500/30' : 'bg-transparent'
+            }`}
+          >
+            <h2 className="text-2xl font-bold text-zinc-100 tracking-tight flex items-center gap-2.5">
+              <Terminal className="w-6 h-6 text-indigo-400" /> Installing the SDK
+            </h2>
+            <p className="text-zinc-355 text-[15px] leading-7 font-sans">
+              Deploy our lightweight, non-blocking telemetry collector directly into your background worker processes. The SDK collects and streams processing performance data asynchronously to avoid overhead on your active job pipelines.
+            </p>
+            <PremiumCodeBlock 
+              filename="Terminal" 
+              code={installCmd} 
+              section="install"
+            >
+              <CodeInstall />
+            </PremiumCodeBlock>
+          </section>
+
+          {/* Section 3: Create Project */}
+          <section 
+            id="projects" 
+            className={`scroll-mt-20 space-y-4 transition-all duration-700 rounded-lg p-1.5 ${
+              highlightedSection === 'projects' ? 'bg-indigo-500/10 ring-1 ring-indigo-500/30' : 'bg-transparent'
+            }`}
+          >
+            <h2 className="text-2xl font-bold text-zinc-100 tracking-tight flex items-center gap-2.5">
+              <Key className="w-6 h-6 text-indigo-400" /> Create a Project
+            </h2>
+            <p className="text-zinc-355 text-[15px] leading-7 font-sans">
+              QueueWatch segments telemetry event records using distinct projects. This allows you to separate dashboards for staging, production, or individual microservices:
+            </p>
+            <ol className="space-y-3.5 text-zinc-355 text-[14.5px] leading-7 pl-6 list-decimal font-sans">
+              <li>Open the <Link href="/login" className="text-indigo-400 hover:text-indigo-350 underline font-semibold transition-colors">QueueWatch Console</Link>.</li>
+              <li>Click the project selector in the left sidebar and select <span className="text-zinc-100 font-semibold">+ Create Project</span>.</li>
+              <li>Enter a descriptive name (e.g., <code className="bg-zinc-900 border border-zinc-800 text-indigo-355 px-1.5 py-0.5 rounded font-mono text-[13px]">Checkout API - Production</code>).</li>
+              <li>Copy the credentials from the project setup panel and assign them in your environment settings (<code className="bg-zinc-900 border border-zinc-800 text-indigo-355 px-1.5 py-0.5 rounded font-mono text-[13px]">.env</code>):</li>
+            </ol>
+
+            <PremiumCodeBlock 
+              filename=".env" 
+              code={envExample} 
+              section="env"
+            >
+              <CodeEnv />
+            </PremiumCodeBlock>
+          </section>
+
+          {/* Section 4: API Credentials */}
+          <section 
+            id="api-keys" 
+            className={`scroll-mt-20 space-y-4 transition-all duration-700 rounded-lg p-1.5 ${
+              highlightedSection === 'api-keys' ? 'bg-indigo-500/10 ring-1 ring-indigo-500/30' : 'bg-transparent'
+            }`}
+          >
+            <h2 className="text-2xl font-bold text-zinc-100 tracking-tight flex items-center gap-2.5">
+              <Key className="w-6 h-6 text-indigo-400" /> API Credentials Security
+            </h2>
+            <p className="text-zinc-355 text-[15px] leading-7 font-sans">
+              Authentication tokens authorize your background queues to transmit telemetry to our SRE event ingestion brokers. Keep these tokens secure.
+            </p>
+
+            <div className="bg-indigo-950/20 border border-indigo-900/40 rounded-lg p-4 flex items-start gap-3 text-zinc-305 text-[13.5px] leading-relaxed">
+              <ShieldAlert className="w-4.5 h-4.5 text-indigo-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold text-zinc-100">Security Best Practice:</span> Never expose your API keys in client-side code bundles. Always load them secure in environment variables on your background processing servers or secrets manager.
+              </div>
+            </div>
+          </section>
+
+          {/* Section 5: BullMQ Integration */}
+          <section 
+            id="bullmq" 
+            className={`scroll-mt-20 space-y-4 transition-all duration-700 rounded-lg p-1.5 ${
+              highlightedSection === 'bullmq' ? 'bg-indigo-500/10 ring-1 ring-indigo-500/30' : 'bg-transparent'
+            }`}
+          >
+            <h2 className="text-2xl font-bold text-zinc-100 tracking-tight flex items-center gap-2.5">
+              <Layers className="w-6 h-6 text-indigo-400" /> BullMQ Integration
+            </h2>
+            <p className="text-zinc-355 text-[15px] leading-7 font-sans">
+              To capture metrics, import the SDK and wrap your active BullMQ queues. This hooks onto queue listeners and streams telemetry indicators to your designated ingestion server:
+            </p>
+
+            <PremiumCodeBlock 
+              filename="instrument.ts" 
+              code={setupCode} 
+              section="init"
+            >
+              <CodeSetup />
+            </PremiumCodeBlock>
+          </section>
+
+          {/* Section 6: Telemetry Events */}
+          <section 
+            id="events" 
+            className={`scroll-mt-20 space-y-4 transition-all duration-700 rounded-lg p-1.5 ${
+              highlightedSection === 'events' ? 'bg-indigo-500/10 ring-1 ring-indigo-500/30' : 'bg-transparent'
+            }`}
+          >
+            <h2 className="text-2xl font-bold text-zinc-100 tracking-tight flex items-center gap-2.5">
+              <Activity className="w-6 h-6 text-indigo-400" /> Tracked Telemetry Events
+            </h2>
+            <p className="text-zinc-355 text-[15px] leading-7 font-sans">
+              Once wrapped with the <code className="bg-zinc-900 border border-zinc-800 text-indigo-350 px-1.5 py-0.5 rounded font-mono text-[13px]">monitorQueue</code> function, the SDK automatically listens for and transmits the following state transitions:
+            </p>
+
+            <div className="border border-zinc-800 rounded-lg overflow-hidden font-mono text-[12px] bg-[#0b0b0d]">
+              <div className="grid grid-cols-12 bg-[#09090b] px-4 py-2.5 text-zinc-400 font-bold border-b border-zinc-800">
+                <div className="col-span-4 font-mono tracking-wider">EVENT STATE</div>
+                <div className="col-span-8 font-mono tracking-wider">TELEMETRY DETAIL</div>
+              </div>
+              <div className="divide-y divide-zinc-800">
+                <div className="grid grid-cols-12 px-4 py-3 text-zinc-305">
+                  <div className="col-span-4 font-bold text-indigo-400">active</div>
+                  <div className="col-span-8 font-sans leading-relaxed text-zinc-350">Fired when a worker thread pulls a job and begins executing its handler. Starts the execution timer.</div>
+                </div>
+                <div className="grid grid-cols-12 px-4 py-3 text-zinc-305">
+                  <div className="col-span-4 font-bold text-indigo-400">completed</div>
+                  <div className="col-span-8 font-sans leading-relaxed text-zinc-350">Fired upon successful job completion, logging processing execution latencies and memory usage.</div>
+                </div>
+                <div className="grid grid-cols-12 px-4 py-3 text-zinc-305">
+                  <div className="col-span-4 font-bold text-indigo-400">failed</div>
+                  <div className="col-span-8 font-sans leading-relaxed text-zinc-350">Fired on job errors, carrying payload exception messages, stack traces, and retries attempts counts.</div>
+                </div>
+                <div className="grid grid-cols-12 px-4 py-3 text-zinc-305">
+                  <div className="col-span-4 font-bold text-indigo-400">stalled</div>
+                  <div className="col-span-8 font-sans leading-relaxed text-zinc-350">Fired when locks expire, indicating crashed or frozen worker execution threads that require rescheduling.</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Section 7: Structured Logs */}
+          <section 
+            id="logging" 
+            className={`scroll-mt-20 space-y-4 transition-all duration-700 rounded-lg p-1.5 ${
+              highlightedSection === 'logging' ? 'bg-indigo-500/10 ring-1 ring-indigo-500/30' : 'bg-transparent'
+            }`}
+          >
+            <h2 className="text-2xl font-bold text-zinc-100 tracking-tight flex items-center gap-2.5">
+              <ShieldAlert className="w-6 h-6 text-indigo-400" /> Structured Log Correlation
+            </h2>
+            <p className="text-zinc-355 text-[15px] leading-7 font-sans">
+              Forward application logs from inside workers to automatically link trace logs directly with active SRE incident reports in the console. This correlation helps isolate issues instantly:
+            </p>
+
+            <PremiumCodeBlock 
+              filename="worker.ts" 
+              code={logCodeText} 
+              section="telemetry"
+            >
+              <CodeLogger />
+            </PremiumCodeBlock>
+          </section>
+
+          {/* Section 8: Troubleshooting */}
+          <section 
+            id="troubleshooting" 
+            className={`scroll-mt-20 space-y-4 border-t border-zinc-850 pt-12 transition-all duration-700 rounded-lg p-1.5 ${
+              highlightedSection === 'troubleshooting' ? 'bg-indigo-500/10 ring-1 ring-indigo-500/30' : 'bg-transparent'
+            }`}
+          >
+            <h2 className="text-2xl font-bold text-zinc-100 tracking-tight flex items-center gap-2.5">
+              Troubleshooting & Support
+            </h2>
+            <p className="text-zinc-355 text-[15px] leading-7 font-sans">
+              If your console dashboard continues to show the onboarding waiting screen, verify the following:
+            </p>
             
-            {/* Section 1: Introduction */}
-            <section 
-              id="intro" 
-              className={`scroll-mt-6 space-y-4 transition-all duration-700 rounded-lg p-1.5 ${
-                highlightedSection === 'intro' ? 'bg-indigo-500/10 ring-1 ring-indigo-500/30' : 'bg-transparent'
-              }`}
-            >
-              <h1 className="text-3xl font-extrabold text-zinc-100 tracking-tight flex items-center gap-2.5">
-                <Book className="w-7 h-7 text-indigo-400" /> Platform Introduction
-              </h1>
-              <p className="text-zinc-355 text-[15px] leading-7 font-sans">
-                QueueWatch is an operational reliability and SRE diagnostics platform built to monitor, investigate, and triage distributed asynchronous processes. By hooking directly into your background queues and worker runtimes, QueueWatch extracts real-time event logs, stack traces, and worker processing metrics. It generates active dependency topology maps and detects incident bottlenecks automatically, providing SREs with actionable resolution runbooks.
-              </p>
-            </section>
-
-            {/* Section 2: Installation */}
-            <section 
-              id="installation" 
-              className={`scroll-mt-6 space-y-4 transition-all duration-700 rounded-lg p-1.5 ${
-                highlightedSection === 'installation' ? 'bg-indigo-500/10 ring-1 ring-indigo-500/30' : 'bg-transparent'
-              }`}
-            >
-              <h2 className="text-2xl font-bold text-zinc-100 tracking-tight flex items-center gap-2.5">
-                <Terminal className="w-6 h-6 text-indigo-400" /> Installing the SDK
-              </h2>
-              <p className="text-zinc-355 text-[15px] leading-7 font-sans">
-                Deploy our lightweight, non-blocking telemetry collector directly into your background worker processes. The SDK collects and streams processing performance data asynchronously to avoid overhead on your active job pipelines.
-              </p>
-              <PremiumCodeBlock 
-                filename="Terminal" 
-                code={installCmd} 
-                section="install"
-              >
-                <CodeInstall />
-              </PremiumCodeBlock>
-            </section>
-
-            {/* Section 3: Create Project */}
-            <section 
-              id="projects" 
-              className={`scroll-mt-6 space-y-4 transition-all duration-700 rounded-lg p-1.5 ${
-                highlightedSection === 'projects' ? 'bg-indigo-500/10 ring-1 ring-indigo-500/30' : 'bg-transparent'
-              }`}
-            >
-              <h2 className="text-2xl font-bold text-zinc-100 tracking-tight flex items-center gap-2.5">
-                <Key className="w-6 h-6 text-indigo-400" /> Create a Project
-              </h2>
-              <p className="text-zinc-355 text-[15px] leading-7 font-sans">
-                QueueWatch segments telemetry event records using distinct projects. This allows you to separate dashboards for staging, production, or individual microservices:
-              </p>
-              <ol className="space-y-3.5 text-zinc-355 text-[14.5px] leading-7 pl-6 list-decimal font-sans">
-                <li>Open the <Link href="/login" className="text-indigo-400 hover:text-indigo-350 underline font-semibold transition-colors">QueueWatch Console</Link>.</li>
-                <li>Click the project selector in the left sidebar and select <span className="text-zinc-100 font-semibold">+ Create Project</span>.</li>
-                <li>Enter a descriptive name (e.g., <code className="bg-zinc-900 border border-zinc-800 text-indigo-350 px-1.5 py-0.5 rounded font-mono text-[13px]">Checkout API - Production</code>).</li>
-                <li>Copy the credentials from the project setup panel and assign them in your environment settings (<code className="bg-zinc-900 border border-zinc-800 text-indigo-355 px-1.5 py-0.5 rounded font-mono text-[13px]">.env</code>):</li>
-              </ol>
-
-              <PremiumCodeBlock 
-                filename=".env" 
-                code={envExample} 
-                section="env"
-              >
-                <CodeEnv />
-              </PremiumCodeBlock>
-            </section>
-
-            {/* Section 4: API Credentials */}
-            <section 
-              id="api-keys" 
-              className={`scroll-mt-6 space-y-4 transition-all duration-700 rounded-lg p-1.5 ${
-                highlightedSection === 'api-keys' ? 'bg-indigo-500/10 ring-1 ring-indigo-500/30' : 'bg-transparent'
-              }`}
-            >
-              <h2 className="text-2xl font-bold text-zinc-100 tracking-tight flex items-center gap-2.5">
-                <Key className="w-6 h-6 text-indigo-400" /> API Credentials Security
-              </h2>
-              <p className="text-zinc-355 text-[15px] leading-7 font-sans">
-                Authentication tokens authorize your background queues to transmit telemetry to our SRE event ingestion brokers. Keep these tokens secure.
-              </p>
-
-              <div className="bg-indigo-950/20 border border-indigo-900/40 rounded-lg p-4 flex items-start gap-3 text-zinc-350 text-[13.5px] leading-relaxed">
-                <ShieldAlert className="w-4.5 h-4.5 text-indigo-400 shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-semibold text-zinc-100">Security Best Practice:</span> Never expose your API keys in client-side code bundles. Always load them secure in environment variables on your background processing servers or secrets manager.
-                </div>
-              </div>
-            </section>
-
-            {/* Section 5: BullMQ Integration */}
-            <section 
-              id="bullmq" 
-              className={`scroll-mt-6 space-y-4 transition-all duration-700 rounded-lg p-1.5 ${
-                highlightedSection === 'bullmq' ? 'bg-indigo-500/10 ring-1 ring-indigo-500/30' : 'bg-transparent'
-              }`}
-            >
-              <h2 className="text-2xl font-bold text-zinc-100 tracking-tight flex items-center gap-2.5">
-                <Layers className="w-6 h-6 text-indigo-400" /> BullMQ Integration
-              </h2>
-              <p className="text-zinc-355 text-[15px] leading-7 font-sans">
-                To capture metrics, import the SDK and wrap your active BullMQ queues. This hooks onto queue listeners and streams telemetry indicators to your designated ingestion server:
-              </p>
-
-              <PremiumCodeBlock 
-                filename="instrument.ts" 
-                code={setupCode} 
-                section="init"
-              >
-                <CodeSetup />
-              </PremiumCodeBlock>
-            </section>
-
-            {/* Section 6: Telemetry Events */}
-            <section 
-              id="events" 
-              className={`scroll-mt-6 space-y-4 transition-all duration-700 rounded-lg p-1.5 ${
-                highlightedSection === 'events' ? 'bg-indigo-500/10 ring-1 ring-indigo-500/30' : 'bg-transparent'
-              }`}
-            >
-              <h2 className="text-2xl font-bold text-zinc-100 tracking-tight flex items-center gap-2.5">
-                <Activity className="w-6 h-6 text-indigo-400" /> Tracked Telemetry Events
-              </h2>
-              <p className="text-zinc-355 text-[15px] leading-7 font-sans">
-                Once wrapped with the <code className="bg-zinc-900 border border-zinc-800 text-indigo-350 px-1.5 py-0.5 rounded font-mono text-[13px]">monitorQueue</code> function, the SDK automatically listens for and transmits the following state transitions:
-              </p>
-
-              <div className="border border-zinc-800 rounded-lg overflow-hidden font-mono text-[12px] bg-[#0b0b0d]">
-                <div className="grid grid-cols-12 bg-[#09090b] px-4 py-2.5 text-zinc-400 font-bold border-b border-zinc-800">
-                  <div className="col-span-4 font-mono tracking-wider">EVENT STATE</div>
-                  <div className="col-span-8 font-mono tracking-wider">TELEMETRY DETAIL</div>
-                </div>
-                <div className="divide-y divide-zinc-800">
-                  <div className="grid grid-cols-12 px-4 py-3 text-zinc-305">
-                    <div className="col-span-4 font-bold text-indigo-400">active</div>
-                    <div className="col-span-8 font-sans leading-relaxed text-zinc-350">Fired when a worker thread pulls a job and begins executing its handler. Starts the execution timer.</div>
-                  </div>
-                  <div className="grid grid-cols-12 px-4 py-3 text-zinc-305">
-                    <div className="col-span-4 font-bold text-indigo-400">completed</div>
-                    <div className="col-span-8 font-sans leading-relaxed text-zinc-350">Fired upon successful job completion, logging processing execution latencies and memory usage.</div>
-                  </div>
-                  <div className="grid grid-cols-12 px-4 py-3 text-zinc-305">
-                    <div className="col-span-4 font-bold text-indigo-400">failed</div>
-                    <div className="col-span-8 font-sans leading-relaxed text-zinc-350">Fired on job errors, carrying payload exception messages, stack traces, and retries attempts counts.</div>
-                  </div>
-                  <div className="grid grid-cols-12 px-4 py-3 text-zinc-305">
-                    <div className="col-span-4 font-bold text-indigo-400">stalled</div>
-                    <div className="col-span-8 font-sans leading-relaxed text-zinc-350">Fired when locks expire, indicating crashed or frozen worker execution threads that require rescheduling.</div>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* Section 7: Structured Logs */}
-            <section 
-              id="logging" 
-              className={`scroll-mt-6 space-y-4 transition-all duration-700 rounded-lg p-1.5 ${
-                highlightedSection === 'logging' ? 'bg-indigo-500/10 ring-1 ring-indigo-500/30' : 'bg-transparent'
-              }`}
-            >
-              <h2 className="text-2xl font-bold text-zinc-100 tracking-tight flex items-center gap-2.5">
-                <ShieldAlert className="w-6 h-6 text-indigo-400" /> Structured Log Correlation
-              </h2>
-              <p className="text-zinc-355 text-[15px] leading-7 font-sans">
-                Forward application logs from inside workers to automatically link trace logs directly with active SRE incident reports in the console. This correlation helps isolate issues instantly:
-              </p>
-
-              <PremiumCodeBlock 
-                filename="worker.ts" 
-                code={logCodeText} 
-                section="telemetry"
-              >
-                <CodeLogger />
-              </PremiumCodeBlock>
-            </section>
-
-            {/* Section 8: Troubleshooting */}
-            <section 
-              id="troubleshooting" 
-              className={`scroll-mt-6 space-y-4 border-t border-zinc-850 pt-12 transition-all duration-700 rounded-lg p-1.5 ${
-                highlightedSection === 'troubleshooting' ? 'bg-indigo-500/10 ring-1 ring-indigo-500/30' : 'bg-transparent'
-              }`}
-            >
-              <h2 className="text-2xl font-bold text-zinc-100 tracking-tight flex items-center gap-2.5">
-                Troubleshooting & Support
-              </h2>
-              <p className="text-zinc-355 text-[15px] leading-7 font-sans">
-                If your console dashboard continues to show the onboarding waiting screen, verify the following:
-              </p>
-              
-              <div className="space-y-6 text-zinc-355 font-sans mt-4">
-                <div className="space-y-1.5">
-                  <p className="font-semibold text-zinc-100 text-[15px] flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-                    1. Confirm Port Bindings & Endpoints
-                  </p>
-                  <p className="text-zinc-400 leading-relaxed text-[13.5px] pl-3.5">
-                    By default, the SDK communicates with the endpoint on <code className="bg-zinc-900 text-zinc-300 border border-zinc-800 px-1 py-0.5 rounded font-mono text-xs">http://localhost:3001</code>. Ensure your API server is actively listening on port <code className="bg-zinc-900 text-zinc-300 border border-zinc-800 px-1 py-0.5 rounded font-mono text-xs">3001</code> and is accessible from your worker nodes.
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <p className="font-semibold text-zinc-100 text-[15px] flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-                    2. Verify Project IDs & Secret Tokens
-                  </p>
-                  <p className="text-zinc-400 leading-relaxed text-[13.5px] pl-3.5">
-                    Double check that the <code className="bg-zinc-900 text-zinc-300 border border-zinc-800 px-1 py-0.5 rounded font-mono text-xs">QUEUEWATCH_API_KEY</code> matches the exact string shown under the <span className="text-zinc-100 font-semibold">SDK Setup & Keys</span> tab inside the Console, and matches the active <code className="bg-zinc-900 text-zinc-300 border border-zinc-800 px-1 py-0.5 rounded font-mono text-xs">QUEUEWATCH_PROJECT_ID</code>.
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <p className="font-semibold text-zinc-100 text-[15px] flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-                    3. Check Redis Connection State
-                  </p>
-                  <p className="text-zinc-400 leading-relaxed text-[13.5px] pl-3.5">
-                    Verify that your local Redis container is up and running. In standard environments, you can verify this by checking if the docker container is active on port <code className="bg-zinc-900 text-zinc-300 border border-zinc-800 px-1 py-0.5 rounded font-mono text-xs">6379</code>.
-                  </p>
-                </div>
+            <div className="space-y-6 text-zinc-355 font-sans mt-4">
+              <div className="space-y-1.5">
+                <p className="font-semibold text-zinc-100 text-[15px] flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                  1. Confirm Port Bindings & Endpoints
+                </p>
+                <p className="text-zinc-400 leading-relaxed text-[13.5px] pl-3.5">
+                  By default, the SDK communicates with the endpoint on <code className="bg-zinc-900 text-zinc-300 border border-zinc-800 px-1 py-0.5 rounded font-mono text-xs">http://localhost:3001</code>. Ensure your API server is actively listening on port <code className="bg-zinc-900 text-zinc-300 border border-zinc-800 px-1 py-0.5 rounded font-mono text-xs">3001</code> and is accessible from your worker nodes.
+                </p>
               </div>
 
-              <div className="bg-amber-955/15 border border-amber-900/30 rounded-lg p-4 flex items-start gap-3 text-zinc-305 text-[13px] leading-relaxed mt-6">
-                <HelpCircle className="w-4.5 h-4.5 text-amber-500 shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-semibold text-zinc-100">Connection Verification:</span> Run <code className="bg-zinc-900 text-zinc-300 border border-zinc-800 px-1 py-0.5 rounded font-mono text-xs">curl http://localhost:3001/health</code> from your worker server to verify network connectivity to the QueueWatch event API.
-                </div>
+              <div className="space-y-1.5">
+                <p className="font-semibold text-zinc-100 text-[15px] flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                  2. Verify Project IDs & Secret Tokens
+                </p>
+                <p className="text-zinc-400 leading-relaxed text-[13.5px] pl-3.5">
+                  Double check that the <code className="bg-zinc-900 text-zinc-300 border border-zinc-800 px-1 py-0.5 rounded font-mono text-xs">QUEUEWATCH_API_KEY</code> matches the exact string shown under the <span className="text-zinc-100 font-semibold">SDK Setup & Keys</span> tab inside the Console, and matches the active <code className="bg-zinc-900 text-zinc-300 border border-zinc-800 px-1 py-0.5 rounded font-mono text-xs">QUEUEWATCH_PROJECT_ID</code>.
+                </p>
               </div>
-            </section>
 
-            {/* Footer */}
-            <footer className="border-t border-zinc-900 bg-[#070709] py-12 text-center text-xs text-zinc-500 font-mono mt-20">
-              <p>&copy; {new Date().getFullYear()} QueueWatch. SRE Operational Reliability Platform. All rights reserved.</p>
-            </footer>
-          </div>
+              <div className="space-y-1.5">
+                <p className="font-semibold text-zinc-100 text-[15px] flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                  3. Check Redis Connection State
+                </p>
+                <p className="text-zinc-400 leading-relaxed text-[13.5px] pl-3.5">
+                  Verify that your local Redis container is up and running. In standard environments, you can verify this by checking if the docker container is active on port <code className="bg-zinc-900 text-zinc-300 border border-zinc-800 px-1 py-0.5 rounded font-mono text-xs">6379</code>.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-amber-950/15 border border-amber-900/30 rounded-lg p-4 flex items-start gap-3 text-zinc-300 text-[13px] leading-relaxed mt-6">
+              <HelpCircle className="w-4.5 h-4.5 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold text-zinc-100">Connection Verification:</span> Run <code className="bg-zinc-900 text-zinc-300 border border-zinc-800 px-1 py-0.5 rounded font-mono text-xs">curl http://localhost:3001/health</code> from your worker server to verify network connectivity to the QueueWatch event API.
+              </div>
+            </div>
+          </section>
         </main>
-      </div>  </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="border-t border-[#121214] bg-zinc-950 py-16 px-6 text-center text-xs text-zinc-550 font-mono relative z-10 w-full mt-24">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-zinc-500 font-mono">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-4.5 h-4.5 rounded bg-zinc-100 flex items-center justify-center font-bold text-[10px] text-black leading-none shrink-0">
+              Q
+            </div>
+            <span className="font-bold text-zinc-300">QueueWatch</span>
+          </div>
+          <p className="text-[10px]">&copy; {new Date().getFullYear()} QueueWatch. SRE Operational Reliability Platform. All rights reserved.</p>
+        </div>
+      </footer>
+    </div>
   );
 }
