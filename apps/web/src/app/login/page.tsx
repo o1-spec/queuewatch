@@ -13,6 +13,7 @@ function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberDevice, setRememberDevice] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -21,8 +22,6 @@ function LoginForm() {
       router.push('/dashboard');
     }
   }, [router, isAuthenticated]);
-
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +35,9 @@ function LoginForm() {
 
     try {
       await login(email, password);
+      if (rememberDevice) {
+        console.log('Remember device flag set');
+      }
       router.push('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Authentication failed. Please verify credentials.');
@@ -44,25 +46,23 @@ function LoginForm() {
     }
   };
 
-
-
   return (
     <div className="bg-zinc-950 text-zinc-200 min-h-screen flex items-center justify-center p-4 sm:p-6 relative w-full overflow-hidden [background-image:radial-gradient(#18181b_1px,transparent_1px)] [background-size:16px_16px]">
       <div className="bg-zinc-950 border border-zinc-900 p-6 sm:p-8 rounded-lg w-full max-w-md space-y-6 relative shadow-2xl font-mono text-xs animate-slide-up">
         
         {/* Header */}
         <div className="flex items-center space-x-3 justify-center text-center pb-3 border-b border-zinc-900">
-          <div className="w-6 h-6 rounded bg-zinc-800 flex items-center justify-center font-bold text-xs text-white">
+          <div className="w-6 h-6 rounded bg-zinc-800 flex items-center justify-center font-bold text-xs text-black shadow-md font-mono shrink-0">
             Q
           </div>
           <div>
             <h2 className="font-extrabold text-sm tracking-wider text-white">QueueWatch</h2>
-            <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest leading-none">Telemetry Engine</p>
+            <p className="text-[9px] text-zinc-550 font-bold uppercase tracking-widest leading-none">Telemetry Engine</p>
           </div>
         </div>
 
         <div className="text-center space-y-1">
-          <h3 className="font-bold text-white text-sm">Sign in to console</h3>
+          <h3 className="font-bold text-white text-sm">Access Console</h3>
           <p className="text-xs text-zinc-500">Sign in to your background telemetry workspace</p>
         </div>
 
@@ -82,20 +82,28 @@ function LoginForm() {
               onChange={(e) => setEmail(e.target.value)}
               disabled={submitting}
               className="w-full bg-zinc-900/20 border border-zinc-900 rounded px-3.5 py-2.5 text-sm sm:text-xs text-white focus:outline-none focus:border-zinc-800 disabled:opacity-50"
-              placeholder="sre@company.com"
+              placeholder="femi@company.com"
               required
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">secret access key</label>
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">access key</label>
+              <Link 
+                href="/forgot-password" 
+                className="text-[9px] text-zinc-550 hover:text-zinc-300 transition-colors uppercase font-bold tracking-wider underline"
+              >
+                Forgot Password?
+              </Link>
+            </div>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={submitting}
-                className="w-full bg-zinc-900/20 border border-zinc-900 rounded pl-3.5 pr-10 py-2.5 text-sm sm:text-xs text-white focus:outline-none focus:border-zinc-800 disabled:opacity-50"
+                className="w-full bg-zinc-900/20 border border-zinc-900 rounded pl-3.5 pr-10 py-2.5 text-sm sm:text-xs text-white focus:outline-none focus:border-zinc-800 disabled:opacity-50 font-mono"
                 placeholder="••••••••••••"
                 required
               />
@@ -110,12 +118,27 @@ function LoginForm() {
             </div>
           </div>
 
+          {/* Remember device checkbox */}
+          <div className="flex items-center space-x-2 pt-1 font-sans">
+            <input
+              type="checkbox"
+              id="rememberDevice"
+              checked={rememberDevice}
+              onChange={(e) => setRememberDevice(e.target.checked)}
+              disabled={submitting}
+              className="w-3.5 h-3.5 rounded border-zinc-800 bg-zinc-900 text-indigo-500 focus:ring-indigo-500/20 focus:ring-offset-0 focus:outline-none cursor-pointer"
+            />
+            <label htmlFor="rememberDevice" className="text-[11px] text-zinc-400 select-none cursor-pointer font-medium">
+              Remember this device
+            </label>
+          </div>
+
           <button
             type="submit"
             disabled={submitting}
             className="w-full py-2.5 rounded bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-800 font-bold transition-all flex items-center justify-center space-x-1.5 disabled:opacity-50 text-xs"
           >
-            <span>{submitting ? 'authenticating...' : 'connect to workspace'}</span>
+            <span>{submitting ? 'authenticating...' : 'Access Console'}</span>
             <ArrowRight className="w-3.5 h-3.5 text-zinc-400" />
           </button>
         </form>
