@@ -117,7 +117,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   }, [showCommandPalette, filteredRoutes, paletteIndex, router]);
 
   const publicPaths = ['/', '/login', '/register', '/pricing', '/docs', '/blog', '/contact', '/about', '/privacy', '/terms'];
-  const isPublicPath = publicPaths.includes(pathname);
+  const isPublicPath = publicPaths.includes(pathname) || pathname.startsWith('/blog/');
 
   useEffect(() => {
     if (!isPublicPath && !loading && !isAuthenticated()) {

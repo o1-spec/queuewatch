@@ -219,7 +219,7 @@ monitorQueue(checkoutQueue, {
               <span>Book Demo</span>
             </Link>
             <Link
-              href="#observe"
+              href="/docs"
               className="px-5 py-2.5 rounded text-zinc-500 hover:text-zinc-300 font-bold text-xs transition-all flex items-center justify-center font-mono"
             >
               <span>View Docs</span>
