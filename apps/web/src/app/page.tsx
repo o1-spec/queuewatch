@@ -43,38 +43,39 @@ const FADE_UP = {
 
 export default function SaaSLandingPage() {
   const { user, isAuthenticated } = useAuth();
-  const [activeShowcaseTab, setActiveShowcaseTab] = useState<'dashboard' | 'investigation' | 'reliability'>('dashboard');
-  const [copiedSdk, setCopiedSdk] = useState(false);
+  const [activeWorkflowStep, setActiveWorkflowStep] = useState<number>(0);
   const [activeCopilotQuery, setActiveCopilotQuery] = useState(0);
+  const [copiedSdk, setCopiedSdk] = useState(false);
+  const [investigationStep, setInvestigationStep] = useState<number>(0);
 
   const copilotDialogues = [
     {
-      question: 'Why is webhook_delivery failing?',
-      answer: `Found 1 active incident on queue "webhook_delivery" (ID: inc-stripe-503).
-• Issue: Stripe API endpoint returned HTTP 503 (Service Unavailable) consecutively.
-• Retry Pattern: Attempt 3/3 failed at 20:04:12.
-• Evidence: Downstream dependency "svc_payment" is currently degraded.
-• Recommendation: Pause consumer or replay jobs once Stripe API status page reports recovery.`,
+      question: 'Why is payment processing degraded?',
+      answer: `Found 1 active incident on service "Payment Service" (ID: inc_stripe_503).
+• Root Cause: Downstream Stripe API endpoint returned consecutive 503 errors.
+• Affected Workflows: Checkout completed webhook loops are stalling.
+• Business Impact: 42 customers experienced delayed purchase confirmation alerts.
+• Recommendation: Scale webhook workers to 4 instances and enable circuit-breaker backoffs.`,
       confidence: 'HIGH',
       metrics: { latency: '42ms', tokens: '104' }
     },
     {
-      question: 'What changed before this incident?',
-      answer: `Correlated 1 deployment event:
-• Deployment Commit: "git commit c72cf2b" (svc_payment v2.4.1) deployed by admin@queuewatch.io.
-• Timestamp: 2026-06-03T19:48:42 (12 minutes before failures began).
-• Change Diff: Added stricter Zod validations to Stripe payment payload.
-• Impact: Jobs enqueued with the old payload format are failing validation: "Missing parameter 'imageUrl'".`,
+      question: 'Identify the impact of the latest deployment',
+      answer: `Correlated 1 deployment event (v2.4.1) deployed by admin@queuewatch.io:
+• Timestamp: 2026-06-09T11:12:00 (12 minutes before failures spiked).
+• Git Commit: c72cf2b (Added strict Zod payload validations to svc_payment).
+• Regression: Old client requests missing 'imageUrl' parameter are rejected by the worker.
+• Resolution: Recommend rolling back to v2.4.0 or deploying quick validation patch.`,
       confidence: 'HIGH',
       metrics: { latency: '68ms', tokens: '148' }
     },
     {
-      question: 'Which queue has the highest retry rate?',
-      answer: `Analyzing last 24h queue telemetry:
-• Queue: "image_processing" has the highest retry rate of 8.4%.
-• Cause: 89% of retries occur during CPU-intensive AVIF image compression tasks.
-• Worker Health: Worker "img-worker-node-2" CPU load spiked to 92% causing transient timeouts.
-• Resolution: Recommend scaling worker instances from 2 to 4 or offloading to GPU nodes.`,
+      question: 'Which service has the lowest reliability score?',
+      answer: `Analyzing reliability scores across registered systems:
+• Lowest: "Order Service" (72.5%) due to cascaded webhook timeout failures.
+• Active Outages: 1 unresolved critical warning on Stripe integration.
+• Average MTTR: 28 minutes over the last 7 days.
+• Health Score Trend: -12% compared to the previous week's baseline.`,
       confidence: 'MEDIUM',
       metrics: { latency: '51ms', tokens: '122' }
     }
@@ -82,15 +83,17 @@ export default function SaaSLandingPage() {
 
   const sdkCodeText = `import { monitorQueue } from "@queuewatch/node";
 
-monitorQueue(emailQueue, {
+monitorQueue(checkoutQueue, {
+  projectId: process.env.QUEUEWATCH_PROJECT_ID,
   apiKey: process.env.QUEUEWATCH_API_KEY,
+  endpoint: "https://api.queuewatch.io"
 });`;
 
   const copyTextToClipboard = (text: string) => {
     if (typeof window === 'undefined') return;
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).catch((err) => {
-        console.error('Failed to copy text: ', err);
+        console.error('Failed to copy: ', err);
         fallbackCopyText(text);
       });
     } else {
@@ -122,12 +125,20 @@ monitorQueue(emailQueue, {
     setTimeout(() => setCopiedSdk(false), 2000);
   };
 
+  // Auto-animate the hero workflow visual steps
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveWorkflowStep((prev) => (prev + 1) % 4);
+    }, 3500);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="bg-zinc-950 text-zinc-100 min-h-screen relative overflow-x-hidden w-full font-sans antialiased">
       {/* Background SRE Grids */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f0f11_1px,transparent_1px),linear-gradient(to_bottom,#0f0f11_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
 
-      {/* Sticky top navbar */}
+      {/* Top sticky navbar */}
       <header className="border-b border-zinc-900/80 bg-zinc-950/70 backdrop-blur-md sticky top-0 z-50 px-4 md:px-8 lg:px-12 h-14 flex items-center justify-between">
         <div className="flex items-center space-x-2.5">
           <div className="w-5.5 h-5.5 rounded bg-zinc-100 flex items-center justify-center font-bold text-xs text-black shadow-md font-mono shrink-0">
@@ -135,29 +146,28 @@ monitorQueue(emailQueue, {
           </div>
           <span className="font-mono font-extrabold text-[12px] tracking-wider text-white">QUEUEWATCH</span>
           <span className="bg-zinc-900 border border-zinc-800 text-zinc-500 font-mono text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider hidden sm:inline">
-            op-intel v5
+            RELIABILITY OP-INTEL
           </span>
         </div>
 
         <nav className="hidden md:flex items-center space-x-6 text-xs font-mono font-semibold text-zinc-400">
-          <Link href="#features" className="hover:text-white transition-colors">Features</Link>
-          <Link href="#solutions" className="hover:text-white transition-colors">Solutions</Link>
-          <Link href="#docs" className="hover:text-white transition-colors">Docs</Link>
-          <Link href="#pricing" className="hover:text-white transition-colors">Pricing</Link>
-          <Link href="#blog" className="hover:text-white transition-colors">Blog</Link>
+          <Link href="#observe" className="hover:text-white transition-colors">Observe</Link>
+          <Link href="#diagnose" className="hover:text-white transition-colors">Diagnose</Link>
+          <Link href="#copilot" className="hover:text-white transition-colors">Copilot</Link>
+          <Link href="#systems" className="hover:text-white transition-colors">Supported Systems</Link>
         </nav>
 
         <div className="flex items-center space-x-3 font-mono">
           {isAuthenticated() ? (
             <>
               <span className="text-[11px] text-zinc-400 hidden sm:inline">
-                Signed in as <span className="text-zinc-200 font-semibold">{user?.name || user?.email}</span>
+                SRE: <span className="text-zinc-200 font-semibold">{user?.name || user?.email}</span>
               </span>
               <Link
                 href="/dashboard"
                 className="px-4 py-2 rounded border border-zinc-850 bg-zinc-900 hover:bg-zinc-800 text-zinc-100 hover:text-white font-extrabold text-xs transition-all flex items-center space-x-1.5"
               >
-                <span>Dashboard</span>
+                <span>Console</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </>
@@ -168,7 +178,7 @@ monitorQueue(emailQueue, {
               </Link>
               <Link
                 href="/register"
-                className="px-4 py-2 rounded border border-zinc-800 bg-zinc-900 hover:bg-zinc-850 text-zinc-100 hover:text-white font-extrabold text-xs transition-all flex items-center space-x-1.5"
+                className="px-4 py-2 rounded border border-zinc-850 bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-extrabold text-xs transition-all flex items-center space-x-1.5"
               >
                 <span>Get Started</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -179,460 +189,413 @@ monitorQueue(emailQueue, {
       </header>
 
       {/* SECTION 1: HERO */}
-      <section className="relative px-4 md:px-8 lg:px-12 pt-16 pb-24 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-        <div className="lg:col-span-5 space-y-6 animate-slide-up">
-          <div className="inline-flex items-center space-x-2 bg-zinc-900/60 border border-zinc-800/80 px-2.5 py-1 rounded text-zinc-400 text-[10px] font-mono font-bold uppercase tracking-wider">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>PROACTIVE INCIDENT MITIGATION</span>
+      <section className="relative px-4 md:px-8 lg:px-12 pt-20 pb-28 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+        <div className="lg:col-span-6 space-y-6 animate-slide-up">
+          <div className="inline-flex items-center space-x-2 bg-zinc-900/60 border border-zinc-800/80 px-2.5 py-1 rounded text-indigo-400 text-[10px] font-mono font-bold uppercase tracking-wider shadow-inner">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+            <span>AI Reliability Engineer</span>
           </div>
 
-          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.08] font-sans">
-            Understand failures before your customers do.
-          </h2>
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.08] font-sans">
+            AI-Powered Reliability Intelligence for Modern Systems
+          </h1>
 
-          <p className="text-zinc-455 text-sm sm:text-base leading-relaxed max-w-xl">
-            QueueWatch helps engineering teams monitor queues, investigate incidents, analyze worker health, and improve the reliability of asynchronous systems.
+          <p className="text-zinc-400 text-sm sm:text-base leading-relaxed max-w-xl">
+            Monitor queues, workers, jobs, services, and operational workflows in real time. Detect incidents, diagnose root causes, and resolve failures faster with AI-powered operational intelligence.
           </p>
 
-          <div className="flex items-center gap-3 pt-2">
+          <div className="flex flex-wrap items-center gap-3 pt-2">
             <Link
               href={isAuthenticated() ? "/dashboard" : "/register"}
-              className="px-5 py-2.5 rounded bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-extrabold text-xs transition-all flex items-center justify-center space-x-2 font-mono shadow-md"
+              className="px-5 py-2.5 rounded bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-extrabold text-xs transition-all flex items-center justify-center space-x-2 font-mono shadow-lg"
             >
-              <span>{isAuthenticated() ? "Go to Dashboard" : "Start Monitoring"}</span>
+              <span>{isAuthenticated() ? "Open Control Center" : "Get Started"}</span>
               <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link
+              href="/login"
+              className="px-5 py-2.5 rounded border border-zinc-800 bg-zinc-900/30 hover:bg-zinc-800 text-zinc-350 hover:text-white font-bold text-xs transition-all flex items-center justify-center space-x-2 font-mono"
+            >
+              <span>Book Demo</span>
+            </Link>
+            <Link
+              href="#observe"
+              className="px-5 py-2.5 rounded text-zinc-500 hover:text-zinc-300 font-bold text-xs transition-all flex items-center justify-center font-mono"
+            >
+              <span>View Docs</span>
             </Link>
           </div>
         </div>
 
-        {/* Dashboard Preview Graphic */}
-        <div
-          className="lg:col-span-7 bg-zinc-950/80 border border-zinc-900 rounded-lg p-5 shadow-2xl space-y-5 select-none text-zinc-400 relative overflow-hidden animate-slide-up"
-          style={{ animationDelay: '0.1s' }}
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-zinc-900 pb-3 text-[10px] font-mono">
-            <div className="flex items-center space-x-2">
-              <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0"></span>
-              <span className="text-zinc-200 font-bold uppercase tracking-wider">operational health center</span>
-            </div>
-            <span className="text-zinc-500 font-mono">redis://127.0.0.1:6379</span>
+        {/* Visual: Live Reliability Workflow Progression */}
+        <div className="lg:col-span-6 bg-zinc-950 border border-zinc-900 rounded-xl p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between h-[360px]">
+          <div className="absolute top-0 right-0 p-3 text-[9px] font-mono text-zinc-650 select-none">
+            REALTIME ENGINE // ACTIVE
           </div>
 
-          {/* Quick Metrics Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 text-zinc-300 font-mono">
-            <div className="bg-zinc-900/20 border border-zinc-900/80 p-3 rounded">
-              <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">reliability score</p>
-              <div className="flex items-baseline space-x-1.5 mt-1">
-                <span className="text-xl font-bold text-emerald-400">89</span>
-                <span className="text-[9px] text-zinc-500">/ 100</span>
-              </div>
-            </div>
-            <div className="bg-zinc-900/20 border border-zinc-900/80 p-3 rounded">
-              <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">active incidents</p>
-              <div className="flex items-baseline space-x-1.5 mt-1">
-                <span className="text-xl font-bold text-rose-500">1</span>
-                <span className="text-[9px] text-zinc-500">unresolved</span>
-              </div>
-            </div>
-            <div className="bg-zinc-900/20 border border-zinc-900/80 p-3 rounded">
-              <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">queue status</p>
-              <div className="flex items-baseline space-x-1.5 mt-1">
-                <span className="text-xl font-bold text-white">4</span>
-                <span className="text-[9px] text-zinc-500">online</span>
-              </div>
-            </div>
-            <div className="bg-zinc-900/20 border border-zinc-900/80 p-3 rounded">
-              <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">worker health</p>
-              <div className="flex items-baseline space-x-1.5 mt-1">
-                <span className="text-xl font-bold text-amber-500">Degraded</span>
-              </div>
-            </div>
+          <div className="flex items-center space-x-2 text-[10px] font-mono text-zinc-500 border-b border-zinc-900 pb-3">
+            <Server className="w-4.5 h-4.5 text-zinc-400" />
+            <span>OPERATIONAL HEALTH WORKFLOW</span>
           </div>
 
-          {/* Active Incident Block */}
-          <div className="border border-rose-900/40 bg-rose-950/5 rounded p-3.5 space-y-2 font-mono text-[10.5px]">
-            <div className="flex items-center justify-between text-[9px] text-rose-500 font-bold">
-              <span className="flex items-center space-x-1">
-                <AlertTriangle className="w-3.5 h-3.5" />
-                <span>CRITICAL INCIDENT DETECTED</span>
-              </span>
-              <span>ID: inc-stripe-503</span>
-            </div>
-            <p className="text-zinc-200 font-semibold text-[11px] leading-snug">
-              ZodValidationError: Stripe webhook endpoint returned 503 Service Unavailable.
-            </p>
-            <div className="bg-zinc-950/80 border border-zinc-900 p-2 rounded text-[10px] text-zinc-500">
-              <span className="text-zinc-400 font-bold">Investigation Summary:</span> DOWNSTREAM CASCADE. Downstream microservice <code className="text-amber-500">svc_payment</code> execution failed due to an invalid JSON arguments list payload schema error in the enqueued jobs data.
-            </div>
-          </div>
-
-          {/* Queues Status Section */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider font-mono">Telemetry Queue Registry</span>
-              <span className="text-[9px] text-zinc-500 font-mono">1,432 processed/min</span>
-            </div>
-            <div className="border border-zinc-900 rounded overflow-hidden text-[10.5px] font-mono">
-              <div className="grid grid-cols-12 bg-zinc-900/50 border-b border-zinc-900 px-3 py-2 text-zinc-500 font-bold">
-                <div className="col-span-5">QUEUE</div>
-                <div className="col-span-2 text-right">WAITING</div>
-                <div className="col-span-2 text-right">ACTIVE</div>
-                <div className="col-span-3 text-right">RELIABILITY</div>
-              </div>
-              <div className="divide-y divide-zinc-900">
-                <div className="grid grid-cols-12 px-3 py-2 text-zinc-300">
-                  <div className="col-span-5 text-white font-semibold">webhook_delivery</div>
-                  <div className="col-span-2 text-right text-zinc-500">0</div>
-                  <div className="col-span-2 text-right text-zinc-500">0</div>
-                  <div className="col-span-3 text-right text-rose-500 font-bold">72.5%</div>
+          {/* Connected Steps */}
+          <div className="space-y-4 my-auto">
+            {[
+              { label: 'Incident Detected', desc: 'SLA breach triggered on webhook consumer', color: 'border-rose-900/60 text-rose-500 bg-rose-950/10' },
+              { label: 'Root Cause Found', desc: 'Stripe API consecutively timeout: 503 errors', color: 'border-amber-900/60 text-amber-500 bg-amber-950/10' },
+              { label: 'Business Impact Identified', desc: 'Payment transactions sync halted', color: 'border-indigo-900/60 text-indigo-400 bg-indigo-950/10' },
+              { label: 'Recommended Fix Generated', desc: 'Deploy Circuit Breaker retry middleware', color: 'border-emerald-900/60 text-emerald-400 bg-emerald-950/10' }
+            ].map((step, idx) => {
+              const isActive = activeWorkflowStep === idx;
+              return (
+                <div
+                  key={idx}
+                  className={`flex items-start space-x-3.5 border p-3 rounded-lg transition-all duration-500 ${
+                    isActive
+                      ? `${step.color} scale-[1.02] shadow-md`
+                      : 'border-zinc-900/40 text-zinc-500 bg-zinc-950 opacity-40'
+                  }`}
+                >
+                  <div className={`w-5.5 h-5.5 rounded-full flex items-center justify-center font-mono text-[10px] font-bold border ${
+                    isActive ? 'border-current bg-zinc-950 shadow-inner' : 'border-zinc-800'
+                  }`}>
+                    {idx + 1}
+                  </div>
+                  <div className="text-[11.5px] font-mono">
+                    <p className={`font-bold uppercase tracking-wider ${isActive ? 'text-zinc-100' : 'text-zinc-650'}`}>
+                      {step.label}
+                    </p>
+                    <p className="text-[10px] mt-0.5 text-zinc-450">{step.desc}</p>
+                  </div>
                 </div>
-                <div className="grid grid-cols-12 px-3 py-2 text-zinc-300">
-                  <div className="col-span-5 text-white font-semibold">email_notifications</div>
-                  <div className="col-span-2 text-right text-zinc-500">14</div>
-                  <div className="col-span-2 text-right text-indigo-400">2</div>
-                  <div className="col-span-3 text-right text-emerald-400 font-bold">99.8%</div>
-                </div>
-              </div>
-            </div>
+              );
+            })}
           </div>
         </div>
       </section>
 
-      {/* SECTION 2: SOCIAL PROOF BAR */}
-      <section className="border-y border-zinc-900 bg-zinc-950/60 py-8 px-4 md:px-8 text-center">
-        <div className="max-w-6xl mx-auto space-y-4">
-          <p className="text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-widest">
-            Built for modern asynchronous systems
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-2.5">
-            {['BullMQ', 'Redis', 'Workers', 'Background Jobs', 'Dead-Letter Queues', 'Incident Investigations'].map((tech) => (
-              <span
-                key={tech}
-                className="bg-zinc-900 border border-zinc-800 text-zinc-400 text-[10px] font-mono px-3 py-1 rounded-full font-semibold"
-              >
-                {tech}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* SECTION 3: THE PROBLEM */}
-      <section className="py-24 px-4 md:px-8 lg:px-12 max-w-7xl mx-auto space-y-16">
-        <div className="text-center space-y-3">
-          <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest font-mono">OPERATIONAL CHALLENGES</span>
-          <h3 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-sans">
-            Most failures happen in the background.
-          </h3>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            {
-              title: 'Retries explode',
-              desc: 'Transient errors cause jobs to fail repeatedly. Exponential backoffs saturate queues, creating severe processing backlogs and worker fatigue.'
-            },
-            {
-              title: 'Workers silently fail',
-              desc: 'Memory leaks and unhandled promise rejections crash background worker nodes silently without generating standard HTTP exception alerts.'
-            },
-            {
-              title: 'Dead-letter queues grow',
-              desc: 'Stuck payloads are routed to DLQ sinks. They remain unmonitored until downstream databases drift and customer pipelines freeze.'
-            },
-            {
-              title: 'Customers notice first',
-              desc: 'Observability gaps in asynchronous event brokers mean engineering remains unaware of queue failure cascades until support tickets spike.'
-            }
-          ].map((card, i) => (
-            <div key={i} className="bg-zinc-900/30 border border-zinc-900 p-5 rounded space-y-3">
-              <span className="font-mono text-[10.5px] text-zinc-500 font-bold uppercase tracking-wider block">0{i + 1} {'//'}</span>
-              <h4 className="text-sm font-bold text-white">{card.title}</h4>
-              <p className="text-zinc-400 text-xs leading-relaxed">{card.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* SECTION 4: WHAT QUEUEWATCH DOES */}
-      <section className="py-20 border-t border-zinc-900 bg-zinc-950/40 px-4 md:px-8 lg:px-12">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Column 1 */}
-          <div className="bg-zinc-950 border border-zinc-900 p-6 rounded space-y-4">
-            <div className="flex items-center space-x-2 text-indigo-400">
-              <Activity className="w-4 h-4" />
-              <h4 className="text-xs font-bold font-mono uppercase tracking-wider">Monitor</h4>
-            </div>
-            <ul className="space-y-4 pt-2">
-              {[
-                { title: 'Queue Metrics', desc: 'Realtime waiting, active, delayed, and throughput metrics straight from Redis memory hashes.' },
-                { title: 'Worker Health', desc: 'Tracks active worker threads, concurrency load, CPU limits, and RAM usage ratios.' },
-                { title: 'Retry Analysis', desc: 'Visualizes retry loops and schedules to isolate failing patterns and systemic dependencies.' },
-                { title: 'Dead-Letter Visibility', desc: 'Direct access to failed and dead-letter jobs before they are discarded by TTL limits.' }
-              ].map((item, index) => (
-                <li key={index} className="space-y-1">
-                  <h5 className="text-xs font-bold text-zinc-200">{item.title}</h5>
-                  <p className="text-zinc-450 text-[11px] leading-relaxed">{item.desc}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Column 2 */}
-          <div className="bg-zinc-950 border border-zinc-900 p-6 rounded space-y-4">
-            <div className="flex items-center space-x-2 text-rose-450">
-              <AlertTriangle className="w-4 h-4 text-rose-500" />
-              <h4 className="text-xs font-bold font-mono uppercase tracking-wider">Investigate</h4>
-            </div>
-            <ul className="space-y-4 pt-2">
-              {[
-                { title: 'Incident Detection', desc: 'Deterministic rules audit backlog accumulations, SLA spikes, and high retry loops.' },
-                { title: 'Root Cause Analysis', desc: 'Deep payload stacktrace parsing isolates corrupted payloads and schema mismatches.' },
-                { title: 'Timeline Reconstruction', desc: 'Correlates worker metrics, queue events, and error stack logs in a chronological graph.' },
-                { title: 'Evidence Collection', desc: 'Isolates and logs failing parameters automatically for direct reproduction runs.' }
-              ].map((item, index) => (
-                <li key={index} className="space-y-1">
-                  <h5 className="text-xs font-bold text-zinc-200">{item.title}</h5>
-                  <p className="text-zinc-450 text-[11px] leading-relaxed">{item.desc}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Column 3 */}
-          <div className="bg-zinc-950 border border-zinc-900 p-6 rounded space-y-4">
-            <div className="flex items-center space-x-2 text-emerald-400">
-              <ShieldCheck className="w-4 h-4" />
-              <h4 className="text-xs font-bold font-mono uppercase tracking-wider">Improve Reliability</h4>
-            </div>
-            <ul className="space-y-4 pt-2">
-              {[
-                { title: 'Reliability Scores', desc: 'Calculates active SLA ratings (0-100) per queue based on real operational telemetry.' },
-                { title: 'Operational Insights', desc: 'Surfaces recommendations to scale consumers, clear buffers, or refactor timeouts.' },
-                { title: 'Runbooks', desc: 'Provides step-by-step SRE playbook guides tied directly to active queue error parameters.' },
-                { title: 'Predictive Warnings', desc: 'Forecasts storage limits and backlog bounds using deterministic growth rates.' }
-              ].map((item, index) => (
-                <li key={index} className="space-y-1">
-                  <h5 className="text-xs font-bold text-zinc-200">{item.title}</h5>
-                  <p className="text-zinc-450 text-[11px] leading-relaxed">{item.desc}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      {/* SECTION 5: PRODUCT SHOWCASE TABS */}
-      <section className="py-24 px-4 md:px-8 lg:px-12 max-w-7xl mx-auto space-y-12">
-        <div className="text-center space-y-3">
-          <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest font-mono">Interactive Showcase</span>
-          <h3 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Designed for the modern SRE stack.
-          </h3>
-        </div>
-
-        {/* Tab Buttons */}
-        <div className="flex justify-center border-b border-zinc-900 max-w-lg mx-auto font-mono text-[11px] gap-2">
-          {(['dashboard', 'investigation', 'reliability'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveShowcaseTab(tab)}
-              className={`flex-1 pb-3 text-center transition-colors relative font-bold uppercase ${
-                activeShowcaseTab === tab ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              {tab === 'dashboard' ? 'Health Overview' : tab === 'investigation' ? 'Incident File' : 'Reliability Ledger'}
-              {activeShowcaseTab === tab && (
-                <motion.div
-                  layoutId="showcase-tab-border"
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-100"
-                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                />
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* Tab Content Display */}
-        <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-5 shadow-xl max-w-5xl mx-auto">
-          <AnimatePresence mode="wait">
-            {activeShowcaseTab === 'dashboard' && (
-              <motion.div
-                key="dashboard"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-4 font-mono"
-              >
-                {/* System Health */}
-                <div className="flex items-center justify-between border-b border-zinc-900 pb-3 text-[11px] text-zinc-400">
-                  <div className="flex items-center space-x-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    <span className="text-white font-bold">SYSTEM OVERVIEW</span>
-                  </div>
-                  <span>Uptime: 99.98%</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-zinc-900/20 border border-zinc-900 p-4 rounded">
-                    <span className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider">active nodes</span>
-                    <p className="text-xl font-bold text-white mt-1">12 / 12 running</p>
-                  </div>
-                  <div className="bg-zinc-900/20 border border-zinc-900 p-4 rounded">
-                    <span className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider">throughput p95</span>
-                    <p className="text-xl font-bold text-white mt-1">421ms latency</p>
-                  </div>
-                  <div className="bg-zinc-900/20 border border-zinc-900 p-4 rounded">
-                    <span className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider">total memory load</span>
-                    <p className="text-xl font-bold text-white mt-1">1.4 GB</p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {activeShowcaseTab === 'investigation' && (
-              <motion.div
-                key="investigation"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-4 font-mono text-[10.5px]"
-              >
-                {/* Root Cause UI */}
-                <div className="border border-zinc-900 bg-zinc-900/10 p-4 rounded space-y-3">
-                  <div className="flex items-center justify-between text-zinc-500 text-[10px]">
-                    <span className="text-rose-500 font-bold uppercase tracking-wider flex items-center gap-1">
-                      <AlertTriangle className="w-3.5 h-3.5" /> ROOT CAUSE FOUND
-                    </span>
-                    <span>Class: TypeError</span>
-                  </div>
-                  <h4 className="text-zinc-200 font-semibold text-[11px] leading-snug">
-                    Cannot read properties of undefined (reading &apos;customer_id&apos;) inside worker thread <code className="text-indigo-400">payments-listener-2</code>.
-                  </h4>
-                  <div className="p-2.5 bg-black/60 border border-zinc-900 rounded space-y-1 text-zinc-400">
-                    <span className="text-zinc-300 font-bold">Evidence:</span> Captured 4 telemetry payload logs matching active Redis broker state during job execution parameters.
-                  </div>
-                  <div className="p-2.5 bg-zinc-950 border border-zinc-900 rounded space-y-1">
-                    <span className="text-emerald-400 font-bold">Recommendation:</span> Ensure pre-validation middleware checks for object presence before dereferencing object attributes.
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {activeShowcaseTab === 'reliability' && (
-              <motion.div
-                key="reliability"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-4 font-mono"
-              >
-                {/* Reliability scores */}
-                <div className="border border-zinc-900 bg-zinc-900/10 p-4 rounded space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Queue Performance Index</span>
-                    <span className="text-emerald-400 text-xs font-bold flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5" /> Stable
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {[
-                      { name: 'svc_order', score: '99.2', status: 'Stable' },
-                      { name: 'svc_payment', score: '72.5', status: 'Degraded' },
-                      { name: 'svc_notification', score: '98.8', status: 'Stable' },
-                      { name: 'svc_auth', score: '100.0', status: 'Healthy' }
-                    ].map((item) => (
-                      <div key={item.name} className="p-3 bg-zinc-950 border border-zinc-900 rounded text-[11px]">
-                        <span className="text-zinc-500 font-bold">{item.name}</span>
-                        <div className="flex items-baseline space-x-2 mt-1">
-                          <span className="text-base font-extrabold text-white">{item.score}</span>
-                          <span className={`text-[9px] uppercase font-bold ${item.status === 'Degraded' ? 'text-amber-500' : 'text-emerald-400'}`}>
-                            {item.status}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </section>
-
-      {/* SECTION 6: HOW IT WORKS */}
+      {/* SECTION 2: THE PROBLEM */}
       <section className="py-24 border-t border-zinc-900 bg-zinc-950/40 px-4 md:px-8 lg:px-12">
         <div className="max-w-7xl mx-auto space-y-16">
           <div className="text-center space-y-3">
-            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest font-mono">workflow pipeline</span>
+            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest font-mono">SYSTEM COMPLEXITY</span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
+              Modern Distributed Workflows Are Hard To Operate
+            </h2>
+            <p className="text-zinc-450 text-xs sm:text-sm max-w-2xl mx-auto leading-relaxed">
+              When components interact, a single failure cascades silently through your background services, webhooks, and queues. Teams waste hours digging through siloed systems just trying to discover what happened.
+            </p>
+          </div>
+
+          {/* Interactive Dependency Visualizer Mock */}
+          <div className="bg-zinc-950 border border-zinc-900 rounded-xl p-6 shadow-xl max-w-4xl mx-auto font-mono text-[11px] space-y-6">
+            <div className="flex items-center justify-between border-b border-zinc-900 pb-3 text-zinc-500 text-[10px]">
+              <span>DISTRIBUTED TRANSACTION DEPENDENCIES</span>
+              <span className="text-rose-500 animate-pulse font-bold flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5" /> ERROR PROPAGATION ACTIVE
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+              {[
+                { name: 'Payment Webhook', type: 'API boundary', status: 'normal', color: 'border-zinc-800 text-zinc-400' },
+                { name: 'Payment processing', type: 'BullMQ Queue', status: 'degraded', color: 'border-amber-800 bg-amber-950/5 text-amber-500' },
+                { name: 'Invoice generation', type: 'BullMQ Queue', status: 'normal', color: 'border-zinc-800 text-zinc-400' },
+                { name: 'Email Delivery', type: 'Cron Job', status: 'critical', color: 'border-rose-900 bg-rose-950/5 text-rose-500' },
+                { name: 'Background Workers', type: 'Services', status: 'normal', color: 'border-zinc-800 text-zinc-400' }
+              ].map((node, i) => (
+                <div key={i} className="flex flex-col items-center">
+                  <div className={`w-full border p-3 rounded-lg text-center font-bold ${node.color}`}>
+                    <p className="text-[11px]">{node.name}</p>
+                    <p className="text-[8.5px] text-zinc-500 font-normal uppercase tracking-wider mt-1">{node.type}</p>
+                  </div>
+                  {i < 4 && (
+                    <div className="h-6 w-px bg-gradient-to-b from-zinc-800 to-transparent md:h-px md:w-full md:bg-gradient-to-r md:from-zinc-800 md:to-transparent my-1 md:my-0" />
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="p-4 bg-zinc-900/10 border border-zinc-900 rounded-lg text-zinc-400 leading-relaxed text-[10.5px]">
+              <span className="text-zinc-200 font-bold">Cascade Alert:</span> Webhook payment processing delays triggered a backlog cascade. The invoice service is waiting for confirmations, causing outbound notification crons to timeout.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 3: WHAT QUEUEWATCH DOES (4-Card) */}
+      <section id="observe" className="py-24 border-t border-zinc-900 bg-zinc-950 px-4 md:px-8 lg:px-12">
+        <div className="max-w-7xl mx-auto space-y-16">
+          <div className="text-center space-y-3">
+            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest font-mono">Platform Capabilities</span>
             <h3 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Zero agents. Complete visibility.
+              Operational Intelligence Made Simple
             </h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 relative">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
               {
-                step: 'Step 1',
-                title: 'Install SDK',
-                code: 'pnpm add @queuewatch/node',
-                desc: 'Import and initialize the telemetry collector within your microservices.'
+                title: 'Observe',
+                icon: Activity,
+                desc: 'Monitor queues, workers, retries, dead-letter queues, deployments, and operational workflows.',
+                color: 'border-indigo-900/60 hover:border-indigo-800/80 text-indigo-400 bg-indigo-950/5'
               },
               {
-                step: 'Step 2',
-                title: 'Stream telemetry',
-                code: 'stream: telemetry',
-                desc: 'QueueWatch receives real-time queue events and worker execution telemetry.'
+                title: 'Detect',
+                icon: AlertTriangle,
+                desc: 'Automatically identify incidents, anomalies, bottlenecks, and system reliability risks.',
+                color: 'border-rose-900/60 hover:border-rose-800/80 text-rose-500 bg-rose-950/5'
               },
               {
-                step: 'Step 3',
-                title: 'Detect incidents',
-                code: 'rules: evaluate',
-                desc: 'Operational anomalies evaluate against SLA limits to detect failures.'
+                title: 'Diagnose',
+                icon: Sparkles,
+                desc: 'Use AI to investigate failures, correlate metrics, and trace exact root causes.',
+                color: 'border-amber-900/60 hover:border-amber-800/80 text-amber-500 bg-amber-950/5'
               },
               {
-                step: 'Step 4',
-                title: 'Investigate',
-                code: 'action: report',
-                desc: 'Isolate root cause stacktraces, payload issues, and downstream cascades.'
+                title: 'Resolve',
+                icon: ShieldCheck,
+                desc: 'Generate copy-paste remediation code, runbooks, and action plans to prevent recurrences.',
+                color: 'border-emerald-900/60 hover:border-emerald-800/80 text-emerald-400 bg-emerald-950/5'
               }
-            ].map((step, idx) => (
-              <div key={idx} className="space-y-3.5 relative">
-                <div className="flex items-center justify-between border-b border-zinc-900 pb-2.5">
-                  <span className="font-mono text-[9px] text-indigo-400 font-bold uppercase tracking-widest">{step.step}</span>
-                  <span className="text-zinc-600 font-mono text-[10px]">#0{idx + 1}</span>
+            ].map((card, i) => {
+              const Icon = card.icon;
+              return (
+                <div key={i} className={`border p-6 rounded-xl space-y-4 transition-all duration-300 ${card.color}`}>
+                  <div className="w-8 h-8 rounded bg-zinc-950 border border-zinc-900 flex items-center justify-center shrink-0 shadow-inner">
+                    <Icon className="w-4.5 h-4.5" />
+                  </div>
+                  <h4 className="text-sm font-extrabold uppercase tracking-wider text-zinc-100 font-mono">{card.title}</h4>
+                  <p className="text-zinc-400 text-xs leading-relaxed">{card.desc}</p>
                 </div>
-                <h4 className="text-sm font-bold text-white">{step.title}</h4>
-                {step.code.includes('pnpm') ? (
-                  <div className="bg-zinc-900 border border-zinc-800 p-2.5 rounded text-[10px] font-mono text-zinc-350 flex items-center justify-between">
-                    <span>{step.code}</span>
-                    <Copy className="w-3.5 h-3.5 text-zinc-500 hover:text-zinc-300 cursor-pointer" onClick={handleCopySdk} />
-                  </div>
-                ) : (
-                  <div className="bg-zinc-950 border border-zinc-900/60 p-2 rounded text-[10px] font-mono text-zinc-500 uppercase tracking-wider text-center">
-                    {step.code}
-                  </div>
-                )}
-                <p className="text-zinc-400 text-xs leading-relaxed">{step.desc}</p>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 4: OPERATIONAL INTELLIGENCE COMPARISON */}
+      <section className="py-24 border-t border-zinc-900 bg-zinc-950/40 px-4 md:px-8 lg:px-12">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+          <div className="lg:col-span-5 space-y-6">
+            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest font-mono">WHY QUEUEWATCH</span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
+              Most observability tools tell you WHAT happened.
+            </h2>
+            <p className="text-zinc-100 font-extrabold text-base leading-snug">
+              QueueWatch helps you understand WHY it happened.
+            </p>
+            <p className="text-zinc-400 text-xs sm:text-sm leading-relaxed">
+              Stop guessing when metrics spike. Instead of looking at raw graphs of queue volumes, get correlated root cause files with clear business impact summaries and instant code-level recommendations.
+            </p>
+          </div>
+
+          {/* Comparison Cards */}
+          <div className="lg:col-span-7 grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-[10.5px]">
+            {/* Traditional */}
+            <div className="bg-zinc-950 border border-zinc-900 p-5 rounded-lg space-y-4">
+              <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest">Traditional Tools</span>
+              <div className="space-y-2 text-zinc-400">
+                <div className="flex items-center justify-between border-b border-zinc-900 pb-2">
+                  <span>Queue Depth:</span>
+                  <span className="text-rose-500 font-bold">8,000</span>
+                </div>
+                <div className="flex items-center justify-between border-b border-zinc-900 pb-2">
+                  <span>Failure Rate:</span>
+                  <span className="text-rose-500 font-bold">34%</span>
+                </div>
+                <div className="flex items-center justify-between border-b border-zinc-900 pb-2">
+                  <span>Worker Latency:</span>
+                  <span className="text-white font-bold">6.2s</span>
+                </div>
               </div>
+              <p className="text-[9.5px] text-zinc-650 italic leading-snug pt-2">
+                Requires SRE team to parse logs, map trace IDs, and query external APIs to find the bug.
+              </p>
+            </div>
+
+            {/* QueueWatch */}
+            <div className="bg-zinc-900/15 border border-indigo-900/60 p-5 rounded-lg space-y-4 shadow-md shadow-indigo-950/20">
+              <span className="text-[9px] text-indigo-400 font-bold uppercase tracking-widest">QueueWatch Engine</span>
+              <div className="space-y-3">
+                <div className="space-y-0.5">
+                  <span className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider">Root Cause:</span>
+                  <p className="text-zinc-100 font-semibold leading-snug">SMTP provider (SendGrid) returned rate limits (HTTP 429).</p>
+                </div>
+                <div className="space-y-0.5">
+                  <span className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider">Business Impact:</span>
+                  <p className="text-zinc-300 leading-snug">Order confirmation emails delayed. Checkout transactions unaffected.</p>
+                </div>
+                <div className="space-y-0.5">
+                  <span className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider">Remediation:</span>
+                  <p className="text-emerald-400 font-bold leading-snug">Throttle worker concurrency limit to 2 nodes during cooling window.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 5: SUPPORTED SYSTEMS */}
+      <section id="systems" className="border-y border-zinc-900 bg-zinc-950/60 py-16 px-4 md:px-8 text-center">
+        <div className="max-w-5xl mx-auto space-y-6">
+          <p className="text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-widest">
+            Built for modern distributed systems
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {[
+              'BullMQ',
+              'RabbitMQ',
+              'Background Jobs',
+              'Webhooks',
+              'Workers',
+              'Cron Jobs',
+              'Event-Driven Services'
+            ].map((system) => (
+              <span
+                key={system}
+                className="bg-zinc-900 border border-zinc-800 text-zinc-300 text-[10.5px] font-mono px-4 py-1.5 rounded-md font-semibold"
+              >
+                {system}
+              </span>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 6: INCIDENT INVESTIGATION */}
+      <section id="diagnose" className="py-24 px-4 md:px-8 lg:px-12 max-w-7xl mx-auto space-y-16">
+        <div className="text-center space-y-3">
+          <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest font-mono">Operational Ledger</span>
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
+            Interactive Incident Investigation
+          </h2>
+          <p className="text-zinc-450 text-xs sm:text-sm max-w-xl mx-auto leading-relaxed">
+            Follow how QueueWatch tracks, correlates, and analyzes incidents automatically from creation to resolution.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+          {/* Steps selector */}
+          <div className="lg:col-span-4 flex flex-col justify-between space-y-2 font-mono text-[10.5px]">
+            {[
+              { title: 'Incident Created', desc: 'SLA rule triggers anomaly detection' },
+              { title: 'Telemetry Collected', desc: 'Worker traces and Redis key dumps isolated' },
+              { title: 'AI Investigation', desc: 'LLM synthesizes exceptions and dependencies' },
+              { title: 'Root Cause Analysis', desc: 'Identifies faulty deployment and payload parameter' },
+              { title: 'Recovery Plan', desc: 'Produces runbook steps and copyable code fixes' }
+            ].map((step, idx) => (
+              <button
+                key={idx}
+                onClick={() => setInvestigationStep(idx)}
+                className={`w-full text-left p-3.5 rounded-lg border transition-all flex items-start space-x-3 ${
+                  investigationStep === idx
+                    ? 'bg-zinc-900 border-zinc-700 text-white'
+                    : 'bg-zinc-950 border-zinc-900 text-zinc-500 hover:text-zinc-350'
+                }`}
+              >
+                <span className="w-5 h-5 rounded-full bg-zinc-950 border border-zinc-800 flex items-center justify-center font-bold font-mono text-[9.5px]">
+                  {idx + 1}
+                </span>
+                <div>
+                  <p className="font-extrabold text-[11px] uppercase tracking-wider">{step.title}</p>
+                  <p className="text-[9.5px] mt-0.5 text-zinc-450">{step.desc}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Interactive UI Mockup */}
+          <div className="lg:col-span-8 bg-zinc-950 border border-zinc-900 rounded-xl p-5 shadow-2xl relative overflow-hidden flex flex-col justify-between font-mono text-[10.5px]">
+            <div className="flex items-center justify-between border-b border-zinc-900 pb-3 text-[9px] text-zinc-500 font-bold uppercase">
+              <span>SRE Diagnostics Console</span>
+              <span>project: shopflow // env: production</span>
+            </div>
+
+            <div className="my-6 space-y-4">
+              {investigationStep === 0 && (
+                <div className="border border-rose-900 bg-rose-950/5 p-4 rounded-lg space-y-2">
+                  <p className="text-[9.5px] text-rose-500 font-bold">STATUS: CRITICAL // SLA VIOLATION</p>
+                  <h4 className="text-zinc-200 font-bold text-[11.5px]">Backlog duration exceeded 120s limit on order_processing.</h4>
+                  <p className="text-zinc-450 text-[10px] leading-relaxed">
+                    Triggered Rule: Critical Queue Failure Rate Trigger (rule_failures) has exceeded the threshold limit of 15% failed jobs over a 60s monitoring window.
+                  </p>
+                </div>
+              )}
+
+              {investigationStep === 1 && (
+                <div className="border border-zinc-800 bg-zinc-900/10 p-4 rounded-lg space-y-3">
+                  <p className="text-[9.5px] text-zinc-400 font-bold">STATE SNAPSHOT: CONTEXT INGESTION</p>
+                  <div className="grid grid-cols-2 gap-3 text-[10px] text-zinc-450">
+                    <div className="bg-zinc-900/40 p-2.5 rounded border border-zinc-900">
+                      <p className="font-bold text-zinc-300">Redis Metrics</p>
+                      <p className="mt-1">Active jobs: 42</p>
+                      <p>Waiting jobs: 432</p>
+                    </div>
+                    <div className="bg-zinc-900/40 p-2.5 rounded border border-zinc-900">
+                      <p className="font-bold text-zinc-300">Worker Status</p>
+                      <p className="mt-1">Worker instances: 2 online</p>
+                      <p>CPU usage: 89.2%</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {investigationStep === 2 && (
+                <div className="border border-indigo-900/60 bg-indigo-950/5 p-4 rounded-lg space-y-2">
+                  <p className="text-[9.5px] text-indigo-400 font-bold">AI TELEMETRY SYNTHESIS</p>
+                  <p className="text-zinc-300 leading-relaxed">
+                    Correlating exceptions logs... Found consecutive <code className="text-rose-400 bg-rose-950/20 px-1 py-0.5 rounded">InvalidAddressError</code> exceptions in the trace logs. Downstream service <code className="text-zinc-200 font-bold">svc_shipping</code> reports target location validation API returned 400 Bad Request.
+                  </p>
+                </div>
+              )}
+
+              {investigationStep === 3 && (
+                <div className="border border-amber-900/60 bg-amber-950/5 p-4 rounded-lg space-y-2">
+                  <p className="text-[9.5px] text-amber-500 font-bold">ROOT CAUSE CORRELATION</p>
+                  <div className="space-y-1">
+                    <p className="font-bold text-zinc-200">1. Failed Deployment Registry:</p>
+                    <p className="text-zinc-450">v1.12.0 deployed by devops@shopflow.io (10m before outage).</p>
+                  </div>
+                  <div className="space-y-1 mt-2">
+                    <p className="font-bold text-zinc-200">2. Mismatched Parameter:</p>
+                    <p className="text-zinc-450">Checkout payloads now include postal code as integer instead of string formats. Downstream validation parser crashes on length parsing checks.</p>
+                  </div>
+                </div>
+              )}
+
+              {investigationStep === 4 && (
+                <div className="border border-emerald-900/60 bg-emerald-950/5 p-4 rounded-lg space-y-3">
+                  <p className="text-[9.5px] text-emerald-400 font-bold">SRE RECOVERY RECIPE</p>
+                  <p className="text-zinc-300">Deploy this pre-enqueue validation schema in your checkout middleware to cast postal code types safely:</p>
+                  <pre className="bg-black/60 border border-zinc-900 p-2.5 rounded text-cyan-400 text-[9.5px] overflow-x-auto">
+{`const payloadSchema = z.object({
+  postalCode: z.string().or(z.number().transform(val => val.toString())),
+});`}
+                  </pre>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-zinc-900 pt-3 flex items-center justify-between text-[8px] text-zinc-650 uppercase font-bold tracking-widest">
+              <span>Investigation state: {investigationStep + 1} / 5</span>
+              <span>traceId: tr_849201a9</span>
+            </div>
           </div>
         </div>
       </section>
 
       {/* SECTION 7: RELIABILITY COPILOT */}
-      <section className="py-24 px-4 md:px-8 lg:px-12 max-w-7xl mx-auto space-y-16">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+      <section id="copilot" className="py-24 border-t border-zinc-900 bg-zinc-950/40 px-4 md:px-8 lg:px-12">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           <div className="lg:col-span-5 space-y-5">
             <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest font-mono">operational intelligence</span>
             <h3 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-sans">
-              Meet your Reliability Copilot.
+              Reliability Copilot
             </h3>
             <p className="text-zinc-400 text-xs sm:text-sm leading-relaxed">
-              Ask operational questions and query system status directly. The copilot correlates logs, queue metrics, and deployment events to deliver trace-grounded SRE facts.
+              QueueWatch acts as an operational copilot, helping engineers investigate incidents, understand failures, and make informed decisions faster without leaving the dashboard console.
             </p>
 
             <div className="space-y-2 font-mono text-[10.5px]">
@@ -640,10 +603,10 @@ monitorQueue(emailQueue, {
                 <button
                   key={idx}
                   onClick={() => setActiveCopilotQuery(idx)}
-                  className={`w-full text-left p-3 rounded border transition-colors flex items-center justify-between font-semibold ${
+                  className={`w-full text-left p-3 rounded-lg border transition-colors flex items-center justify-between font-semibold ${
                     activeCopilotQuery === idx
                       ? 'bg-zinc-900 border-zinc-700 text-white'
-                      : 'bg-zinc-950 border-zinc-900 text-zinc-450 hover:text-zinc-200'
+                      : 'bg-zinc-950 border-zinc-900 text-zinc-500 hover:text-zinc-200'
                   }`}
                 >
                   <span>{item.question}</span>
@@ -681,71 +644,13 @@ monitorQueue(emailQueue, {
         </div>
       </section>
 
-      {/* SECTION 8: FEATURE GRID */}
-      <section id="features" className="py-24 border-t border-zinc-900 bg-zinc-950/20 px-4 md:px-8 lg:px-12">
-        <div className="max-w-7xl mx-auto space-y-12">
-          <div className="text-center space-y-3">
-            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest font-mono">Complete capabilities index</span>
-            <h3 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              An engineering-first diagnostics toolkit.
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              {
-                title: 'Queue Monitoring',
-                icon: Layers,
-                desc: 'Realtime waiting, active, delayed, and throughput metrics straight from Redis memory hashes.'
-              },
-              {
-                title: 'Worker Health',
-                icon: Cpu,
-                desc: 'Tracks active worker threads, concurrency load, CPU limits, and RAM usage ratios.'
-              },
-              {
-                title: 'Incident Investigation',
-                icon: AlertTriangle,
-                desc: 'Deterministic rules audit backlog accumulations, SLA spikes, and high retry loops.'
-              },
-              {
-                title: 'Reliability Scoring',
-                icon: ShieldCheck,
-                desc: 'Calculates active SLA ratings (0-100) per queue based on real operational telemetry.'
-              },
-              {
-                title: 'Predictive Insights',
-                icon: TrendingUp,
-                desc: 'Forecasts storage limits and backlog bounds using deterministic growth rates.'
-              },
-              {
-                title: 'Dead-Letter Recovery',
-                icon: Inbox,
-                desc: 'Inspect failed job parameters, apply schema corrections, and replay with full safety controls.'
-              }
-            ].map((feat, idx) => {
-              const Icon = feat.icon;
-              return (
-                <div key={idx} className="bg-zinc-950 border border-zinc-900 p-6 rounded space-y-3 transition-colors hover:bg-zinc-900/30">
-                  <div className="w-8 h-8 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 flex items-center justify-center shrink-0">
-                    <Icon className="w-4 h-4" />
-                  </div>
-                  <h4 className="font-bold text-white text-sm font-mono">{feat.title}</h4>
-                  <p className="text-zinc-400 text-xs leading-relaxed">{feat.desc}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* SECTION 9: DEVELOPER EXPERIENCE */}
+      {/* SECTION 8: DEVELOPER EXPERIENCE (SDK Integration) */}
       <section className="py-24 border-t border-zinc-900 bg-zinc-950/40 px-4 md:px-8 lg:px-12">
         <div className="max-w-4xl mx-auto space-y-12">
           <div className="text-center space-y-3">
             <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest font-mono">developer experience</span>
             <h3 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Integrate in minutes.
+              Deploy the SDK in minutes.
             </h3>
           </div>
 
@@ -760,17 +665,13 @@ monitorQueue(emailQueue, {
                 <span>{copiedSdk ? 'copied' : 'copy'}</span>
               </button>
             </div>
-            <pre className="text-cyan-400 select-all overflow-x-auto whitespace-pre leading-relaxed p-2.5 bg-black/60 rounded">
-{`import { monitorQueue } from "@queuewatch/node";
-
-monitorQueue(emailQueue, {
-  apiKey: process.env.QUEUEWATCH_API_KEY,
-});`}
+            <pre className="text-cyan-455 select-all overflow-x-auto whitespace-pre leading-relaxed p-2.5 bg-black/60 rounded">
+{sdkCodeText}
             </pre>
           </div>
 
-          <p className="text-center text-zinc-400 text-xs max-w-lg mx-auto leading-relaxed font-mono">
-            No agents. No complex setup. Connect your BullMQ infrastructure and start collecting operational telemetry.
+          <p className="text-center text-zinc-500 text-xs max-w-lg mx-auto leading-relaxed font-mono">
+            No infrastructure agents. No complex sidecars. Connect your queue clients directly and start streaming SRE telemetry metrics in real time.
           </p>
         </div>
       </section>
@@ -779,20 +680,26 @@ monitorQueue(emailQueue, {
       <section className="py-28 border-t border-zinc-900 bg-zinc-950 text-center px-4 md:px-8 lg:px-12 space-y-8">
         <div className="max-w-2xl mx-auto space-y-4">
           <h3 className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
-            Stop guessing. Start understanding.
+            Stop Guessing. Start Understanding.
           </h3>
-          <p className="text-zinc-455 text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
-            Detect, investigate, and prevent failures across your asynchronous systems.
+          <p className="text-zinc-400 text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
+            Turn telemetry into operational intelligence with QueueWatch.
           </p>
         </div>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
           <Link
             href={isAuthenticated() ? "/dashboard" : "/register"}
-            className="w-full sm:w-auto px-6 py-3 rounded bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-extrabold text-sm transition-all shadow-md flex items-center justify-center space-x-2 font-mono"
+            className="w-full sm:w-auto px-6 py-3 rounded bg-zinc-100 hover:bg-zinc-200 text-zinc-955 font-extrabold text-sm transition-all shadow-md flex items-center justify-center space-x-2 font-mono"
           >
-            <span>{isAuthenticated() ? "Go to Dashboard" : "Start Monitoring"}</span>
+            <span>{isAuthenticated() ? "Go to Dashboard" : "Get Started"}</span>
             <ArrowRight className="w-4 h-4" />
+          </Link>
+          <Link
+            href="/docs"
+            className="w-full sm:w-auto px-6 py-3 rounded border border-zinc-850 bg-zinc-900/20 hover:bg-zinc-850 text-zinc-300 font-bold text-sm transition-all flex items-center justify-center font-mono"
+          >
+            <span>View Docs</span>
           </Link>
         </div>
       </section>
@@ -803,31 +710,31 @@ monitorQueue(emailQueue, {
           <div className="space-y-4">
             <h5 className="font-mono text-[10.5px] font-bold text-white uppercase tracking-wider">Product</h5>
             <ul className="space-y-2.5 text-xs text-zinc-400 font-semibold font-mono">
-              <li><Link href="#features" className="hover:text-white transition-colors">Features</Link></li>
-              <li><Link href="#pricing" className="hover:text-white transition-colors">Pricing</Link></li>
-              <li><Link href="#docs" className="hover:text-white transition-colors">Docs</Link></li>
+              <li><Link href="#observe" className="hover:text-white transition-colors">Features</Link></li>
+              <li><Link href="/sdk" className="hover:text-white transition-colors">SDK</Link></li>
+              <li><Link href="/dashboard" className="hover:text-white transition-colors">Dashboard</Link></li>
             </ul>
           </div>
           <div className="space-y-4">
             <h5 className="font-mono text-[10.5px] font-bold text-white uppercase tracking-wider">Resources</h5>
             <ul className="space-y-2.5 text-xs text-zinc-400 font-semibold font-mono">
-              <li><Link href="#blog" className="hover:text-white transition-colors">Blog</Link></li>
-              <li><Link href="#guides" className="hover:text-white transition-colors">Guides</Link></li>
-              <li><Link href="#status" className="hover:text-white transition-colors">Status</Link></li>
+              <li><Link href="/docs" className="hover:text-white transition-colors">Documentation</Link></li>
+              <li><Link href="/docs#api" className="hover:text-white transition-colors">API Reference</Link></li>
+              <li><Link href="/docs" className="hover:text-white transition-colors">Status</Link></li>
             </ul>
           </div>
           <div className="space-y-4">
             <h5 className="font-mono text-[10.5px] font-bold text-white uppercase tracking-wider">Company</h5>
             <ul className="space-y-2.5 text-xs text-zinc-400 font-semibold font-mono">
-              <li><Link href="#about" className="hover:text-white transition-colors">About</Link></li>
-              <li><Link href="#contact" className="hover:text-white transition-colors">Contact</Link></li>
+              <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
+              <li><a href="https://github.com/o1-spec/queuewatch" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">GitHub</a></li>
             </ul>
           </div>
           <div className="space-y-4">
             <h5 className="font-mono text-[10.5px] font-bold text-white uppercase tracking-wider">Legal</h5>
             <ul className="space-y-2.5 text-xs text-zinc-400 font-semibold font-mono">
-              <li><Link href="#privacy" className="hover:text-white transition-colors">Privacy</Link></li>
-              <li><Link href="#terms" className="hover:text-white transition-colors">Terms</Link></li>
+              <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link></li>
+              <li><Link href="/terms" className="hover:text-white transition-colors">Terms</Link></li>
             </ul>
           </div>
         </div>
@@ -839,7 +746,7 @@ monitorQueue(emailQueue, {
             </div>
             <span className="font-bold text-zinc-300">QueueWatch</span>
           </div>
-          <p className="text-[10px]">&copy; {new Date().getFullYear()} QueueWatch. Operational Intelligence Platform. All rights reserved.</p>
+          <p className="text-[10px]">&copy; {new Date().getFullYear()} QueueWatch. Operational Reliability Platform. All rights reserved.</p>
         </div>
       </footer>
     </div>
