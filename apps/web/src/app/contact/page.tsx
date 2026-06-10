@@ -3,14 +3,53 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../context/AuthContext';
-import { ArrowRight, Mail, Send, CheckCircle2, MessageSquare } from 'lucide-react';
+import { ArrowRight, Mail, Send, CheckCircle2, MessageSquare, AlertTriangle } from 'lucide-react';
 import PublicHeader from '../../components/PublicHeader';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 export default function ContactPage() {
-  const { isAuthenticated } = useAuth();
+  const { user } = useAuth();
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (user?.email) {
+      setEmail(user.email);
+    }
+  }, [user]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || !message.trim()) return;
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`${API_URL}/api/auth/contact`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, message }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || 'Failed to transmit query');
+      }
+
+      setSubmitted(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to connect to SRE Support. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="bg-zinc-950 text-zinc-100 min-h-screen relative overflow-x-hidden w-full font-sans antialiased">
@@ -34,6 +73,13 @@ export default function ContactPage() {
         </div>
 
         <div className="w-full max-w-md bg-zinc-950 border border-zinc-900 rounded-xl p-8 shadow-2xl relative overflow-hidden font-sans">
+          {error && (
+            <div className="p-3 bg-rose-955/20 border border-rose-900/30 text-rose-300 text-xs rounded mb-4 flex items-start space-x-2 animate-pulse font-mono">
+              <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+
           {submitted ? (
             <div className="text-center py-8 space-y-4">
               <div className="w-12 h-12 rounded-full border border-emerald-900 bg-emerald-950/20 flex items-center justify-center mx-auto text-emerald-400">
@@ -41,27 +87,24 @@ export default function ContactPage() {
               </div>
               <h3 className="text-white text-lg font-bold">Message Transmitted</h3>
               <p className="text-zinc-400 text-xs max-w-xs mx-auto leading-relaxed">
-                Telemetry received. Our operations team will respond to your queries shortly.
+                Telemetry received. Our operations team will respond to your queries shortly, and a confirmation receipt has been sent to your email.
               </p>
             </div>
           ) : (
             <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!email.trim() || !message.trim()) return;
-                setSubmitted(true);
-              }}
+              onSubmit={handleSubmit}
               className="space-y-4"
             >
               <div className="space-y-1.5">
                 <label className="text-xs text-zinc-400 font-medium">Work Email</label>
                 <input
                   required
+                  disabled={submitting}
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@company.com"
-                  className="w-full bg-zinc-900/40 border border-zinc-900 rounded-md px-3.5 py-2.5 focus:outline-none focus:border-zinc-700 text-xs text-white placeholder-zinc-650 transition-colors font-mono"
+                  className="w-full bg-zinc-900/40 border border-zinc-900 rounded-md px-3.5 py-2.5 focus:outline-none focus:border-zinc-700 text-xs text-white placeholder-zinc-650 transition-colors font-mono disabled:opacity-50"
                 />
               </div>
 
@@ -69,21 +112,22 @@ export default function ContactPage() {
                 <label className="text-xs text-zinc-400 font-medium">Operational Query / Message</label>
                 <textarea
                   required
+                  disabled={submitting}
                   rows={4}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   placeholder="e.g. Setting up custom retry alerts..."
-                  className="w-full bg-zinc-900/40 border border-zinc-900 rounded-md px-3.5 py-2.5 focus:outline-none focus:border-zinc-700 text-xs text-white placeholder-zinc-650 transition-colors font-sans resize-none"
+                  className="w-full bg-zinc-900/40 border border-zinc-900 rounded-md px-3.5 py-2.5 focus:outline-none focus:border-zinc-700 text-xs text-white placeholder-zinc-650 transition-colors font-sans resize-none disabled:opacity-50"
                 />
               </div>
 
               <button
                 type="submit"
-                disabled={!email.trim() || !message.trim()}
+                disabled={submitting || !email.trim() || !message.trim()}
                 className="w-full py-2.5 rounded-md bg-white hover:bg-zinc-100 text-black font-semibold transition-all disabled:opacity-50 flex items-center justify-center space-x-2 text-xs font-mono"
               >
                 <Send className="w-3.5 h-3.5 text-black" />
-                <span>Transmit Query</span>
+                <span>{submitting ? 'Transmitting Query...' : 'Transmit Query'}</span>
               </button>
             </form>
           )}

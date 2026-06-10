@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException, BadRequestException, OnModuleInit } 
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { DbService } from '../db/db.service';
+import { MailService } from './mail.service';
 
 export interface User {
   id: string;
@@ -15,7 +16,8 @@ export interface User {
 export class AuthService implements OnModuleInit {
   constructor(
     private readonly jwtService: JwtService,
-    private readonly dbService: DbService
+    private readonly dbService: DbService,
+    private readonly mailService: MailService
   ) {}
 
   async onModuleInit() {
@@ -54,6 +56,12 @@ export class AuthService implements OnModuleInit {
     };
 
     await this.dbService.saveUser(user);
+
+    // Send Welcome Email asynchronously
+    this.mailService.sendWelcomeEmail(user.email, user.name).catch((err) => {
+      // Log failure but do not fail registration
+      console.error('Failed to send welcome email:', err);
+    });
 
     const payload = { sub: user.id, email: user.email, name: user.name };
     const token = this.jwtService.sign(payload);
@@ -117,5 +125,75 @@ export class AuthService implements OnModuleInit {
       }
     }
     return null;
+  }
+
+  async forgotPassword(email: string) {
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await this.dbService.getUser(normalizedEmail);
+
+    if (user) {
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const redis = this.dbService.getRedis();
+      await redis.set(`queuewatch:otp:${normalizedEmail}`, otpCode, 'EX', 600); // 10 minutes TTL
+
+      // Send OTP email asynchronously
+      this.mailService.sendOtpEmail(normalizedEmail, user.name || user.username || 'Operator', otpCode).catch((err) => {
+        console.error('Failed to send recovery OTP email:', err);
+      });
+    }
+
+    return {
+      message: 'If the email is registered, a recovery OTP has been sent.',
+    };
+  }
+
+  async resetPassword(email: string, otp: string, newPassword?: string) {
+    const normalizedEmail = email.trim().toLowerCase();
+    const redis = this.dbService.getRedis();
+    const cachedOtp = await redis.get(`queuewatch:otp:${normalizedEmail}`);
+
+    if (!cachedOtp || cachedOtp !== otp.trim()) {
+      throw new BadRequestException('Invalid or expired recovery OTP code.');
+    }
+
+    const user = await this.dbService.getUser(normalizedEmail);
+    if (!user) {
+      throw new BadRequestException('User not found.');
+    }
+
+    if (!newPassword || newPassword.trim().length < 6) {
+      throw new BadRequestException('Password must be at least 6 characters long.');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.passwordHash = hashedPassword;
+    await this.dbService.saveUser(user);
+
+    // Clean up OTP key
+    await redis.del(`queuewatch:otp:${normalizedEmail}`);
+
+    return {
+      success: true,
+      message: 'Access key configured successfully. Please sign in with your new password.',
+    };
+  }
+
+  async contactSupport(email: string, message: string) {
+    if (!email || !email.trim()) {
+      throw new BadRequestException('Email is required.');
+    }
+    if (!message || !message.trim()) {
+      throw new BadRequestException('Message is required.');
+    }
+
+    // Call mailService
+    this.mailService.sendContactEmails(email.trim(), message.trim()).catch((err) => {
+      console.error('Failed to process support email dispatch:', err);
+    });
+
+    return {
+      success: true,
+      message: 'Support query received and notifications dispatched.',
+    };
   }
 }
