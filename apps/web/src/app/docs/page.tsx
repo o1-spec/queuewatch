@@ -746,26 +746,26 @@ worker.on('active', (job) => {
             </p>
 
             <div className="border border-zinc-800 rounded-lg overflow-hidden font-mono text-[12px] bg-[#0b0b0d]">
-              <div className="grid grid-cols-12 bg-[#09090b] px-4 py-2.5 text-zinc-400 font-bold border-b border-zinc-800">
-                <div className="col-span-4 font-mono tracking-wider">EVENT STATE</div>
-                <div className="col-span-8 font-mono tracking-wider">TELEMETRY DETAIL</div>
+              <div className="grid grid-cols-1 sm:grid-cols-12 bg-[#09090b] px-4 py-2.5 text-zinc-400 font-bold border-b border-zinc-800">
+                <div className="col-span-1 sm:col-span-4 font-mono tracking-wider">EVENT STATE</div>
+                <div className="col-span-1 sm:col-span-8 font-mono tracking-wider hidden sm:block">TELEMETRY DETAIL</div>
               </div>
               <div className="divide-y divide-zinc-800">
-                <div className="grid grid-cols-12 px-4 py-3 text-zinc-305">
-                  <div className="col-span-4 font-bold text-indigo-400">active</div>
-                  <div className="col-span-8 font-sans leading-relaxed text-zinc-350">Fired when a worker thread pulls a job and begins executing its handler. Starts the execution timer.</div>
+                <div className="grid grid-cols-1 sm:grid-cols-12 px-4 py-3 text-zinc-305 gap-1 sm:gap-0">
+                  <div className="col-span-1 sm:col-span-4 font-bold text-indigo-400">active</div>
+                  <div className="col-span-1 sm:col-span-8 font-sans leading-relaxed text-zinc-350">Fired when a worker thread pulls a job and begins executing its handler. Starts the execution timer.</div>
                 </div>
-                <div className="grid grid-cols-12 px-4 py-3 text-zinc-305">
-                  <div className="col-span-4 font-bold text-indigo-400">completed</div>
-                  <div className="col-span-8 font-sans leading-relaxed text-zinc-350">Fired upon successful job completion, logging processing execution latencies and memory usage.</div>
+                <div className="grid grid-cols-1 sm:grid-cols-12 px-4 py-3 text-zinc-305 gap-1 sm:gap-0">
+                  <div className="col-span-1 sm:col-span-4 font-bold text-indigo-400">completed</div>
+                  <div className="col-span-1 sm:col-span-8 font-sans leading-relaxed text-zinc-350">Fired upon successful job completion, logging processing execution latencies and memory usage.</div>
                 </div>
-                <div className="grid grid-cols-12 px-4 py-3 text-zinc-305">
-                  <div className="col-span-4 font-bold text-indigo-400">failed</div>
-                  <div className="col-span-8 font-sans leading-relaxed text-zinc-350">Fired on job errors, carrying payload exception messages, stack traces, and retries attempts counts.</div>
+                <div className="grid grid-cols-1 sm:grid-cols-12 px-4 py-3 text-zinc-305 gap-1 sm:gap-0">
+                  <div className="col-span-1 sm:col-span-4 font-bold text-indigo-400">failed</div>
+                  <div className="col-span-1 sm:col-span-8 font-sans leading-relaxed text-zinc-350">Fired on job errors, carrying payload exception messages, stack traces, and retries attempts counts.</div>
                 </div>
-                <div className="grid grid-cols-12 px-4 py-3 text-zinc-305">
-                  <div className="col-span-4 font-bold text-indigo-400">stalled</div>
-                  <div className="col-span-8 font-sans leading-relaxed text-zinc-350">Fired when locks expire, indicating crashed or frozen worker execution threads that require rescheduling.</div>
+                <div className="grid grid-cols-1 sm:grid-cols-12 px-4 py-3 text-zinc-305 gap-1 sm:gap-0">
+                  <div className="col-span-1 sm:col-span-4 font-bold text-indigo-400">stalled</div>
+                  <div className="col-span-1 sm:col-span-8 font-sans leading-relaxed text-zinc-350">Fired when locks expire, indicating crashed or frozen worker execution threads that require rescheduling.</div>
                 </div>
               </div>
             </div>

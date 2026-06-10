@@ -102,7 +102,7 @@ export default function AnalyticsReport() {
                 Subsystem Performance Indices
               </h3>
 
-              <div className="border border-zinc-900 rounded overflow-hidden">
+              <div className="border border-zinc-900 rounded overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-zinc-900/30 border-b border-zinc-900 text-zinc-500 font-bold uppercase text-[8px]">

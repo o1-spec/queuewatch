@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+import PublicHeader from '../components/PublicHeader';
 import {
   Terminal,
   Activity,
@@ -139,54 +140,7 @@ monitorQueue(checkoutQueue, {
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f0f11_1px,transparent_1px),linear-gradient(to_bottom,#0f0f11_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
 
       {/* Top fixed navbar */}
-      <header className="border-b border-zinc-900/80 bg-zinc-950/70 backdrop-blur-md fixed top-0 left-0 right-0 z-50 px-4 md:px-8 lg:px-12 h-14 flex items-center justify-between">
-        <div className="flex items-center space-x-2.5">
-          <div className="w-5.5 h-5.5 rounded bg-zinc-100 flex items-center justify-center font-bold text-xs text-black shadow-md font-mono shrink-0">
-            Q
-          </div>
-          <span className="font-mono font-extrabold text-[12px] tracking-wider text-white">QUEUEWATCH</span>
-          <span className="bg-zinc-900 border border-zinc-800 text-zinc-500 font-mono text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider hidden sm:inline">
-            RELIABILITY OP-INTEL
-          </span>
-        </div>
-
-        <nav className="hidden md:flex items-center space-x-6 text-xs font-mono font-semibold text-zinc-400">
-          <Link href="#observe" className="hover:text-white transition-colors">Observe</Link>
-          <Link href="#diagnose" className="hover:text-white transition-colors">Diagnose</Link>
-          <Link href="#copilot" className="hover:text-white transition-colors">Copilot</Link>
-          <Link href="#systems" className="hover:text-white transition-colors">Supported Systems</Link>
-        </nav>
-
-        <div className="flex items-center space-x-3 font-mono">
-          {isAuthenticated() ? (
-            <>
-              <span className="text-[11px] text-zinc-400 hidden sm:inline">
-                SRE: <span className="text-zinc-200 font-semibold">{user?.name || user?.email}</span>
-              </span>
-              <Link
-                href="/dashboard"
-                className="px-4 py-2 rounded border border-zinc-850 bg-zinc-900 hover:bg-zinc-800 text-zinc-100 hover:text-white font-extrabold text-xs transition-all flex items-center space-x-1.5"
-              >
-                <span>Console</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link href="/login" className="text-xs font-bold text-zinc-400 hover:text-white transition-colors px-3.5 py-2">
-                Sign In
-              </Link>
-              <Link
-                href="/register"
-                className="px-4 py-2 rounded border border-zinc-850 bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-extrabold text-xs transition-all flex items-center space-x-1.5"
-              >
-                <span>Get Started</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            </>
-          )}
-        </div>
-      </header>
+      <PublicHeader />
 
       {/* SECTION 1: HERO */}
       <section className="relative px-4 md:px-8 lg:px-12 pt-36 pb-28 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
