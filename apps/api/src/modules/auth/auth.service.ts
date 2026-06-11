@@ -10,6 +10,7 @@ export interface User {
   email: string;
   passwordHash: string;
   createdAt: string;
+  company?: string;
 }
 
 @Injectable()
@@ -37,7 +38,7 @@ export class AuthService implements OnModuleInit {
     }
   }
 
-  async register(name: string, email: string, password: string) {
+  async register(name: string, email: string, password: string, company?: string) {
     const normalizedEmail = email.trim().toLowerCase();
     const existing = await this.dbService.getUser(normalizedEmail);
     
@@ -53,6 +54,7 @@ export class AuthService implements OnModuleInit {
       email: normalizedEmail,
       passwordHash: hashedPassword,
       createdAt: new Date().toISOString(),
+      company: company?.trim() || undefined,
     };
 
     await this.dbService.saveUser(user);
@@ -63,7 +65,7 @@ export class AuthService implements OnModuleInit {
       console.error('Failed to send welcome email:', err);
     });
 
-    const payload = { sub: user.id, email: user.email, name: user.name };
+    const payload = { sub: user.id, email: user.email, name: user.name, company: user.company };
     const token = this.jwtService.sign(payload);
 
     return {
@@ -73,6 +75,7 @@ export class AuthService implements OnModuleInit {
         name: user.name,
         email: user.email,
         createdAt: user.createdAt,
+        company: user.company,
       },
     };
   }
@@ -90,7 +93,7 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException('Invalid credentials.');
     }
 
-    const payload = { sub: user.id, email: user.email, name: user.name };
+    const payload = { sub: user.id, email: user.email, name: user.name, company: user.company };
     const token = this.jwtService.sign(payload);
 
     return {
@@ -100,6 +103,7 @@ export class AuthService implements OnModuleInit {
         name: user.name,
         email: user.email,
         createdAt: user.createdAt,
+        company: user.company,
       },
     };
   }
@@ -120,6 +124,7 @@ export class AuthService implements OnModuleInit {
             name: user.name,
             email: user.email,
             createdAt: user.createdAt,
+            company: user.company,
           };
         }
       }

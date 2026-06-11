@@ -27,6 +27,7 @@ export interface UserProfile {
   name: string;
   email: string;
   createdAt?: string;
+  company?: string;
 }
 
 interface AuthContextType {
@@ -41,7 +42,7 @@ interface AuthContextType {
   fetchProjects: () => Promise<Project[]>;
   createProject: (name: string) => Promise<Project>;
   login: (email: string, password: string) => Promise<UserProfile>;
-  register: (name: string, email: string, password: string) => Promise<UserProfile>;
+  register: (name: string, email: string, password: string, company?: string) => Promise<UserProfile>;
   logout: () => void;
   isAuthenticated: () => boolean;
   authFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -189,11 +190,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return data.user;
   };
 
-  const register = async (name: string, email: string, password: string): Promise<UserProfile> => {
+  const register = async (name: string, email: string, password: string, company?: string): Promise<UserProfile> => {
     const res = await fetch(`${API_URL}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ name, email, password, company }),
     });
 
     if (!res.ok) {

@@ -43,11 +43,7 @@ export default function RegisterPage() {
     setSubmitting(true);
 
     try {
-      await register(name, email, password);
-      // Optional: Log company name on successful registration
-      if (company) {
-        console.log(`Registered workspace under company: ${company}`);
-      }
+      await register(name, email, password, company);
       router.push('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please try again.');

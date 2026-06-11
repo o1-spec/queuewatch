@@ -7,6 +7,7 @@ class RegisterDto {
   name: string;
   email: string;
   password?: string;
+  company?: string;
 }
 
 class LoginDto {
@@ -38,7 +39,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Register a new QueueWatch SRE account' })
   @ApiResponse({ status: 201, description: 'Return signed JWT token and user profile.' })
   async register(@Body() body: RegisterDto) {
-    return this.authService.register(body.name, body.email, body.password || '');
+    return this.authService.register(body.name, body.email, body.password || '', body.company);
   }
 
   @Post('login')

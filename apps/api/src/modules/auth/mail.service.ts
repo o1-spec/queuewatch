@@ -48,41 +48,50 @@ export class MailService {
     const appUrl = this.configService.get<string>('API_URL') || 'http://localhost:3001';
     // Replace port 3001 with 3000 for frontend link in emails
     const frontendUrl = appUrl.replace(':3001', ':3000');
-    const subject = 'Welcome to QueueWatch - Operational Diagnostics Platform';
+    const subject = 'Welcome to QueueWatch 👋';
 
     const htmlContent = `
-      <div style="font-family: monospace; padding: 24px; background-color: #09090b; color: #d4d4d8; border: 1px solid #27272a; max-width: 600px; margin: 0 auto; line-height: 1.6;">
-        <div style="display: flex; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #27272a; padding-bottom: 16px;">
-          <div style="width: 28px; height: 28px; background-color: #e4e4e7; color: #09090b; display: flex; align-items: center; justify-content: center; font-weight: bold; border-radius: 4px; font-size: 16px; margin-right: 12px; font-family: monospace;">Q</div>
-          <div>
-            <h2 style="margin: 0; font-size: 18px; color: #ffffff; letter-spacing: 0.05em; font-family: monospace;">QueueWatch</h2>
-            <p style="margin: 0; font-size: 9px; color: #71717a; text-transform: uppercase; letter-spacing: 0.15em; font-weight: bold;">Telemetry Engine</p>
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; padding: 40px; background-color: #ffffff; color: #27272a; max-width: 560px; margin: 0 auto; line-height: 1.6; border: 1px solid #e4e4e7; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.03);">
+        <!-- Header / Logo -->
+        <div style="margin-bottom: 32px; text-align: left; border-bottom: 1px solid #e4e4e7; padding-bottom: 20px;">
+          <div style="font-size: 20px; font-weight: 800; color: #09090b; letter-spacing: -0.03em; display: inline-flex; align-items: center; line-height: 1;">
+            <span style="background: linear-gradient(135deg, #09090b 0%, #27272a 100%); color: #ffffff; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; margin-right: 10px; font-weight: 900; font-size: 15px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">Q</span>
+            <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">QueueWatch</span>
+          </div>
+          <div style="font-size: 12px; color: #71717a; font-weight: 500; margin-top: 6px; letter-spacing: -0.01em;">
+            Operational Intelligence for Modern Systems
           </div>
         </div>
         
-        <p style="font-size: 13px; margin-top: 0;">Welcome, SRE Operator <strong>${name}</strong>.</p>
+        <!-- Title -->
+        <h2 style="font-size: 22px; font-weight: 700; color: #09090b; margin-top: 0; margin-bottom: 20px; letter-spacing: -0.03em;">Welcome to QueueWatch 👋</h2>
         
-        <p style="font-size: 12px;">Your QueueWatch account has been successfully provisioned. You now have access to our real-time operational diagnostics platform for monitoring background queues, worker performance, and dead-letter queues.</p>
+        <!-- Body -->
+        <p style="font-size: 14px; color: #3f3f46; margin-bottom: 16px;">Hi ${name},</p>
+        <p style="font-size: 14px; color: #3f3f46; margin-bottom: 16px;">Thanks for creating your QueueWatch account.</p>
+        <p style="font-size: 14px; color: #3f3f46; margin-bottom: 16px;">You're now ready to start monitoring your systems, investigate operational incidents, and gain visibility into background workloads and distributed services.</p>
         
-        <div style="background-color: #18181b; border: 1px solid #27272a; padding: 16px; border-radius: 4px; margin: 20px 0; font-size: 11px;">
-          <h4 style="margin: 0 0 8px 0; color: #ffffff; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em;">Console Access Details</h4>
-          <table style="width: 100%; border-collapse: collapse; text-align: left;">
-            <tr><td style="color: #71717a; padding: 4px 0; width: 120px;">Operator Name:</td><td style="color: #ffffff;">${name}</td></tr>
-            <tr><td style="color: #71717a; padding: 4px 0;">Work Email:</td><td style="color: #ffffff;">${email}</td></tr>
-            <tr><td style="color: #71717a; padding: 4px 0;">Telemetry Node:</td><td style="color: #6366f1;">active-node-1</td></tr>
-          </table>
-        </div>
+        <p style="font-size: 14px; font-weight: 600; color: #09090b; margin-top: 24px; margin-bottom: 12px;">To get started:</p>
+        <ol style="font-size: 14px; color: #3f3f46; padding-left: 20px; margin-bottom: 24px; line-height: 1.8;">
+          <li>Create your first project</li>
+          <li>Generate an API key</li>
+          <li>Install the QueueWatch SDK</li>
+          <li>Begin streaming telemetry</li>
+        </ol>
         
-        <p style="font-size: 12px;">Please proceed to your administrator console to create or manage your background processing channels.</p>
+        <p style="font-size: 14px; color: #3f3f46; margin-bottom: 24px;">Once QueueWatch receives telemetry, your dashboard will automatically populate with operational insights, worker health, queue metrics, and incident diagnostics.</p>
         
-        <div style="margin: 24px 0 16px 0; text-align: center;">
-          <a href="${frontendUrl}/login" style="display: inline-block; padding: 10px 20px; background-color: #ffffff; color: #09090b; text-decoration: none; font-weight: bold; font-size: 12px; border-radius: 4px; border: 1px solid #e4e4e7; font-family: monospace;">
-            ACCESS OPERATOR PANEL →
+        <!-- Button -->
+        <div style="margin: 32px 0; text-align: left;">
+          <a href="${frontendUrl}/dashboard" style="display: inline-block; padding: 12px 24px; background-color: #09090b; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; border-radius: 6px;">
+            Go to Dashboard
           </a>
         </div>
         
-        <div style="border-top: 1px solid #27272a; padding-top: 16px; margin-top: 24px; font-size: 10px; color: #52525b; text-align: center;">
-          This is an automated system notification from QueueWatch Engine. Please do not reply directly.
+        <!-- Footer -->
+        <div style="border-top: 1px solid #e4e4e7; padding-top: 24px; margin-top: 32px; font-size: 13px; color: #71717a;">
+          <p style="margin: 0 0 8px 0;">Questions? Contact <a href="mailto:support@queuewatch.dev" style="color: #09090b; font-weight: 500; text-decoration: underline;">support@queuewatch.dev</a></p>
+          <p style="margin: 0; font-size: 12px; color: #a1a1aa;">&copy; 2026 QueueWatch</p>
         </div>
       </div>
     `;
@@ -104,8 +113,8 @@ export class MailService {
 [MAIL FALLBACK] Welcome Email logged for ${email} (${name}):
 -----------------------------------------------------------------
 Subject: ${subject}
-Message: Hello ${name}, your QueueWatch SRE operator account has been created.
-Access Link: ${frontendUrl}/login
+Message: Hello ${name}, welcome to QueueWatch.
+Access Link: ${frontendUrl}/dashboard
 -----------------------------------------------------------------
       `);
     }
@@ -113,31 +122,51 @@ Access Link: ${frontendUrl}/login
 
   async sendOtpEmail(email: string, name: string, otpCode: string) {
     const fromAddress = this.configService.get<string>('SMTP_FROM') || 'noreply@queuewatch.dev';
-    const subject = 'QueueWatch - Access Key Reset Request';
+    const appUrl = this.configService.get<string>('API_URL') || 'http://localhost:3001';
+    const frontendUrl = appUrl.replace(':3001', ':3000');
+    const subject = 'Reset your QueueWatch password';
 
     const htmlContent = `
-      <div style="font-family: monospace; padding: 24px; background-color: #09090b; color: #d4d4d8; border: 1px solid #27272a; max-width: 600px; margin: 0 auto; line-height: 1.6;">
-        <div style="display: flex; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #27272a; padding-bottom: 16px;">
-          <div style="width: 28px; height: 28px; background-color: #f43f5e; color: #09090b; display: flex; align-items: center; justify-content: center; font-weight: bold; border-radius: 4px; font-size: 16px; margin-right: 12px; font-family: monospace;">Q</div>
-          <div>
-            <h2 style="margin: 0; font-size: 18px; color: #ffffff; letter-spacing: 0.05em; font-family: monospace;">QueueWatch</h2>
-            <p style="margin: 0; font-size: 9px; color: #71717a; text-transform: uppercase; letter-spacing: 0.15em; font-weight: bold;">Telemetry Engine</p>
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; padding: 40px; background-color: #ffffff; color: #27272a; max-width: 560px; margin: 0 auto; line-height: 1.6; border: 1px solid #e4e4e7; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.03);">
+        <!-- Header / Logo -->
+        <div style="margin-bottom: 32px; text-align: left; border-bottom: 1px solid #e4e4e7; padding-bottom: 20px;">
+          <div style="font-size: 20px; font-weight: 800; color: #09090b; letter-spacing: -0.03em; display: inline-flex; align-items: center; line-height: 1;">
+            <span style="background: linear-gradient(135deg, #09090b 0%, #27272a 100%); color: #ffffff; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; margin-right: 10px; font-weight: 900; font-size: 15px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">Q</span>
+            <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">QueueWatch</span>
+          </div>
+          <div style="font-size: 12px; color: #71717a; font-weight: 500; margin-top: 6px; letter-spacing: -0.01em;">
+            Operational Intelligence for Modern Systems
           </div>
         </div>
         
-        <p style="font-size: 13px; margin-top: 0;">Attention: SRE Operator <strong>${name}</strong>.</p>
+        <!-- Title -->
+        <h2 style="font-size: 22px; font-weight: 700; color: #09090b; margin-top: 0; margin-bottom: 20px; letter-spacing: -0.03em;">Password Reset Request</h2>
         
-        <p style="font-size: 12px;">We received a request to reset your security access key password. Use the verification OTP code below to configure a new access key. This code is active for <strong>10 minutes</strong>.</p>
+        <!-- Body -->
+        <p style="font-size: 14px; color: #3f3f46; margin-bottom: 16px;">Hi ${name},</p>
+        <p style="font-size: 14px; color: #3f3f46; margin-bottom: 16px;">We received a request to reset your QueueWatch password.</p>
+        <p style="font-size: 14px; color: #3f3f46; margin-bottom: 20px;">Use the verification code below to continue:</p>
         
-        <div style="background-color: #1c1917; border: 1px solid #dc2626; padding: 20px; border-radius: 4px; margin: 20px 0; text-align: center;">
-          <span style="font-size: 10px; color: #f87171; text-transform: uppercase; font-weight: bold; letter-spacing: 0.1em; display: block; margin-bottom: 8px;">Security Recovery OTP</span>
-          <span style="font-size: 28px; color: #ffffff; letter-spacing: 0.25em; font-weight: bold; font-family: monospace; display: block;">${otpCode}</span>
+        <!-- Large Centered Code -->
+        <div style="background-color: #f4f4f5; border-radius: 8px; padding: 24px; text-align: center; margin: 24px 0; border: 1px solid #e4e4e7;">
+          <span style="font-size: 36px; font-weight: 800; color: #09090b; letter-spacing: 0.18em; font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Monaco, Consolas, monospace; display: block; line-height: 1; margin-left: 0.18em;">${otpCode}</span>
         </div>
         
-        <p style="font-size: 11px; color: #a1a1aa;">If you did not initiate this reset request, you can safely ignore this email. Your current access key remains active and unchanged.</p>
+        <p style="font-size: 13px; color: #71717a; margin-top: 16px; margin-bottom: 24px; font-weight: 550;">This code expires in 10 minutes.</p>
         
-        <div style="border-top: 1px solid #27272a; padding-top: 16px; margin-top: 24px; font-size: 10px; color: #52525b; text-align: center;">
-          This is an automated system notification from QueueWatch Engine. Please do not reply directly.
+        <p style="font-size: 14px; color: #3f3f46; margin-bottom: 24px;">If you didn't request a password reset, you can safely ignore this email.</p>
+        
+        <!-- Button -->
+        <div style="margin: 32px 0; text-align: left;">
+          <a href="${frontendUrl}/forgot-password" style="display: inline-block; padding: 12px 24px; background-color: #09090b; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; border-radius: 6px;">
+            Reset Password
+          </a>
+        </div>
+        
+        <!-- Footer -->
+        <div style="border-top: 1px solid #e4e4e7; padding-top: 24px; margin-top: 32px; font-size: 13px; color: #71717a;">
+          <p style="margin: 0 0 8px 0;">Questions? Contact <a href="mailto:support@queuewatch.dev" style="color: #09090b; font-weight: 500; text-decoration: underline;">support@queuewatch.dev</a></p>
+          <p style="margin: 0; font-size: 12px; color: #a1a1aa;">&copy; 2026 QueueWatch</p>
         </div>
       </div>
     `;
@@ -166,61 +195,143 @@ Expiration: 10 Minutes
     }
   }
 
-  async sendContactEmails(email: string, message: string) {
-    const fromAddress = this.configService.get<string>('SMTP_FROM') || 'support@queuewatch.dev';
-    const ticketId = `req_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 4)}`;
+  async sendVerificationEmail(email: string, name: string, verificationCode: string) {
+    const fromAddress = this.configService.get<string>('SMTP_FROM') || 'noreply@queuewatch.dev';
+    const appUrl = this.configService.get<string>('API_URL') || 'http://localhost:3001';
+    const frontendUrl = appUrl.replace(':3001', ':3000');
+    const subject = 'Verify your QueueWatch account';
 
-    const userHtml = `
-      <div style="font-family: monospace; padding: 24px; background-color: #09090b; color: #d4d4d8; border: 1px solid #27272a; max-width: 600px; margin: 0 auto; line-height: 1.6;">
-        <div style="display: flex; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #27272a; padding-bottom: 16px;">
-          <div style="width: 28px; height: 28px; background-color: #e4e4e7; color: #09090b; display: flex; align-items: center; justify-content: center; font-weight: bold; border-radius: 4px; font-size: 16px; margin-right: 12px; font-family: monospace;">Q</div>
-          <div>
-            <h2 style="margin: 0; font-size: 18px; color: #ffffff; letter-spacing: 0.05em; font-family: monospace;">QueueWatch</h2>
-            <p style="margin: 0; font-size: 9px; color: #71717a; text-transform: uppercase; letter-spacing: 0.15em; font-weight: bold;">Telemetry Support</p>
+    const htmlContent = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; padding: 40px; background-color: #ffffff; color: #27272a; max-width: 560px; margin: 0 auto; line-height: 1.6; border: 1px solid #e4e4e7; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.03);">
+        <!-- Header / Logo -->
+        <div style="margin-bottom: 32px; text-align: left; border-bottom: 1px solid #e4e4e7; padding-bottom: 20px;">
+          <div style="font-size: 20px; font-weight: 800; color: #09090b; letter-spacing: -0.03em; display: inline-flex; align-items: center; line-height: 1;">
+            <span style="background: linear-gradient(135deg, #09090b 0%, #27272a 100%); color: #ffffff; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; margin-right: 10px; font-weight: 900; font-size: 15px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">Q</span>
+            <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">QueueWatch</span>
+          </div>
+          <div style="font-size: 12px; color: #71717a; font-weight: 500; margin-top: 6px; letter-spacing: -0.01em;">
+            Operational Intelligence for Modern Systems
           </div>
         </div>
         
-        <p style="font-size: 13px; margin-top: 0;">Hello,</p>
+        <!-- Title -->
+        <h2 style="font-size: 22px; font-weight: 700; color: #09090b; margin-top: 0; margin-bottom: 20px; letter-spacing: -0.03em;">Verify your QueueWatch account</h2>
         
-        <p style="font-size: 12px;">We have successfully received your support query. A member of the QueueWatch reliability operations team will review your ticket (ID: <strong>${ticketId}</strong>) and follow up shortly.</p>
+        <!-- Body -->
+        <p style="font-size: 14px; color: #3f3f46; margin-bottom: 16px;">Hi ${name},</p>
+        <p style="font-size: 14px; color: #3f3f46; margin-bottom: 16px;">Thanks for signing up for QueueWatch. Please use the verification code below to verify your email address:</p>
         
-        <div style="background-color: #18181b; border: 1px solid #27272a; padding: 16px; border-radius: 4px; margin: 20px 0; font-size: 11px;">
-          <h4 style="margin: 0 0 8px 0; color: #ffffff; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em;">Transmission Log Copy</h4>
-          <div style="white-space: pre-wrap; color: #a1a1aa; line-height: 1.5; font-family: monospace;">${message}</div>
+        <!-- Large Centered Code -->
+        <div style="background-color: #f4f4f5; border-radius: 8px; padding: 24px; text-align: center; margin: 24px 0; border: 1px solid #e4e4e7;">
+          <span style="font-size: 36px; font-weight: 800; color: #09090b; letter-spacing: 0.18em; font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Monaco, Consolas, monospace; display: block; line-height: 1; margin-left: 0.18em;">${verificationCode}</span>
         </div>
         
-        <div style="border-top: 1px solid #27272a; padding-top: 16px; margin-top: 24px; font-size: 10px; color: #52525b; text-align: center;">
-          This is an automated receipt confirmation from QueueWatch.
-        </div>
-      </div>
-    `;
-
-    const adminHtml = `
-      <div style="font-family: monospace; padding: 24px; background-color: #09090b; color: #d4d4d8; border: 1px solid #27272a; max-width: 600px; margin: 0 auto; line-height: 1.6;">
-        <div style="display: flex; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #f43f5e; padding-bottom: 16px;">
-          <div style="width: 28px; height: 28px; background-color: #f43f5e; color: #09090b; display: flex; align-items: center; justify-content: center; font-weight: bold; border-radius: 4px; font-size: 16px; margin-right: 12px; font-family: monospace;">Q</div>
-          <div>
-            <h2 style="margin: 0; font-size: 18px; color: #ffffff; letter-spacing: 0.05em; font-family: monospace;">QueueWatch Support</h2>
-            <p style="margin: 0; font-size: 9px; color: #f43f5e; text-transform: uppercase; letter-spacing: 0.15em; font-weight: bold;">New Inbound Query</p>
-          </div>
+        <p style="font-size: 14px; color: #3f3f46; margin-bottom: 24px;">or click the button below to verify your account.</p>
+        
+        <!-- Button -->
+        <div style="margin: 32px 0; text-align: left;">
+          <a href="${frontendUrl}/verify-email?email=${encodeURIComponent(email)}&code=${verificationCode}" style="display: inline-block; padding: 12px 24px; background-color: #09090b; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; border-radius: 6px;">
+            Verify Account
+          </a>
         </div>
         
-        <table style="width: 100%; border-collapse: collapse; text-align: left; margin-bottom: 20px; font-size: 12px;">
-          <tr><td style="color: #71717a; padding: 4px 0; width: 120px;">Ticket ID:</td><td style="color: #ffffff;"><strong>${ticketId}</strong></td></tr>
-          <tr><td style="color: #71717a; padding: 4px 0;">From Operator:</td><td style="color: #ffffff;">${email}</td></tr>
-          <tr><td style="color: #71717a; padding: 4px 0;">Received At:</td><td style="color: #ffffff;">${new Date().toLocaleString()}</td></tr>
-        </table>
-        
-        <div style="background-color: #18181b; border: 1px solid #27272a; padding: 16px; border-radius: 4px; font-size: 11px;">
-          <h4 style="margin: 0 0 8px 0; color: #ffffff; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em;">Query Payload</h4>
-          <div style="white-space: pre-wrap; color: #d4d4d8; line-height: 1.5; font-family: monospace;">${message}</div>
+        <!-- Footer -->
+        <div style="border-top: 1px solid #e4e4e7; padding-top: 24px; margin-top: 32px; font-size: 13px; color: #71717a;">
+          <p style="margin: 0 0 8px 0;">Questions? Contact <a href="mailto:support@queuewatch.dev" style="color: #09090b; font-weight: 500; text-decoration: underline;">support@queuewatch.dev</a></p>
+          <p style="margin: 0; font-size: 12px; color: #a1a1aa;">&copy; 2026 QueueWatch</p>
         </div>
       </div>
     `;
 
     if (this.transporter) {
       try {
-        // Send receipt to operator
+        await this.transporter.sendMail({
+          from: `QueueWatch <${fromAddress}>`,
+          to: email,
+          subject,
+          html: htmlContent,
+        });
+        this.logger.log(`Verification email successfully sent to ${email}.`);
+      } catch (error: any) {
+        this.logger.error(`Failed to send verification email to ${email}:`, error);
+      }
+    } else {
+      this.logger.log(`
+[MAIL FALLBACK] Verification Email logged for ${email} (${name}):
+-----------------------------------------------------------------
+Subject: ${subject}
+Verification Code: ${verificationCode}
+Link: ${frontendUrl}/verify-email?email=${encodeURIComponent(email)}&code=${verificationCode}
+-----------------------------------------------------------------
+      `);
+    }
+  }
+
+  async sendContactEmails(email: string, message: string) {
+    const fromAddress = this.configService.get<string>('SMTP_FROM') || 'support@queuewatch.dev';
+    const ticketId = `req_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 4)}`;
+
+    const userHtml = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; padding: 40px; background-color: #ffffff; color: #27272a; max-width: 560px; margin: 0 auto; line-height: 1.6; border: 1px solid #e4e4e7; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.03);">
+        <!-- Header / Logo -->
+        <div style="margin-bottom: 32px; text-align: left; border-bottom: 1px solid #e4e4e7; padding-bottom: 20px;">
+          <div style="font-size: 20px; font-weight: 800; color: #09090b; letter-spacing: -0.03em; display: inline-flex; align-items: center; line-height: 1;">
+            <span style="background: linear-gradient(135deg, #09090b 0%, #27272a 100%); color: #ffffff; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; margin-right: 10px; font-weight: 900; font-size: 15px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">Q</span>
+            <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">QueueWatch</span>
+          </div>
+          <div style="font-size: 12px; color: #71717a; font-weight: 500; margin-top: 6px; letter-spacing: -0.01em;">
+            Operational Intelligence for Modern Systems
+          </div>
+        </div>
+        
+        <!-- Title -->
+        <h2 style="font-size: 22px; font-weight: 700; color: #09090b; margin-top: 0; margin-bottom: 20px; letter-spacing: -0.03em;">Support Ticket Created</h2>
+        
+        <!-- Body -->
+        <p style="font-size: 14px; color: #3f3f46; margin-bottom: 16px;">Hello,</p>
+        <p style="font-size: 14px; color: #3f3f46; margin-bottom: 16px;">We have successfully received your support query. A member of the QueueWatch reliability operations team will review your ticket (ID: <strong>${ticketId}</strong>) and follow up shortly.</p>
+        
+        <div style="background-color: #f4f4f5; border: 1px solid #e4e4e7; padding: 20px; border-radius: 8px; margin: 24px 0; font-size: 13px;">
+          <h4 style="margin: 0 0 8px 0; color: #09090b; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Monaco, Consolas, monospace;">Transmission Log Copy</h4>
+          <div style="white-space: pre-wrap; color: #52525b; line-height: 1.5; font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Monaco, Consolas, monospace; font-size: 12px;">${message}</div>
+        </div>
+        
+        <!-- Footer -->
+        <div style="border-top: 1px solid #e4e4e7; padding-top: 24px; margin-top: 32px; font-size: 13px; color: #71717a;">
+          <p style="margin: 0 0 8px 0;">Questions? Contact <a href="mailto:support@queuewatch.dev" style="color: #09090b; font-weight: 500; text-decoration: underline;">support@queuewatch.dev</a></p>
+          <p style="margin: 0; font-size: 12px; color: #a1a1aa;">&copy; 2026 QueueWatch</p>
+        </div>
+      </div>
+    `;
+
+    const adminHtml = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; padding: 40px; background-color: #ffffff; color: #27272a; max-width: 560px; margin: 0 auto; line-height: 1.6; border: 1px solid #e4e4e7; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.03);">
+        <!-- Header / Logo -->
+        <div style="margin-bottom: 32px; text-align: left; border-bottom: 1px solid #e4e4e7; padding-bottom: 20px;">
+          <div style="font-size: 20px; font-weight: 800; color: #09090b; letter-spacing: -0.03em; display: inline-flex; align-items: center; line-height: 1;">
+            <span style="background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); color: #ffffff; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; margin-right: 10px; font-weight: 900; font-size: 15px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">Q</span>
+            <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">QueueWatch Support</span>
+          </div>
+          <div style="font-size: 12px; color: #ef4444; font-weight: 500; margin-top: 6px; letter-spacing: -0.01em;">
+            New Inbound Support Ticket
+          </div>
+        </div>
+        
+        <table style="width: 100%; border-collapse: collapse; text-align: left; margin-bottom: 24px; font-size: 13px;">
+          <tr><td style="color: #71717a; padding: 8px 0; width: 130px; border-bottom: 1px solid #f4f4f5;">Ticket ID:</td><td style="color: #09090b; border-bottom: 1px solid #f4f4f5;"><strong>${ticketId}</strong></td></tr>
+          <tr><td style="color: #71717a; padding: 8px 0; border-bottom: 1px solid #f4f4f5;">From Operator:</td><td style="color: #09090b; border-bottom: 1px solid #f4f4f5;">${email}</td></tr>
+          <tr><td style="color: #71717a; padding: 8px 0; border-bottom: 1px solid #f4f4f5;">Received At:</td><td style="color: #09090b; border-bottom: 1px solid #f4f4f5;">${new Date().toLocaleString()}</td></tr>
+        </table>
+        
+        <div style="background-color: #f4f4f5; border: 1px solid #e4e4e7; padding: 20px; border-radius: 8px; font-size: 13px;">
+          <h4 style="margin: 0 0 8px 0; color: #09090b; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Monaco, Consolas, monospace;">Query Payload</h4>
+          <div style="white-space: pre-wrap; color: #27272a; line-height: 1.5; font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Monaco, Consolas, monospace; font-size: 12px;">${message}</div>
+        </div>
+      </div>
+    `;
+
+    if (this.transporter) {
+      try {
         await this.transporter.sendMail({
           from: `QueueWatch Support <${fromAddress}>`,
           to: email,
@@ -233,7 +344,6 @@ Expiration: 10 Minutes
       }
 
       try {
-        // Send notification to support team
         await this.transporter.sendMail({
           from: `QueueWatch System <${fromAddress}>`,
           to: fromAddress, // admin inbox
