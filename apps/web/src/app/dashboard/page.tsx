@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import useSocket from '../../hooks/useSocket';
 import Link from 'next/link';
 import { QueueMetrics, WorkerHealth, QueueName, Incident } from '@queuewatch/shared';
-import { CheckCircle2, Activity, Skull, Clock, AlertTriangle, Play, Sparkles, Server, GitCommit, BellRing, Loader2 } from 'lucide-react';
+import { CheckCircle2, Activity, Skull, Clock, AlertTriangle, Play, Sparkles, Server, GitCommit, BellRing, Loader2, Check, Copy, ArrowRight, Circle } from 'lucide-react';
 import { MetricCard } from '../../components/MetricCard';
 import { QueueCard } from '../../components/QueueCard';
 import { WorkerCard } from '../../components/WorkerCard';
@@ -38,6 +38,12 @@ export default function DashboardOverview() {
   const [aiLoading, setAiLoading] = useState(true);
   const [loadingData, setLoadingData] = useState(true);
   const [copiedText, setCopiedText] = useState<'npm' | 'js' | null>(null);
+
+  // Onboarding & Celebration Flow States
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [wasWaiting, setWasWaiting] = useState(false);
+  const [isCelebrating, setIsCelebrating] = useState(false);
+  const [celebrationStep, setCelebrationStep] = useState(0);
 
   const copyTextToClipboard = (text: string) => {
     if (typeof window === 'undefined') return;
@@ -166,7 +172,10 @@ export default function DashboardOverview() {
   // Polling loop for active connection when telemetry is pending
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    const hasTelemetry = metrics.length > 0 || workers.length > 0 || incidents.length > 0;
+    const hasTelemetry =
+      activeProjectId === 'proj_demo' ||
+      (activeProject && activeProject.hasReceivedTelemetry === true);
+
     if (activeProjectId && !hasTelemetry && !loadingData) {
       interval = setInterval(() => {
         loadData();
@@ -176,17 +185,59 @@ export default function DashboardOverview() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [activeProjectId, metrics.length, workers.length, incidents.length, loadingData]);
+  }, [activeProjectId, activeProject?.hasReceivedTelemetry, loadingData]);
+
+  // Track telemetry status change to trigger celebration
+  useEffect(() => {
+    if (!loadingData && activeProjectId && activeProjectId !== 'proj_demo') {
+      const hasTelemetry = activeProject && activeProject.hasReceivedTelemetry === true;
+      if (!hasTelemetry) {
+        setWasWaiting(true);
+      } else if (hasTelemetry && wasWaiting && !isCelebrating) {
+        setIsCelebrating(true);
+        setWasWaiting(false);
+        setCelebrationStep(0);
+      }
+    }
+  }, [activeProject?.hasReceivedTelemetry, loadingData, activeProjectId, wasWaiting, isCelebrating]);
+
+  // Manage celebration step timers
+  useEffect(() => {
+    if (isCelebrating) {
+      const step1 = setTimeout(() => setCelebrationStep(1), 800);
+      const step2 = setTimeout(() => setCelebrationStep(2), 1600);
+      const step3 = setTimeout(() => setCelebrationStep(3), 2400);
+      const end = setTimeout(() => {
+        setIsCelebrating(false);
+        setCelebrationStep(0);
+      }, 3500);
+      return () => {
+        clearTimeout(step1);
+        clearTimeout(step2);
+        clearTimeout(step3);
+        clearTimeout(end);
+      };
+    }
+  }, [isCelebrating]);
 
   const socketListeners = {
     'metrics.updated': (data: QueueMetrics[]) => {
       setMetrics(data);
     },
     'worker.health.updated': (data: WorkerHealth[]) => {
+      const match = data.find((w: any) => w.projectId === activeProjectId);
+      if (match) {
+        fetchProjects();
+        loadData();
+      }
       setWorkers(data);
       loadAiReport();
     },
     'incident.created': (data: Incident) => {
+      if ((data as any).projectId === activeProjectId) {
+        fetchProjects();
+        loadData();
+      }
       setIncidents((prev) => [data, ...prev.filter(i => i.id !== data.id)]);
       pushLiveEvent(data.affectedQueue, 'DLQ', `NEW INCIDENT: ${data.title}`);
     },
@@ -194,6 +245,10 @@ export default function DashboardOverview() {
       setIncidents((prev) => prev.map(i => i.id === data.id ? data : i));
     },
     'telemetry.event': (data: any) => {
+      if (data.projectId === activeProjectId) {
+        fetchProjects();
+        loadData();
+      }
       if (data.type === 'job.created') {
         pushLiveEvent(data.queueName, 'Created', `Job ${data.jobId} enqueued inside Redis`);
       } else if (data.type === 'job.active') {
@@ -274,86 +329,203 @@ export default function DashboardOverview() {
   if (projects.length === 0) {
     return (
       <div className="min-h-[75vh] flex flex-col items-center justify-center font-sans text-zinc-300 px-4">
-        <div className="w-full max-w-md bg-zinc-950 border border-zinc-900 rounded-xl p-8 space-y-6 shadow-2xl relative overflow-hidden">
+        <div className="w-full max-w-lg bg-zinc-950 border border-zinc-900 rounded-xl p-8 space-y-6 shadow-2xl relative overflow-hidden">
           <div className="absolute -top-20 -left-20 w-40 h-40 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
 
           <div className="space-y-3 text-center relative font-sans">
-            <div className="w-12 h-12 rounded-lg border border-zinc-800 bg-zinc-900 flex items-center justify-center mx-auto mb-3 text-zinc-350">
-              <Activity className="w-6 h-6 text-zinc-400 animate-pulse" />
+            <div className="w-12 h-12 rounded-lg border border-zinc-800 bg-zinc-900 flex items-center justify-center mx-auto mb-3 text-zinc-300">
+              <Activity className="w-6 h-6 text-indigo-400 animate-pulse" />
             </div>
-            <h1 className="text-white text-xl font-bold tracking-tight">
+            <h1 className="text-white text-2xl font-bold tracking-tight font-sans">
               Welcome to QueueWatch
             </h1>
-            <p className="text-zinc-400 leading-relaxed text-sm">
-              Create a project to begin monitoring asynchronous systems, investigate incidents, and improve operational reliability.
+            <p className="text-zinc-405 leading-relaxed text-sm max-w-sm mx-auto font-sans">
+              Let&apos;s connect your first system. Live dashboard updates require an active project connection.
             </p>
           </div>
 
-          <form 
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (!projectName.trim()) return;
-              try {
-                setCreating(true);
-                setError('');
-                const project = await createProject(projectName.trim());
-                if (project) {
-                  router.push('/sdk');
-                }
-              } catch (err: any) {
-                setError(err.message || 'Failed to create project');
-              } finally {
-                setCreating(false);
-              }
-            }}
-            className="space-y-4 relative font-sans"
-          >
-            <div className="space-y-2">
-              <label className="text-xs text-zinc-400 font-medium block">Project Name</label>
-              <input
-                autoFocus
-                type="text"
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                placeholder="e.g. Production Web Service"
-                className="w-full bg-zinc-900/40 border border-zinc-900 rounded-md px-3.5 py-2.5 focus:outline-none focus:border-zinc-700 text-sm text-white placeholder-zinc-650 transition-colors"
-                disabled={creating}
-              />
-            </div>
-
-            {error && (
-              <div className="text-rose-400 text-xs bg-rose-950/10 border border-rose-900/30 p-3 rounded-md">
-                {error}
+          {/* Progress Tracker */}
+          <div className="bg-zinc-900/30 border border-zinc-900/50 p-5 rounded-lg space-y-4 font-sans max-w-md mx-auto w-full">
+            <h3 className="text-[10px] font-bold text-zinc-550 uppercase tracking-widest font-mono">Progress</h3>
+            <div className="space-y-3.5">
+              <div className="flex items-center space-x-3 text-sm">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span className="text-zinc-500 line-through">Create Account</span>
               </div>
-            )}
-
-            <div className="flex flex-col space-y-3 pt-2">
-              <button
-                type="submit"
-                disabled={creating || !projectName.trim()}
-                className="w-full py-2.5 rounded-md bg-white hover:bg-zinc-100 text-black font-semibold transition-all disabled:opacity-50 flex items-center justify-center space-x-2 text-sm"
-              >
-                {creating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin text-black" />
-                    <span>Creating Project...</span>
-                  </>
-                ) : (
-                  <span>Create Project</span>
-                )}
-              </button>
-              
-              <a
-                href="https://docs.queuewatch.dev"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full py-2.5 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-350 border border-zinc-800 text-center font-semibold transition-all text-sm block"
-              >
-                Read Documentation
-              </a>
+              <div className="flex items-center space-x-3 text-sm font-semibold text-white">
+                <ArrowRight className="w-4 h-4 text-indigo-400 shrink-0 animate-pulse" />
+                <span>Create Project</span>
+              </div>
+              <div className="flex items-center space-x-3 text-sm text-zinc-600">
+                <Circle className="w-4 h-4 shrink-0" />
+                <span>Install SDK</span>
+              </div>
+              <div className="flex items-center space-x-3 text-sm text-zinc-600">
+                <Circle className="w-4 h-4 shrink-0" />
+                <span>Connect Application</span>
+              </div>
+              <div className="flex items-center space-x-3 text-sm text-zinc-600">
+                <Circle className="w-4 h-4 shrink-0" />
+                <span>Receive Telemetry</span>
+              </div>
             </div>
-          </form>
+          </div>
+
+          <div className="max-w-md mx-auto pt-2 w-full">
+            {!showCreateForm ? (
+              <button
+                onClick={() => setShowCreateForm(true)}
+                className="w-full py-3 rounded-md bg-white hover:bg-zinc-100 text-black font-semibold transition-all flex items-center justify-center space-x-2 text-sm shadow-lg shadow-white/5"
+              >
+                <span>Create First Project</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            ) : (
+              <form 
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!projectName.trim()) return;
+                  try {
+                    setCreating(true);
+                    setError('');
+                    const project = await createProject(projectName.trim());
+                    if (project) {
+                      router.push('/dashboard');
+                    }
+                  } catch (err: any) {
+                    setError(err.message || 'Failed to create project');
+                  } finally {
+                    setCreating(false);
+                  }
+                }}
+                className="space-y-4 relative font-sans text-left"
+              >
+                <div className="space-y-2">
+                  <label className="text-xs text-zinc-400 font-bold uppercase tracking-wider block">Project Name</label>
+                  <input
+                    autoFocus
+                    type="text"
+                    value={projectName}
+                    onChange={(e) => setProjectName(e.target.value)}
+                    placeholder="e.g. ShopFlow Production"
+                    className="w-full bg-zinc-900/60 border border-zinc-900 rounded-md px-3.5 py-2.5 focus:outline-none focus:border-zinc-700 text-sm text-white placeholder-zinc-650 transition-colors"
+                    disabled={creating}
+                  />
+                </div>
+
+                {error && (
+                  <div className="text-rose-455 text-xs bg-rose-950/10 border border-rose-900/30 p-3 rounded-md">
+                    {error}
+                  </div>
+                )}
+
+                <div className="flex space-x-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateForm(false)}
+                    className="flex-1 py-2.5 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-400 border border-zinc-850 font-semibold transition-all text-sm"
+                    disabled={creating}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={creating || !projectName.trim()}
+                    className="flex-1 py-2.5 rounded-md bg-white hover:bg-zinc-100 text-black font-semibold transition-all disabled:opacity-50 flex items-center justify-center space-x-2 text-sm"
+                  >
+                    {creating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-black" />
+                        <span>Creating Project...</span>
+                      </>
+                    ) : (
+                      <span>Create Project</span>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Celebration Screen when telemetry is first received
+  if (isCelebrating) {
+    const discoveredQueues = metrics.map((q) => q.queueName);
+    const queueCount = metrics.length || 4;
+    const workerCount = workers.length || 5;
+
+    return (
+      <div className="min-h-[75vh] flex flex-col items-center justify-center font-sans text-zinc-300 px-4">
+        <div className="w-full max-w-md bg-zinc-950 border border-zinc-900 rounded-xl p-8 space-y-6 shadow-2xl relative overflow-hidden text-center animate-fade-in">
+          <div className="absolute -top-20 -left-20 w-40 h-40 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+
+          {/* Pulsing check icon */}
+          <div className="relative flex items-center justify-center w-16 h-16 mx-auto bg-emerald-500/10 border border-emerald-500/30 rounded-full text-emerald-400">
+            <CheckCircle2 className="w-8 h-8 animate-pulse text-emerald-400" />
+          </div>
+
+          <div className="space-y-1">
+            <h1 className="text-white text-2xl font-bold tracking-tight">
+              ✓ Application Connected
+            </h1>
+            <p className="text-zinc-500 text-xs font-mono uppercase tracking-wider font-semibold">
+              Telemetry Active
+            </p>
+          </div>
+
+          {/* Sequential Checklist Discovery */}
+          <div className="bg-zinc-900/30 border border-zinc-900/50 p-5 rounded-lg text-left space-y-4 font-sans max-w-sm mx-auto w-full">
+            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest font-mono border-b border-zinc-900 pb-2">Discovered Resources</h3>
+            
+            <div className="space-y-4">
+              {/* Item 1: Discovered Queues */}
+              <div className={`flex items-start space-x-3 transition-opacity duration-300 ${celebrationStep >= 1 ? 'opacity-100' : 'opacity-20'}`}>
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <span className="text-xs font-bold text-white uppercase tracking-wider font-mono">Discovered: {queueCount} Queues</span>
+                  {celebrationStep >= 1 && (
+                    <div className="flex flex-wrap gap-1.5 pt-1.5 animate-slide-up">
+                      {discoveredQueues.length > 0 ? (
+                        discoveredQueues.map((name) => (
+                          <span key={name} className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[10px] font-mono text-zinc-350">
+                            {name}
+                          </span>
+                        ))
+                      ) : (
+                        ['payment_processing', 'email_notifications', 'shipment_updates', 'inventory_sync'].map((name) => (
+                          <span key={name} className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[10px] font-mono text-zinc-450">
+                            {name}
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Item 2: Discovered Workers */}
+              <div className={`flex items-center space-x-3 transition-opacity duration-300 ${celebrationStep >= 2 ? 'opacity-100' : 'opacity-20'}`}>
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span className="text-xs font-bold text-white uppercase tracking-wider font-mono">Discovered: {workerCount} Workers</span>
+              </div>
+
+              {/* Item 3: Configured Services */}
+              <div className={`flex items-center space-x-3 transition-opacity duration-300 ${celebrationStep >= 3 ? 'opacity-100' : 'opacity-20'}`}>
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span className="text-xs font-bold text-white uppercase tracking-wider font-mono">Discovered: 1 Service</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center space-x-2.5 pt-2 text-zinc-550 text-xs">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <span>Redirecting to live dashboard...</span>
+          </div>
         </div>
       </div>
     );
@@ -363,150 +535,190 @@ export default function DashboardOverview() {
     activeProjectId === 'proj_demo' ||
     (activeProject && activeProject.hasReceivedTelemetry === true);
 
-  // 2. SDK Connection Pending wait screen if project exists but has no telemetry
+  // 3. SDK Connection Pending wait screen if project exists but has no telemetry
   if (!hasTelemetry) {
     const activeApiKey = activeProject?.apiKey || 'qw_pk_demo_key';
     const activeProjectIdVal = activeProject?.id || 'proj_demo';
-    const installCommand = 'pnpm add @queuewatch/node';
+    const activeEndpoint = API_URL;
+    const installCommand = 'npm install @queuewatch/node';
     const envExample = `QUEUEWATCH_PROJECT_ID=${activeProjectIdVal}
 QUEUEWATCH_API_KEY=${activeApiKey}
-QUEUEWATCH_ENDPOINT=http://localhost:3001`;
+QUEUEWATCH_ENDPOINT=${activeEndpoint}`;
 
-    const initCode = `monitorQueue(emailQueue, {
-  apiKey: process.env.QUEUEWATCH_API_KEY,
+    const initCode = `const queuewatch = new QueueWatch({
   projectId: process.env.QUEUEWATCH_PROJECT_ID,
-  endpoint: process.env.QUEUEWATCH_ENDPOINT,
-  queueName: "email_notifications",
-});`;
+  apiKey: process.env.QUEUEWATCH_API_KEY,
+});
+
+queuewatch.monitorQueue(emailQueue);`;
 
     return (
-      <div className="min-h-[75vh] flex flex-col items-center justify-center font-sans text-zinc-300 px-4">
-        <div className="w-full max-w-xl bg-zinc-950 border border-zinc-900 rounded-xl p-8 space-y-6 shadow-2xl relative overflow-hidden">
-          <div className="absolute -top-20 -left-20 w-40 h-40 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
-
-          <div className="space-y-3 text-center relative border-b border-zinc-900 pb-5">
-            <div className="flex items-center justify-center space-x-2.5 bg-zinc-900/60 border border-zinc-800 text-zinc-400 px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider mx-auto w-fit">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-              <span>Waiting for telemetry</span>
-            </div>
-            <h1 className="text-white text-xl font-bold tracking-tight mt-2.5">
-              Connect your application
-            </h1>
-            <p className="text-zinc-400 leading-relaxed text-sm max-w-md mx-auto">
-              QueueWatch has not received telemetry for this project yet. Please integrate the SDK to unlock the dashboard.
-            </p>
-          </div>
-
-          <div className="space-y-5 relative">
-            {/* Checklist */}
-            <div className="space-y-3 bg-zinc-900/20 border border-zinc-900/50 p-4 rounded-lg">
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider font-mono">SDK Setup Checklist</h3>
-              <ul className="space-y-2.5 text-zinc-400 text-xs font-sans">
-                <li className="flex items-start space-x-2">
-                  <span className="w-4 h-4 rounded-full bg-indigo-950 border border-indigo-850 text-indigo-400 text-[9px] font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
-                  <span>Copy your Project ID and API Key into your environment variables.</span>
-                </li>
-                <li className="flex items-start space-x-2">
-                  <span className="w-4 h-4 rounded-full bg-indigo-950 border border-indigo-850 text-indigo-400 text-[9px] font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
-                  <span>Install the QueueWatch Node SDK in your application.</span>
-                </li>
-                <li className="flex items-start space-x-2">
-                  <span className="w-4 h-4 rounded-full bg-indigo-950 border border-indigo-850 text-indigo-400 text-[9px] font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
-                  <span>Call <code>monitorQueue()</code> to instrument your BullMQ queue instances.</span>
-                </li>
-                <li className="flex items-start space-x-2">
-                  <span className="w-4 h-4 rounded-full bg-indigo-950 border border-indigo-850 text-indigo-400 text-[9px] font-bold flex items-center justify-center shrink-0 mt-0.5">4</span>
-                  <span>Trigger a job or worker activity to transmit the first telemetry event.</span>
-                </li>
-              </ul>
-            </div>
-
-            {/* Step 1: Install */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-white font-mono uppercase tracking-wide">1. Install command</span>
-              </div>
-              <div className="flex items-center justify-between bg-black/60 border border-zinc-900 rounded-md p-3 font-mono text-xs text-zinc-300">
-                <span className="select-all">{installCommand}</span>
-                <button 
-                  onClick={() => handleCopy(installCommand, 'npm')}
-                  className="text-zinc-500 hover:text-white transition-colors"
-                  title="Copy"
-                >
-                  {copiedText === 'npm' ? (
-                    <span className="text-[10px] font-sans font-medium text-emerald-400">Copied!</span>
-                  ) : (
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Step 2: Env */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-white font-mono uppercase tracking-wide">2. Environment configuration</span>
-                <button 
-                  onClick={() => handleCopy(envExample, 'js')}
-                  className="text-zinc-500 hover:text-white text-[10px] font-sans flex items-center space-x-1"
-                >
-                  {copiedText === 'js' ? (
-                    <span className="text-emerald-400 font-medium">Copied!</span>
-                  ) : (
-                    <>
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                      </svg>
-                      <span>Copy Config</span>
-                    </>
-                  )}
-                </button>
-              </div>
-              <pre className="bg-black/60 border border-zinc-900 rounded-md p-4 font-mono text-xs text-zinc-350 overflow-x-auto leading-normal">
-                {envExample}
-              </pre>
-            </div>
-
-            {/* Step 3: Example Code */}
-            <div className="space-y-2">
-              <span className="text-xs font-semibold text-white font-mono uppercase tracking-wide">3. Initialization snippet</span>
-              <pre className="bg-black/60 border border-zinc-900 rounded-md p-4 font-mono text-xs text-zinc-350 overflow-x-auto leading-normal">
-                {initCode}
-              </pre>
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              <button
-                onClick={() => handleCopy(activeApiKey, 'npm')}
-                className="flex-1 py-2.5 rounded-md bg-zinc-900 hover:bg-zinc-850 text-white font-semibold text-xs border border-zinc-800 transition-all flex items-center justify-center space-x-2"
-              >
-                <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                </svg>
-                <span>Copy API Key</span>
-              </button>
-              
-              <Link
-                href="/sdk"
-                className="flex-1 py-2.5 rounded-md bg-white hover:bg-zinc-100 text-black font-semibold text-xs text-center transition-all block"
-              >
-                View setup guide
-              </Link>
-            </div>
-
-            {/* Waiting Status */}
-            <div className="flex items-center justify-center space-x-2.5 pt-4 border-t border-zinc-900/60">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+      <div className="min-h-[80vh] flex flex-col justify-center font-sans text-zinc-300 px-2 lg:px-4 py-8 animate-fade-in">
+        <div className="w-full max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* Setup Instructions Column */}
+          <div className="lg:col-span-7 bg-zinc-950 border border-zinc-900 rounded-xl p-6 lg:p-8 space-y-6 shadow-2xl relative overflow-hidden">
+            <div className="absolute -top-20 -left-20 w-40 h-40 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+            
+            <div className="border-b border-zinc-900 pb-5">
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium text-[10px] uppercase tracking-wider">
+                Project Created Successfully
               </span>
-              <span className="text-[11px] text-zinc-500 font-medium tracking-wide">Waiting for ingestion status...</span>
+              <h1 className="text-white text-2xl font-bold tracking-tight mt-3">
+                Let&apos;s connect your application
+              </h1>
+              <p className="text-zinc-400 leading-relaxed text-sm mt-1 max-w-lg">
+                Follow these simple steps to integrate the QueueWatch SDK and unlock live telemetry diagnostics.
+              </p>
+            </div>
+
+            <div className="space-y-5">
+              {/* Step 1: Install */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-white uppercase tracking-wider font-mono">1. Install the SDK</span>
+                </div>
+                <div className="flex items-center justify-between bg-black/60 border border-zinc-900 rounded-md p-3.5 font-mono text-xs text-zinc-300">
+                  <span className="select-all">{installCommand}</span>
+                  <button 
+                    onClick={() => handleCopy(installCommand, 'npm')}
+                    className="text-zinc-500 hover:text-white transition-colors"
+                    title="Copy"
+                  >
+                    {copiedText === 'npm' ? (
+                      <span className="text-[10px] font-sans font-medium text-emerald-400 flex items-center space-x-1">
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Copied!</span>
+                      </span>
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Step 2: Config variables */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-white uppercase tracking-wider font-mono">2. Environment configuration</span>
+                  <button 
+                    onClick={() => handleCopy(envExample, 'js')}
+                    className="text-zinc-500 hover:text-white text-xs font-sans flex items-center space-x-1.5"
+                  >
+                    {copiedText === 'js' ? (
+                      <span className="text-emerald-400 font-medium flex items-center space-x-1">
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Copied!</span>
+                      </span>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copy Environment Block</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <pre className="bg-black/60 border border-zinc-900 rounded-md p-4 font-mono text-xs text-zinc-350 overflow-x-auto leading-normal">
+                  {envExample}
+                </pre>
+              </div>
+
+              {/* Step 3: Initialization Snippet */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-white uppercase tracking-wider font-mono">3. Initialize SDK Constructor</span>
+                </div>
+                <pre className="bg-black/60 border border-zinc-900 rounded-md p-4 font-mono text-xs text-zinc-350 overflow-x-auto leading-normal">
+                  {initCode}
+                </pre>
+              </div>
             </div>
           </div>
+
+          {/* Right Status / Dashboard Lock Column */}
+          <div className="lg:col-span-5 space-y-6">
+            
+            {/* Checklist */}
+            <div className="bg-zinc-950 border border-zinc-900 rounded-xl p-6 shadow-xl space-y-4">
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider font-mono border-b border-zinc-900 pb-2">Onboarding Checklist</h3>
+              <div className="space-y-3.5 text-xs">
+                <div className="flex items-center space-x-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <span className="text-zinc-500 line-through">Create Account</span>
+                </div>
+                <div className="flex items-center space-x-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <span className="text-zinc-500 line-through">Create Project</span>
+                </div>
+                <div className="flex items-center space-x-2.5 font-semibold text-white">
+                  <ArrowRight className="w-4 h-4 text-indigo-400 shrink-0 animate-pulse" />
+                  <span>Install SDK</span>
+                </div>
+                <div className="flex items-center space-x-2.5 text-zinc-650">
+                  <Circle className="w-4 h-4 shrink-0" />
+                  <span>Connect Application</span>
+                </div>
+                <div className="flex items-center space-x-2.5 text-zinc-655">
+                  <Circle className="w-4 h-4 shrink-0" />
+                  <span>Receive Telemetry</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Locked Live Status Monitor */}
+            <div className="bg-zinc-950 border border-zinc-900 rounded-xl p-6 shadow-xl space-y-6 relative overflow-hidden">
+              <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+              
+              <div className="space-y-1 pb-4 border-b border-zinc-900">
+                <div className="flex items-center space-x-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                  </span>
+                  <span className="text-xs font-bold text-white uppercase tracking-wider font-mono">Connection Status</span>
+                </div>
+                <h3 className="text-sm font-semibold text-zinc-400 mt-1">No telemetry detected yet</h3>
+              </div>
+
+              {/* Locked stats counters */}
+              <div className="grid grid-cols-2 gap-4 text-xs font-sans">
+                <div className="bg-zinc-900/20 border border-zinc-900 p-3 rounded-lg">
+                  <span className="text-[10px] text-zinc-500 uppercase font-mono block">Last connection</span>
+                  <span className="text-zinc-400 font-semibold font-mono mt-0.5 block">Never</span>
+                </div>
+                <div className="bg-zinc-900/20 border border-zinc-900 p-3 rounded-lg">
+                  <span className="text-[10px] text-zinc-500 uppercase font-mono block">Queues Discovered</span>
+                  <span className="text-zinc-400 font-semibold font-mono mt-0.5 block">0</span>
+                </div>
+                <div className="bg-zinc-900/20 border border-zinc-900 p-3 rounded-lg">
+                  <span className="text-[10px] text-zinc-500 uppercase font-mono block">Workers Discovered</span>
+                  <span className="text-zinc-400 font-semibold font-mono mt-0.5 block">0</span>
+                </div>
+                <div className="bg-zinc-900/20 border border-zinc-900 p-3 rounded-lg">
+                  <span className="text-[10px] text-zinc-500 uppercase font-mono block">Services Discovered</span>
+                  <span className="text-zinc-400 font-semibold font-mono mt-0.5 block">0</span>
+                </div>
+              </div>
+
+              {/* Pulsing Radar Animation */}
+              <div className="bg-black/40 border border-zinc-900/60 rounded-lg p-6 text-center space-y-4">
+                <div className="relative flex items-center justify-center w-20 h-20 mx-auto">
+                  <div className="absolute inset-0 rounded-full bg-indigo-500/10 animate-ping" />
+                  <div className="absolute inset-3 rounded-full bg-indigo-500/20 animate-pulse" />
+                  <div className="relative w-10 h-10 rounded-full bg-zinc-900 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
+                    <Activity className="w-5 h-5 animate-pulse" />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-xs font-semibold text-white">Waiting for QueueWatch SDK connection...</p>
+                  <p className="text-[10px] text-zinc-550 font-mono">Listening on port 3001/ingest...</p>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+
         </div>
       </div>
     );

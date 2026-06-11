@@ -34,7 +34,7 @@ import {
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, loading, isAuthenticated, logout, projects, activeProject, setActiveProjectId, createProject } = useAuth();
+  const { user, loading, isAuthenticated, logout, projects, projectsLoaded, activeProject, setActiveProjectId, createProject } = useAuth();
 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -124,6 +124,18 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       router.push('/login');
     }
   }, [isPublicPath, loading, isAuthenticated, router]);
+
+  // Lock down sub-pages if telemetry is missing
+  useEffect(() => {
+    if (!isPublicPath && !loading && projectsLoaded && isAuthenticated()) {
+      const hasTelemetry = activeProject && (activeProject.id === 'proj_demo' || activeProject.hasReceivedTelemetry === true);
+      const hasNoProjects = projects.length === 0;
+
+      if ((hasNoProjects || !hasTelemetry) && pathname !== '/dashboard') {
+        router.push('/dashboard');
+      }
+    }
+  }, [isPublicPath, loading, projectsLoaded, isAuthenticated, activeProject, projects.length, pathname, router]);
 
   if (loading && !isPublicPath) {
     return (
@@ -563,7 +575,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                     await createProject(newProjectName.trim());
                     setShowCreateProjectModal(false);
                     setNewProjectName('');
-                    router.push('/sdk');
+                    router.push('/dashboard');
                   } catch (err: any) {
                     alert(err.message || 'Failed to create project');
                   } finally {
