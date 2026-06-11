@@ -140,4 +140,18 @@ export class IngestController {
     this.wsGateway.broadcast('worker.health.updated', [{ ...report, projectId }]);
     return { success: true };
   }
+
+  @Post('verify')
+  @ApiOperation({ summary: 'Verify API Key and Project connectivity' })
+  async verifyConnection(
+    @Headers('authorization') authHeader: string,
+    @Body() body: { projectId: string }
+  ) {
+    const { projectId } = await this.authorize(authHeader, body.projectId);
+    const project = await this.dbService.getProject(projectId);
+    return {
+      success: true,
+      projectName: project ? project.name : 'Unknown Project',
+    };
+  }
 }

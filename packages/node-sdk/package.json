@@ -7,7 +7,7 @@
     "build": "tsc"
   },
   "peerDependencies": {
-    "bullmq": "^5.4.1"
+    "bullmq": "^5.0.0"
   },
   "devDependencies": {
     "typescript": "^5.3.3",
