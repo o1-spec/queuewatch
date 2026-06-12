@@ -171,8 +171,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const navItemClass = (path: string) => {
     const active = isActive(path);
     return `flex items-center space-x-3 px-3 py-2 rounded-md text-[13px] font-sans font-medium transition-all ${active
-        ? 'bg-zinc-900 text-white font-semibold'
-        : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40'
+      ? 'bg-zinc-900 text-white font-semibold'
+      : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40'
       }`;
   };
 
@@ -231,8 +231,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                         setShowProjectDropdown(false);
                       }}
                       className={`w-full text-left px-3 py-2 transition-colors flex items-center justify-between ${p.id === (activeProject?.id)
-                          ? 'bg-zinc-900 text-white font-semibold'
-                          : 'text-zinc-400 hover:bg-zinc-900/50 hover:text-white'
+                        ? 'bg-zinc-900 text-white font-semibold'
+                        : 'text-zinc-400 hover:bg-zinc-900/50 hover:text-white'
                         }`}
                     >
                       <span className="truncate">{p.name}</span>
@@ -677,8 +677,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                     }}
                     onMouseEnter={() => setPaletteIndex(index)}
                     className={`flex items-start space-x-3 px-4 py-3 rounded-md cursor-pointer transition-colors ${isSelected
-                        ? 'bg-zinc-900 text-white'
-                        : 'text-zinc-400 hover:bg-zinc-900/40 hover:text-white'
+                      ? 'bg-zinc-900 text-white'
+                      : 'text-zinc-400 hover:bg-zinc-900/40 hover:text-white'
                       }`}
                   >
                     <IconComponent className={`w-4 h-4 shrink-0 mt-0.5 ${isSelected ? 'text-white' : 'text-zinc-500'}`} />
