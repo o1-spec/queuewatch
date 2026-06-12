@@ -427,8 +427,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* ── Main Content Area ─────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen md:pl-56 lg:pl-60">
-        <header className="h-14 border-b border-zinc-900 px-4 md:px-6 flex items-center justify-between bg-zinc-950/40 backdrop-blur-md sticky top-0 z-30 font-sans">
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen md:pl-56 lg:pl-60 pt-14">
+        <header className="fixed top-0 left-0 md:left-56 lg:left-60 right-0 h-14 border-b border-zinc-900 px-4 md:px-6 flex items-center justify-between bg-zinc-950/45 backdrop-blur-md z-30 font-sans">
 
           {/* Left: Hamburger + Project Name + Health Status */}
           <div className="flex items-center space-x-4">
