@@ -2,7 +2,10 @@ export type QueueName =
   | 'email_notifications'
   | 'webhook_delivery'
   | 'image_processing'
-  | 'ai_tasks';
+  | 'ai_tasks'
+  | 'payment_queue'
+  | 'email_queue'
+  | 'webhook_queue';
 
 export type JobStatus = 'waiting' | 'active' | 'completed' | 'failed' | 'delayed' | 'retried' | 'stalled' | 'dead-letter';
 

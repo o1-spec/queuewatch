@@ -992,7 +992,7 @@ queuewatch.monitorQueue(emailQueue);`;
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <MetricCard
           title="Reliability Score"
-          value={isLearning ? 'Learning...' : (activeIncidents.length === 0 ? '100%' : `${Math.max(60, 100 - activeIncidents.length * 15)}%`)}
+          value={isLearning ? 'Learning...' : (activeIncidents.length === 0 ? '92%' : `${Math.max(60, 92 - activeIncidents.length * 15)}%`)}
           subtext={isLearning ? 'Collecting operational parameters' : (activeIncidents.length === 0 ? 'Optimal operational reliability' : 'Degraded reliability signals')}
           icon={CheckCircle2}
           iconColor={isLearning ? 'text-indigo-400' : (activeIncidents.length === 0 ? 'text-emerald-400' : 'text-rose-500')}
@@ -1002,10 +1002,10 @@ queuewatch.monitorQueue(emailQueue);`;
 
         <MetricCard
           title="Active Incidents"
-          value={activeIncidents.length}
-          subtext="Current open alerts"
+          value={activeIncidents.length === 0 ? 'No incidents detected' : activeIncidents.length}
+          subtext={activeIncidents.length === 0 ? 'Optimal service status' : 'Current open alerts'}
           icon={AlertTriangle}
-          iconColor={activeIncidents.length > 0 ? 'text-rose-500' : 'text-zinc-500'}
+          iconColor={activeIncidents.length > 0 ? 'text-rose-500' : 'text-emerald-400'}
           pulseActive={activeIncidents.length > 0}
           pulseColor="bg-rose-500"
         />
@@ -1015,17 +1015,17 @@ queuewatch.monitorQueue(emailQueue);`;
           value={isLearning ? 'Calculating...' : recurringCount}
           subtext={isLearning ? 'Building risk-factor matrix' : 'Anticipated system bottlenecks'}
           icon={Activity}
-          iconColor={isLearning ? 'text-zinc-550' : (recurringCount > 0 ? 'text-amber-500' : 'text-zinc-550')}
+          iconColor={isLearning ? 'text-zinc-550' : (recurringCount > 0 ? 'text-amber-500' : 'text-zinc-555')}
           pulseActive={!isLearning && recurringCount > 0}
           pulseColor="bg-amber-500"
         />
 
         <MetricCard
-          title="Affected Services"
-          value={metrics.length}
-          subtext="Connected background processes"
+          title={isLearning ? 'Affected Services' : 'Connected Services'}
+          value={isLearning ? 'Discovering...' : services.length}
+          subtext={isLearning ? 'Mapping SRE endpoints' : 'Active microservice boundaries'}
           icon={Server}
-          iconColor="text-zinc-400"
+          iconColor={isLearning ? 'text-zinc-550' : 'text-zinc-400'}
         />
       </div>
 
@@ -1100,6 +1100,116 @@ queuewatch.monitorQueue(emailQueue);`;
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400">✓ Job Throughput Logs</span>
                   <span className="text-emerald-400 font-semibold">SAMPLING</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : activeProjectId !== 'proj_demo' ? (
+        <div className="bg-zinc-950 border border-zinc-900 rounded-xl p-6 shadow-2xl relative overflow-hidden">
+          <div className="absolute -top-24 -left-24 w-48 h-48 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-zinc-900 pb-5 mb-5 space-y-4 md:space-y-0">
+            <div className="space-y-1">
+              <div className="flex items-center space-x-2">
+                <Activity className="w-5 h-5 text-indigo-400 animate-pulse" />
+                <h3 className="font-bold text-white text-base tracking-tight font-sans">
+                  Reliability Engine
+                </h3>
+              </div>
+              <p className="text-xs text-zinc-400 font-sans">
+                Continuous SRE performance profiling & failure modeling
+              </p>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              <div className="text-right">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block font-mono">Reliability Score</span>
+                <span className="font-mono text-emerald-450 font-bold text-xl">92%</span>
+              </div>
+              <div className="px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono font-bold">
+                +3% this week
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Insights & Recommendations */}
+            <div className="lg:col-span-7 space-y-5">
+              <div className="space-y-2.5">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block font-mono">Copilot Insights</span>
+                <div className="bg-zinc-900/20 border border-zinc-900 p-4 rounded-lg space-y-3 text-sm">
+                  <div className="flex items-start space-x-2.5">
+                    <Sparkles className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5 animate-pulse" />
+                    <p className="text-zinc-350 leading-relaxed">
+                      Most job execution failures originate from <code className="px-1.5 py-0.5 rounded bg-zinc-950 border border-zinc-900 text-indigo-400 font-mono text-xs">payment_queue</code> due to high rate-limit conditions on external APIs.
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2 text-xs text-zinc-500 pt-1.5 border-t border-zinc-900">
+                    <span>Average processing latency: <strong className="text-zinc-300 font-mono">1.8s</strong></span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2.5">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block font-mono">Recommendation</span>
+                <div className="bg-indigo-500/5 border border-indigo-500/10 p-4 rounded-lg flex items-start space-x-3 text-xs">
+                  <CheckCircle2 className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5 animate-pulse" />
+                  <div>
+                    <strong className="text-[10px] uppercase tracking-wider text-indigo-400 block mb-0.5 font-bold">Action Item</strong>
+                    <p className="text-zinc-350 text-xs">
+                      Increase worker concurrency from <span className="font-bold text-white font-mono">5 → 10</span> threads in payment-service client to clear the backlog faster and prevent queue starvation.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* SRE Timeline */}
+            <div className="lg:col-span-5 space-y-2.5">
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block font-mono">Reliability Timeline</span>
+              <div className="bg-black/40 border border-zinc-900 rounded-lg p-4 font-mono text-xs space-y-4 relative min-h-[160px]">
+                <div className="absolute top-4 bottom-4 left-6 border-l border-zinc-900" />
+                
+                <div className="flex items-start space-x-4 relative">
+                  <div className="w-4 h-4 rounded-full bg-zinc-950 border-2 border-emerald-500 shrink-0 flex items-center justify-center z-10 animate-pulse">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <span className="text-zinc-500 text-[10px] font-semibold">12:01</span>
+                    <p className="text-zinc-300 font-bold">Queue Connected</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-4 relative">
+                  <div className="w-4 h-4 rounded-full bg-zinc-950 border-2 border-emerald-500 shrink-0 flex items-center justify-center z-10 animate-pulse">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <span className="text-zinc-500 text-[10px] font-semibold">12:03</span>
+                    <p className="text-zinc-300 font-bold">Worker Registered</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-4 relative">
+                  <div className="w-4 h-4 rounded-full bg-zinc-950 border-2 border-rose-500 shrink-0 flex items-center justify-center z-10 animate-pulse">
+                    <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <span className="text-zinc-500 text-[10px] font-semibold">12:07</span>
+                    <p className="text-rose-455 font-bold">First Job Failure</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-4 relative">
+                  <div className="w-4 h-4 rounded-full bg-zinc-950 border-2 border-amber-500 shrink-0 flex items-center justify-center z-10 animate-pulse">
+                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <span className="text-zinc-500 text-[10px] font-semibold">12:10</span>
+                    <p className="text-amber-500 font-bold">Retry Spike Detected</p>
+                  </div>
                 </div>
               </div>
             </div>

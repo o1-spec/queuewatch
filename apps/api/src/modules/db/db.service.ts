@@ -452,6 +452,70 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       project.firstTelemetryAt = Date.now();
       await this.redis.set(`queuewatch:project_metadata:${projectId}`, JSON.stringify(project));
       this.logger.log(`Project ${projectId} telemetry state marked as active.`);
+
+      // Automatically create the initial services, queues, and workers mapping!
+      if (projectId !== 'proj_demo') {
+        // Create payment-service
+        const paymentService: Service = {
+          id: 'svc_payment_service',
+          name: 'payment-service',
+          description: 'SRE mapped payment service processing checkouts, webhooks, and client receipts.',
+          environment: 'production',
+          owner: 'payment-team',
+          status: 'healthy',
+          createdAt: Date.now(),
+          queues: ['payment_queue', 'email_queue', 'webhook_queue'],
+          workers: ['worker-1', 'worker-2'],
+          deployments: [],
+          incidents: [],
+        };
+        await this.saveService(paymentService, projectId);
+
+        // Register the queues under the project
+        await this.registerProjectQueue(projectId, 'payment_queue');
+        await this.registerProjectQueue(projectId, 'email_queue');
+        await this.registerProjectQueue(projectId, 'webhook_queue');
+
+        // Create the workers
+        await this.saveWorker({
+          workerId: 'worker-1',
+          queueName: 'payment_queue' as any,
+          status: 'healthy',
+          concurrency: 5,
+          cpuUsage: 12,
+          memoryUsage: 25,
+          lastActive: Date.now(),
+        }, projectId);
+
+        await this.saveWorker({
+          workerId: 'worker-2',
+          queueName: 'email_queue' as any,
+          status: 'healthy',
+          concurrency: 10,
+          cpuUsage: 8,
+          memoryUsage: 30,
+          lastActive: Date.now(),
+        }, projectId);
+
+        // Seed default dependency graph for the project
+        const defaultGraph: DependencyGraph = {
+          nodes: [
+            { id: 'svc_payment_service', label: 'payment-service', type: 'service' },
+            { id: 'payment_queue', label: 'payment_queue', type: 'queue' },
+            { id: 'email_queue', label: 'email_queue', type: 'queue' },
+            { id: 'webhook_queue', label: 'webhook_queue', type: 'queue' }
+          ],
+          edges: [
+            { from: 'svc_payment_service', to: 'payment_queue' },
+            { from: 'svc_payment_service', to: 'email_queue' },
+            { from: 'svc_payment_service', to: 'webhook_queue' }
+          ],
+          serviceImpacts: {
+            svc_payment_service: ['payment_queue', 'email_queue', 'webhook_queue']
+          }
+        };
+        await this.saveDependencyGraph(defaultGraph, projectId);
+      }
     }
   }
 

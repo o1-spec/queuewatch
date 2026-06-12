@@ -285,6 +285,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                   <LayoutDashboard className={navIconClass('/dashboard')} />
                   <span>Dashboard</span>
                 </Link>
+                <Link href="/services" className={navItemClass('/services')}>
+                  <Cpu className={navIconClass('/services')} />
+                  <span>Connected Services</span>
+                </Link>
               </div>
             </div>
 
