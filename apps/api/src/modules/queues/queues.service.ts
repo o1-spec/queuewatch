@@ -24,20 +24,24 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit() {
-    const host = this.configService.get<string>('REDIS_HOST') || 'localhost';
-    const port = this.configService.get<number>('REDIS_PORT') || 6379;
-
-    this.logger.log(`Connecting to Redis broker at redis://${host}:${port}`);
-
-    this.redisConnection = new Redis({
-      host,
-      port,
-      maxRetriesPerRequest: null, // Required by BullMQ
-      retryStrategy: (times) => {
-        const delay = Math.min(times * 100, 3000);
-        return delay;
-      },
-    });
+    const redisUrl = this.configService.get<string>('REDIS_URL');
+    if (redisUrl) {
+      this.logger.log('Connecting to Redis broker using REDIS_URL');
+      this.redisConnection = new Redis(redisUrl, {
+        maxRetriesPerRequest: null, // Required by BullMQ
+        retryStrategy: (times) => Math.min(times * 100, 3000),
+      });
+    } else {
+      const host = this.configService.get<string>('REDIS_HOST') || 'localhost';
+      const port = this.configService.get<number>('REDIS_PORT') || 6379;
+      this.logger.log(`Connecting to Redis broker at redis://${host}:${port}`);
+      this.redisConnection = new Redis({
+        host,
+        port,
+        maxRetriesPerRequest: null, // Required by BullMQ
+        retryStrategy: (times) => Math.min(times * 100, 3000),
+      });
+    }
 
     this.redisConnection.on('connect', () => {
       this.logger.log('Successfully connected to Redis broker.');

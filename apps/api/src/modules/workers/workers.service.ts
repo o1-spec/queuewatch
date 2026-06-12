@@ -1,6 +1,7 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger, Inject, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Worker, Job } from 'bullmq';
+import Redis from 'ioredis';
 import { QueueName } from '@queuewatch/shared';
 import { SimulationConfigService } from '../queues/simulation-config.service';
 import { QueuesService } from '../queues/queues.service';
@@ -27,10 +28,17 @@ export class WorkersService implements OnModuleInit, OnModuleDestroy {
     private telemetryService: TelemetryService,
     private dbService: DbService
   ) {
-    this.redisConnection = {
-      host: this.configService.get<string>('REDIS_HOST') || 'localhost',
-      port: this.configService.get<number>('REDIS_PORT') || 6379,
-    };
+    const redisUrl = this.configService.get<string>('REDIS_URL');
+    if (redisUrl) {
+      this.redisConnection = new Redis(redisUrl, {
+        maxRetriesPerRequest: null,
+      });
+    } else {
+      this.redisConnection = {
+        host: this.configService.get<string>('REDIS_HOST') || 'localhost',
+        port: this.configService.get<number>('REDIS_PORT') || 6379,
+      };
+    }
   }
 
   onModuleInit() {
@@ -263,6 +271,10 @@ export class WorkersService implements OnModuleInit, OnModuleDestroy {
       } catch (e) {}
       await worker.close();
       this.logger.log(`Worker processor for queue "${name}" connection closed.`);
+    }
+    if (this.redisConnection && typeof this.redisConnection.quit === 'function') {
+      await this.redisConnection.quit();
+      this.logger.log('Worker Redis connection closed.');
     }
   }
 }

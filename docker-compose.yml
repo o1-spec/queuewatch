@@ -7,5 +7,31 @@ services:
     ports:
       - "6379:6379"
     restart: unless-stopped
-    # Fast background saving disabled for lightweight demo systems
     command: redis-server --save "" --appendonly no
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: queuewatch-api
+    ports:
+      - "3001:3001"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=your_docker_jwt_secret_change_me
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:3001
+    container_name: queuewatch-web
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    restart: unless-stopped

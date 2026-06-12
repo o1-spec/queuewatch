@@ -17,14 +17,21 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   constructor(private configService: ConfigService) {}
 
   onModuleInit() {
-    const host = this.configService.get<string>('REDIS_HOST') || 'localhost';
-    const port = this.configService.get<number>('REDIS_PORT') || 6379;
+    const redisUrl = this.configService.get<string>('REDIS_URL');
+    if (redisUrl) {
+      this.redis = new Redis(redisUrl, {
+        retryStrategy: (times) => Math.min(times * 100, 3000),
+      });
+    } else {
+      const host = this.configService.get<string>('REDIS_HOST') || 'localhost';
+      const port = this.configService.get<number>('REDIS_PORT') || 6379;
 
-    this.redis = new Redis({
-      host,
-      port,
-      retryStrategy: (times) => Math.min(times * 100, 3000),
-    });
+      this.redis = new Redis({
+        host,
+        port,
+        retryStrategy: (times) => Math.min(times * 100, 3000),
+      });
+    }
 
     this.redis.on('connect', () => {
       this.logger.log('Successfully connected persistent DB client to Redis.');
