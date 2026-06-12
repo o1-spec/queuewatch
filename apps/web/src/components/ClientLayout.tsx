@@ -405,12 +405,12 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      {/* ── Sidebar — mobile: slide-in drawer, md+: static ──────────────── */}
+      {/* ── Sidebar — mobile: slide-in drawer, md+: sticky/fixed ─────────── */}
       <aside
         className={`
           fixed inset-y-0 left-0 z-50 w-64 border-r border-zinc-900 bg-zinc-950 flex flex-col justify-between h-screen
           transform transition-transform duration-300 ease-in-out
-          md:static md:translate-x-0 md:z-auto md:w-56 lg:w-60 md:shrink-0
+          md:sticky md:top-0 md:translate-x-0 md:z-auto md:w-56 lg:w-60 md:shrink-0
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
