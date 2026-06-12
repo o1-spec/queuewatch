@@ -1,5 +1,5 @@
-const PROJECT_ID = 'proj_1781298733903_94v8n1';
-const API_KEY = 'qw_pk_7h592nvn75oapfi1';
+const PROJECT_ID = 'proj_1781301728667_k5undm';
+const API_KEY = 'qw_pk_u25by1t7na1ne7ks';
 const ENDPOINT = 'http://localhost:3001';
 
 console.log(`Starting telemetry simulation for project: ${PROJECT_ID}`);

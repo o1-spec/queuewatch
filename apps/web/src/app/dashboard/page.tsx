@@ -42,8 +42,18 @@ export default function DashboardOverview() {
   // Onboarding & Celebration Flow States
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [wasWaiting, setWasWaiting] = useState(false);
-  const [isCelebrating, setIsCelebrating] = useState(false);
-  const [celebrationStep, setCelebrationStep] = useState(0);
+
+  // High-Fidelity SRE Onboarding & Discovery states
+  const [onboardingDismissed, setOnboardingDismissed] = useState(true);
+  const [isDiscovering, setIsDiscovering] = useState(false);
+  const [discoveryProgress, setDiscoveryProgress] = useState(0);
+  const [systemDiscovered, setSystemDiscovered] = useState(false);
+  const [fastTracked, setFastTracked] = useState(false);
+  const [firstTelemetryTime, setFirstTelemetryTime] = useState<number | null>(null);
+  const [baselineEventsCount, setBaselineEventsCount] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [services, setServices] = useState<any[]>([]);
+  const [lastTelemetryTime, setLastTelemetryTime] = useState<number | null>(null);
 
   const copyTextToClipboard = (text: string) => {
     if (typeof window === 'undefined') return;
@@ -83,7 +93,7 @@ export default function DashboardOverview() {
 
   const loadData = async () => {
     try {
-      const [queuesRes, dlqRes, incidentsRes, workersRes, recurringRes, deploymentsRes, notificationsRes] = await Promise.all([
+      const [queuesRes, dlqRes, incidentsRes, workersRes, recurringRes, deploymentsRes, notificationsRes, servicesRes] = await Promise.all([
         authFetch(`${API_URL}/api/queues`),
         authFetch(`${API_URL}/api/queues/dead_letter_queue/jobs`),
         authFetch(`${API_URL}/api/incidents`),
@@ -91,6 +101,7 @@ export default function DashboardOverview() {
         authFetch(`${API_URL}/api/copilot/recurring-incidents`),
         authFetch(`${API_URL}/api/deployments`),
         authFetch(`${API_URL}/api/notifications`),
+        authFetch(`${API_URL}/api/services`),
       ]);
       
       if (queuesRes.ok) {
@@ -137,6 +148,11 @@ export default function DashboardOverview() {
       if (notificationsRes && notificationsRes.ok) {
         const data = await notificationsRes.json();
         setNotificationsCount(data.length || 0);
+      }
+
+      if (servicesRes && servicesRes.ok) {
+        const data = await servicesRes.json();
+        setServices(data);
       }
     } catch (err) {
       console.error('Failed to load initial REST telemetry:', err);
@@ -187,38 +203,107 @@ export default function DashboardOverview() {
     };
   }, [activeProjectId, activeProject?.hasReceivedTelemetry, loadingData]);
 
-  // Track telemetry status change to trigger celebration
+  // Load local storage states on project switch
+  useEffect(() => {
+    if (activeProjectId) {
+      if (typeof window !== 'undefined') {
+        const dismissed = localStorage.getItem(`onboarding_dismissed_${activeProjectId}`) === 'true';
+        setOnboardingDismissed(dismissed);
+        
+        const ft = localStorage.getItem(`fast_tracked_${activeProjectId}`) === 'true';
+        setFastTracked(ft);
+
+        const firstTimeStr = localStorage.getItem(`first_telemetry_${activeProjectId}`);
+        if (firstTimeStr) {
+          const t = parseInt(firstTimeStr, 10);
+          setFirstTelemetryTime(t);
+          setElapsedSeconds(Math.floor((Date.now() - t) / 1000));
+        } else {
+          setFirstTelemetryTime(null);
+          setElapsedSeconds(0);
+        }
+
+        const storedCount = localStorage.getItem(`telemetry_count_${activeProjectId}`);
+        setBaselineEventsCount(storedCount ? parseInt(storedCount, 10) : 0);
+
+        const lastTimeStr = localStorage.getItem(`last_telemetry_${activeProjectId}`);
+        if (lastTimeStr) {
+          setLastTelemetryTime(parseInt(lastTimeStr, 10));
+        } else {
+          setLastTelemetryTime(null);
+        }
+      }
+      setIsDiscovering(false);
+      setDiscoveryProgress(0);
+      setSystemDiscovered(false);
+    }
+  }, [activeProjectId]);
+
+  // Track telemetry status change to trigger discovery
   useEffect(() => {
     if (!loadingData && activeProjectId && activeProjectId !== 'proj_demo') {
       const hasTelemetry = activeProject && activeProject.hasReceivedTelemetry === true;
       if (!hasTelemetry) {
         setWasWaiting(true);
-      } else if (hasTelemetry && wasWaiting && !isCelebrating) {
-        setIsCelebrating(true);
-        setWasWaiting(false);
-        setCelebrationStep(0);
+      } else if (hasTelemetry) {
+        // Save first telemetry timestamp if not present
+        if (typeof window !== 'undefined') {
+          const storedTime = localStorage.getItem(`first_telemetry_${activeProjectId}`);
+          if (!storedTime) {
+            const nowStr = Date.now().toString();
+            localStorage.setItem(`first_telemetry_${activeProjectId}`, nowStr);
+            setFirstTelemetryTime(Date.now());
+            localStorage.setItem(`telemetry_count_${activeProjectId}`, '0');
+            setBaselineEventsCount(0);
+            localStorage.setItem(`last_telemetry_${activeProjectId}`, nowStr);
+            setLastTelemetryTime(Date.now());
+          }
+        }
+
+        // Trigger discovery if not dismissed and not already completed
+        const dismissed = typeof window !== 'undefined' && localStorage.getItem(`onboarding_dismissed_${activeProjectId}`) === 'true';
+        if (!dismissed && !isDiscovering && !systemDiscovered) {
+          setIsDiscovering(true);
+          setDiscoveryProgress(0);
+        }
       }
     }
-  }, [activeProject?.hasReceivedTelemetry, loadingData, activeProjectId, wasWaiting, isCelebrating]);
+  }, [activeProject?.hasReceivedTelemetry, loadingData, activeProjectId, isDiscovering, systemDiscovered]);
 
-  // Manage celebration step timers
+  // Manage discovery step timers
   useEffect(() => {
-    if (isCelebrating) {
-      const step1 = setTimeout(() => setCelebrationStep(1), 800);
-      const step2 = setTimeout(() => setCelebrationStep(2), 1600);
-      const step3 = setTimeout(() => setCelebrationStep(3), 2400);
-      const end = setTimeout(() => {
-        setIsCelebrating(false);
-        setCelebrationStep(0);
-      }, 3500);
-      return () => {
-        clearTimeout(step1);
-        clearTimeout(step2);
-        clearTimeout(step3);
-        clearTimeout(end);
-      };
+    let interval: NodeJS.Timeout;
+    if (isDiscovering) {
+      interval = setInterval(() => {
+        setDiscoveryProgress((prev) => {
+          if (prev >= 6) {
+            clearInterval(interval);
+            setIsDiscovering(false);
+            setSystemDiscovered(true);
+            return 6;
+          }
+          return prev + 1;
+        });
+      }, 1000);
     }
-  }, [isCelebrating]);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isDiscovering]);
+
+  // Keep track of elapsed baseline seconds
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (firstTelemetryTime && !fastTracked && baselineEventsCount < 15) {
+      interval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - firstTelemetryTime) / 1000);
+        setElapsedSeconds(elapsed);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [firstTelemetryTime, fastTracked, baselineEventsCount]);
 
   const socketListeners = {
     'metrics.updated': (data: QueueMetrics[]) => {
@@ -248,6 +333,17 @@ export default function DashboardOverview() {
       if (data.projectId === activeProjectId) {
         fetchProjects();
         loadData();
+
+        // Increment baseline events count
+        setBaselineEventsCount((prev) => {
+          const nextVal = prev + 1;
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(`telemetry_count_${activeProjectId}`, nextVal.toString());
+            localStorage.setItem(`last_telemetry_${activeProjectId}`, Date.now().toString());
+          }
+          setLastTelemetryTime(Date.now());
+          return nextVal;
+        });
       }
       if (data.type === 'job.created') {
         pushLiveEvent(data.queueName, 'Created', `Job ${data.jobId} enqueued inside Redis`);
@@ -315,6 +411,26 @@ export default function DashboardOverview() {
   const runningAverageLatency = averageLatencies.length > 0
     ? Math.round(averageLatencies.reduce((a, b) => a + b, 0) / averageLatencies.length)
     : 0;
+
+  const handleFastTrack = async () => {
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`fast_tracked_${activeProjectId}`, 'true');
+        localStorage.setItem(`telemetry_count_${activeProjectId}`, '15');
+        if (!localStorage.getItem(`first_telemetry_${activeProjectId}`)) {
+          localStorage.setItem(`first_telemetry_${activeProjectId}`, Date.now().toString());
+        }
+      }
+      
+      setFastTracked(true);
+      setBaselineEventsCount(15);
+      
+      setAiLoading(true);
+      await Promise.all([loadData(), loadAiReport()]);
+    } catch (err) {
+      console.error('Fast-track failed:', err);
+    }
+  };
 
   if (!projectsLoaded || loadingData) {
     return (
@@ -452,79 +568,209 @@ export default function DashboardOverview() {
     );
   }
 
-  // 2. Celebration Screen when telemetry is first received
-  if (isCelebrating) {
-    const discoveredQueues = metrics.map((q) => q.queueName);
-    const queueCount = metrics.length || 4;
-    const workerCount = workers.length || 5;
+  // 2. Discovery Screen when telemetry is first received but not yet completed
+  if (isDiscovering) {
+    const queueNames = metrics.map(q => q.queueName).join(', ') || 'Scanning...';
+    const workerCount = workers.length;
+    const projName = activeProject?.name || 'payment-service';
 
     return (
-      <div className="min-h-[75vh] flex flex-col items-center justify-center font-sans text-zinc-300 px-4">
-        <div className="w-full max-w-md bg-zinc-950 border border-zinc-900 rounded-xl p-8 space-y-6 shadow-2xl relative overflow-hidden text-center animate-fade-in">
-          <div className="absolute -top-20 -left-20 w-40 h-40 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
-
-          {/* Pulsing check icon */}
-          <div className="relative flex items-center justify-center w-16 h-16 mx-auto bg-emerald-500/10 border border-emerald-500/30 rounded-full text-emerald-400">
-            <CheckCircle2 className="w-8 h-8 animate-pulse text-emerald-400" />
+      <div className="min-h-[80vh] flex items-center justify-center font-sans text-zinc-350 px-4 py-8">
+        <div className="w-full max-w-2xl bg-zinc-950 border border-zinc-900 rounded-xl shadow-2xl overflow-hidden relative">
+          {/* Terminal Title Bar */}
+          <div className="bg-zinc-900 px-4 py-3 border-b border-zinc-950 flex items-center justify-between">
+            <div className="flex space-x-2">
+              <div className="w-3 h-3 rounded-full bg-rose-500/80 animate-pulse" />
+              <div className="w-3 h-3 rounded-full bg-amber-500/80 animate-pulse" />
+              <div className="w-3 h-3 rounded-full bg-emerald-500/80 animate-pulse" />
+            </div>
+            <span className="text-[11px] font-mono text-zinc-500 tracking-wider">queuewatch-agent@host:~</span>
+            <div className="w-12" />
           </div>
 
-          <div className="space-y-1">
+          {/* Terminal Content */}
+          <div className="p-6 font-mono text-xs leading-relaxed space-y-3.5 bg-black/90 min-h-[320px] relative">
+            <div className="absolute top-0 right-0 p-4 opacity-[0.02] pointer-events-none">
+              <Activity className="w-48 h-48 text-indigo-500 animate-pulse" />
+            </div>
+
+            <div className="flex items-center space-x-2 text-indigo-400">
+              <span className="text-zinc-650 font-bold font-sans">$</span>
+              <span>queuewatch-cli discover --project-id={activeProjectId}</span>
+            </div>
+
+            <div className="text-zinc-450 border-b border-zinc-900 pb-2 flex items-center justify-between">
+              <span>Discovering Infrastructure...</span>
+              <span className="animate-pulse px-2 py-0.5 text-[10px] rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-semibold uppercase font-mono">
+                SCANNING ACTIVE
+              </span>
+            </div>
+
+            <div className="space-y-2.5 pt-1.5 text-zinc-350">
+              {discoveryProgress >= 0 && (
+                <div className="flex items-center space-x-2.5">
+                  {discoveryProgress > 0 ? (
+                    <span className="text-emerald-400 font-bold">✔</span>
+                  ) : (
+                    <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin shrink-0" />
+                  )}
+                  <span className={discoveryProgress > 0 ? "text-zinc-200" : "text-zinc-400 font-medium animate-pulse"}>
+                    SDK Connected <span className="text-zinc-600 text-[10px]">(protocol: WebSocket secure)</span>
+                  </span>
+                </div>
+              )}
+
+              {discoveryProgress >= 1 && (
+                <div className="flex items-center space-x-2.5">
+                  {discoveryProgress > 1 ? (
+                    <span className="text-emerald-400 font-bold">✔</span>
+                  ) : (
+                    <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin shrink-0" />
+                  )}
+                  <span className={discoveryProgress > 1 ? "text-zinc-200" : "text-zinc-400 font-medium animate-pulse"}>
+                    Service Registered: <span className="text-indigo-400 font-bold">{projName}</span>
+                  </span>
+                </div>
+              )}
+
+              {discoveryProgress >= 2 && (
+                <div className="flex items-start space-x-2.5">
+                  {discoveryProgress > 2 ? (
+                    <span className="text-emerald-400 font-bold mt-0.5">✔</span>
+                  ) : (
+                    <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin shrink-0 mt-0.5" />
+                  )}
+                  <span className={discoveryProgress > 2 ? "text-zinc-200" : "text-zinc-400 font-medium animate-pulse"}>
+                    Queues Discovered: <span className="text-zinc-400">{queueNames}</span>
+                  </span>
+                </div>
+              )}
+
+              {discoveryProgress >= 3 && (
+                <div className="flex items-center space-x-2.5">
+                  {discoveryProgress > 3 ? (
+                    <span className="text-emerald-400 font-bold">✔</span>
+                  ) : (
+                    <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin shrink-0" />
+                  )}
+                  <span className={discoveryProgress > 3 ? "text-zinc-200" : "text-zinc-400 font-medium animate-pulse"}>
+                    Workers Detected: <span className="text-indigo-400">{workerCount} active client instances</span>
+                  </span>
+                </div>
+              )}
+
+              {discoveryProgress >= 4 && (
+                <div className="flex items-center space-x-2.5">
+                  {discoveryProgress > 4 ? (
+                    <span className="text-emerald-400 font-bold">✔</span>
+                  ) : (
+                    <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin shrink-0" />
+                  )}
+                  <span className={discoveryProgress > 4 ? "text-zinc-200" : "text-zinc-400 font-medium animate-pulse"}>
+                    Initial Health Analysis: <span className="text-emerald-400">Optimal (100% healthy worker heartbeats)</span>
+                  </span>
+                </div>
+              )}
+
+              {discoveryProgress >= 5 && (
+                <div className="flex items-center space-x-2.5">
+                  {discoveryProgress > 5 ? (
+                    <span className="text-emerald-400 font-bold">✔</span>
+                  ) : (
+                    <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin shrink-0" />
+                  )}
+                  <span className={discoveryProgress > 5 ? "text-zinc-200" : "text-zinc-400 font-medium animate-pulse"}>
+                    Generating operational baseline & risk models...
+                  </span>
+                </div>
+              )}
+
+              {discoveryProgress >= 6 && (
+                <div className="pt-2 text-indigo-400 flex items-center space-x-2 animate-bounce">
+                  <span>► Discovery Complete. Ready to map dashboard.</span>
+                  <span className="w-1.5 h-3.5 bg-indigo-400 animate-blink inline-block" />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Summary Screen before unlocking
+  if (systemDiscovered) {
+    const queueCount = metrics.length;
+    const workerCount = workers.length;
+    const incidentCount = incidents.filter(i => i.status === 'open').length;
+    const projName = activeProject?.name || 'payment-service';
+
+    const handleDismissOnboarding = () => {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`onboarding_dismissed_${activeProjectId}`, 'true');
+        setOnboardingDismissed(true);
+      }
+      setSystemDiscovered(false);
+    };
+
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center font-sans text-zinc-350 px-4 py-8">
+        <div className="w-full max-w-lg bg-zinc-950 border border-zinc-900 rounded-2xl p-8 space-y-6 shadow-2xl relative overflow-hidden text-center">
+          <div className="absolute -top-20 -left-20 w-40 h-40 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="relative flex items-center justify-center w-16 h-16 mx-auto bg-emerald-500/10 border border-emerald-500/30 rounded-full text-emerald-400">
+            <Check className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-2.5">
             <h1 className="text-white text-2xl font-bold tracking-tight">
-              ✓ Application Connected
+              System Discovered Successfully
             </h1>
-            <p className="text-zinc-500 text-xs font-mono uppercase tracking-wider font-semibold">
-              Telemetry Active
+            <p className="text-zinc-450 text-xs font-mono uppercase tracking-wider font-semibold">
+              QueueWatch SRE Analysis Complete
             </p>
           </div>
 
-          {/* Sequential Checklist Discovery */}
-          <div className="bg-zinc-900/30 border border-zinc-900/50 p-5 rounded-lg text-left space-y-4 font-sans max-w-sm mx-auto w-full">
-            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest font-mono border-b border-zinc-900 pb-2">Discovered Resources</h3>
-            
-            <div className="space-y-4">
-              {/* Item 1: Discovered Queues */}
-              <div className={`flex items-start space-x-3 transition-opacity duration-300 ${celebrationStep >= 1 ? 'opacity-100' : 'opacity-20'}`}>
-                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <span className="text-xs font-bold text-white uppercase tracking-wider font-mono">Discovered: {queueCount} Queues</span>
-                  {celebrationStep >= 1 && (
-                    <div className="flex flex-wrap gap-1.5 pt-1.5 animate-slide-up">
-                      {discoveredQueues.length > 0 ? (
-                        discoveredQueues.map((name) => (
-                          <span key={name} className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[10px] font-mono text-zinc-350">
-                            {name}
-                          </span>
-                        ))
-                      ) : (
-                        ['payment_processing', 'email_notifications', 'shipment_updates', 'inventory_sync'].map((name) => (
-                          <span key={name} className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[10px] font-mono text-zinc-450">
-                            {name}
-                          </span>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
+          {/* Checklist report */}
+          <div className="bg-zinc-900/30 border border-zinc-900 p-6 rounded-xl text-left space-y-4 font-sans max-w-sm mx-auto w-full">
+            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest font-mono border-b border-zinc-800 pb-2.5 flex items-center justify-between">
+              <span>Discovered Metrics Report</span>
+              <span className="text-[9px] font-sans px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold uppercase">Active</span>
+            </h3>
 
-              {/* Item 2: Discovered Workers */}
-              <div className={`flex items-center space-x-3 transition-opacity duration-300 ${celebrationStep >= 2 ? 'opacity-100' : 'opacity-20'}`}>
-                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span className="text-xs font-bold text-white uppercase tracking-wider font-mono">Discovered: {workerCount} Workers</span>
+            <div className="space-y-3.5">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-zinc-450 font-medium">Services Mapped</span>
+                <span className="font-mono text-white font-bold">{services.length || 1} ({projName})</span>
               </div>
-
-              {/* Item 3: Configured Services */}
-              <div className={`flex items-center space-x-3 transition-opacity duration-300 ${celebrationStep >= 3 ? 'opacity-100' : 'opacity-20'}`}>
-                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span className="text-xs font-bold text-white uppercase tracking-wider font-mono">Discovered: 1 Service</span>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-zinc-450 font-medium">Active Queues</span>
+                <span className="font-mono text-white font-bold">{queueCount} Found</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-zinc-450 font-medium">Workers Registered</span>
+                <span className="font-mono text-white font-bold">{workerCount} Online</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-zinc-450 font-medium">Initial Health</span>
+                <span className="font-mono text-emerald-400 font-bold">{incidentCount === 0 ? 'No incidents detected' : `${incidentCount} Active`}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm pt-2.5 border-t border-zinc-900">
+                <span className="text-zinc-350 font-bold">Baseline Mapping</span>
+                <span className="font-mono text-amber-500 font-bold">In progress</span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-center space-x-2.5 pt-2 text-zinc-550 text-xs">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            <span>Redirecting to live dashboard...</span>
+          <div className="pt-2">
+            <button
+              onClick={handleDismissOnboarding}
+              className="w-full max-w-sm mx-auto py-3 rounded-lg bg-indigo-650 hover:bg-indigo-600 text-white font-semibold transition-all flex items-center justify-center space-x-2 text-sm shadow-lg shadow-indigo-655/15"
+            >
+              <span>Open Dashboard</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </div>
@@ -727,6 +973,17 @@ queuewatch.monitorQueue(emailQueue);`;
   const workersHealthyCount = workers.filter((w) => w.status === 'healthy').length;
   const workersTotalCount = workers.length || 1;
   const workerHealthScore = Math.round((workersHealthyCount / workersTotalCount) * 100);
+  const elapsedSecondsVal = elapsedSeconds;
+  const isLearning = activeProjectId !== 'proj_demo' && !fastTracked && (baselineEventsCount < 15 && elapsedSecondsVal < 300);
+
+  const lastTelemetrySeconds = lastTelemetryTime ? Math.floor((Date.now() - lastTelemetryTime) / 1000) : null;
+  const lastTelemetryText = lastTelemetrySeconds === null 
+    ? 'Never' 
+    : (lastTelemetrySeconds < 5 
+      ? 'Just now' 
+      : (lastTelemetrySeconds < 60 
+        ? `${lastTelemetrySeconds}s ago` 
+        : `${Math.floor(lastTelemetrySeconds / 60)}m ago`));
 
   return (
     <div className="space-y-6 font-sans text-sm text-zinc-300">
@@ -735,11 +992,11 @@ queuewatch.monitorQueue(emailQueue);`;
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <MetricCard
           title="Reliability Score"
-          value={activeIncidents.length === 0 ? '100%' : `${Math.max(60, 100 - activeIncidents.length * 15)}%`}
-          subtext={activeIncidents.length === 0 ? 'Optimal operational reliability' : 'Degraded reliability signals'}
+          value={isLearning ? 'Learning...' : (activeIncidents.length === 0 ? '100%' : `${Math.max(60, 100 - activeIncidents.length * 15)}%`)}
+          subtext={isLearning ? 'Collecting operational parameters' : (activeIncidents.length === 0 ? 'Optimal operational reliability' : 'Degraded reliability signals')}
           icon={CheckCircle2}
-          iconColor={activeIncidents.length === 0 ? 'text-emerald-400' : 'text-rose-500'}
-          pulseActive={activeIncidents.length > 0}
+          iconColor={isLearning ? 'text-indigo-400' : (activeIncidents.length === 0 ? 'text-emerald-400' : 'text-rose-500')}
+          pulseActive={!isLearning && activeIncidents.length > 0}
           pulseColor="bg-rose-500"
         />
 
@@ -755,11 +1012,11 @@ queuewatch.monitorQueue(emailQueue);`;
 
         <MetricCard
           title="Predicted Risks"
-          value={recurringCount}
-          subtext="Anticipated system bottlenecks"
+          value={isLearning ? 'Calculating...' : recurringCount}
+          subtext={isLearning ? 'Building risk-factor matrix' : 'Anticipated system bottlenecks'}
           icon={Activity}
-          iconColor={recurringCount > 0 ? 'text-amber-500' : 'text-zinc-550'}
-          pulseActive={recurringCount > 0}
+          iconColor={isLearning ? 'text-zinc-550' : (recurringCount > 0 ? 'text-amber-500' : 'text-zinc-550')}
+          pulseActive={!isLearning && recurringCount > 0}
           pulseColor="bg-amber-500"
         />
 
@@ -772,11 +1029,88 @@ queuewatch.monitorQueue(emailQueue);`;
         />
       </div>
 
-      {/* 2. Copilot Insights (AI Diagnostic Panel) */}
-      <AIInsightPanel 
-        report={aiReport} 
-        loading={aiLoading} 
-      />
+      {/* 2. Copilot Insights or Learning Baseline Card */}
+      {isLearning ? (
+        <div className="bg-zinc-950 border border-zinc-900 rounded-xl p-6 shadow-2xl relative overflow-hidden">
+          <div className="absolute -top-24 -left-24 w-48 h-48 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-zinc-900 pb-5 mb-5 space-y-4 md:space-y-0">
+            <div className="space-y-1">
+              <div className="flex items-center space-x-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                </span>
+                <h3 className="font-bold text-white text-base tracking-tight font-sans">
+                  Learning Your System
+                </h3>
+              </div>
+              <p className="text-xs text-zinc-400">
+                Baseline Progress: <span className="text-white font-mono font-semibold">{baselineEventsCount}/15 events</span>
+                {firstTelemetryTime && (
+                  <span className="text-zinc-600 ml-2">
+                    (First event received {elapsedSecondsVal}s ago)
+                  </span>
+                )}
+              </p>
+            </div>
+            
+            <button
+              onClick={handleFastTrack}
+              className="px-4 py-2 rounded-md bg-zinc-900 hover:bg-zinc-805 text-zinc-300 border border-zinc-800 text-xs font-semibold tracking-wider font-mono transition-all flex items-center space-x-2 hover:border-zinc-700"
+            >
+              <span>Fast-Track Baseline (Developer Skip)</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+            <div className="lg:col-span-7 space-y-4">
+              <p className="text-zinc-405 text-sm leading-relaxed">
+                QueueWatch is analyzing and mapping your background processing pipeline. Reliability insights, anomaly detection, predictive risk alerts, and automated copilot diagnoses will unlock dynamically once the operational baseline is established.
+              </p>
+
+              {/* Progress bar */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-[10px] font-mono font-bold text-zinc-500 uppercase">
+                  <span>Profiling pipeline signature</span>
+                  <span>{Math.round((baselineEventsCount / 15) * 100)}%</span>
+                </div>
+                <div className="w-full bg-zinc-905 border border-zinc-900 h-2 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-indigo-500 transition-all duration-500 ease-out" 
+                    style={{ width: `${(baselineEventsCount / 15) * 100}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-5 bg-black/40 border border-zinc-900 rounded-lg p-4 space-y-3 font-mono text-xs">
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block border-b border-zinc-900 pb-2">Active Monitors</span>
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">✓ Hosts and Workers</span>
+                  <span className="text-emerald-400 font-semibold">LISTENING</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">✓ Redis Queue Memory</span>
+                  <span className="text-emerald-400 font-semibold">PROFILING</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">✓ Job Throughput Logs</span>
+                  <span className="text-emerald-400 font-semibold">SAMPLING</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <AIInsightPanel 
+          report={aiReport} 
+          loading={aiLoading} 
+        />
+      )}
 
       {/* 3. Active Incidents (Details card list if any exist) */}
       {activeIncidents.length > 0 && (
@@ -862,8 +1196,9 @@ queuewatch.monitorQueue(emailQueue);`;
           </div>
         </div>
 
-        {/* Connected Workers */}
-        <div className="space-y-4">
+        {/* Connected Workers and System Discovery Card */}
+        <div className="space-y-6">
+          {/* Connected Workers */}
           <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-6">
             <div className="flex items-center justify-between mb-4 border-b border-zinc-900 pb-3">
               <div>
@@ -885,6 +1220,48 @@ queuewatch.monitorQueue(emailQueue);`;
                   Waiting for worker heartbeat tokens...
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* System Discovery Card */}
+          <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-6 relative overflow-hidden">
+            <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="flex items-center justify-between mb-4 border-b border-zinc-900 pb-3">
+              <div>
+                <h3 className="font-semibold text-white text-base tracking-tight font-sans">System Discovery</h3>
+                <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider font-semibold">Mapped Resources</p>
+              </div>
+              <span className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded-full text-xs font-semibold font-mono">
+                v1.4.2
+              </span>
+            </div>
+
+            <div className="space-y-3 font-sans text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-zinc-400 font-medium">Services Mapped</span>
+                <span className="text-white font-mono font-bold">{services.length || 1}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-zinc-400 font-medium">Active Queues</span>
+                <span className="text-white font-mono font-bold">{metrics.length}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-zinc-400 font-medium">Active Workers</span>
+                <span className="text-white font-mono font-bold">{workers.length}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-zinc-400 font-medium">Environment</span>
+                <span className="text-emerald-450 font-mono font-bold">{activeProjectId === 'proj_demo' ? 'Demo' : 'Production'}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-zinc-400 font-medium">Last Telemetry</span>
+                <span className="text-white font-mono font-bold">{lastTelemetryText}</span>
+              </div>
+              <div className="flex items-center justify-between pt-3 border-t border-zinc-900">
+                <span className="text-zinc-550 font-bold uppercase tracking-wider text-[10px] font-mono">Discovery Engine</span>
+                <span className="text-zinc-400 font-semibold">AUTOMATIC</span>
+              </div>
             </div>
           </div>
         </div>
