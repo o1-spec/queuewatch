@@ -1,13 +1,24 @@
 'use client';
 
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 
 const LERP_FACTOR = 0.085;   // Lower = slower/glassier, Higher = snappier (0.05–0.15)
 const WHEEL_MULTIPLIER = 1.0; // Scale wheel delta (1.0 = native speed)
 const TOUCH_MULTIPLIER = 1.8; // Amplify touch swipe feel
 
 export default function SmoothScroller() {
+  const pathname = usePathname();
+
   useEffect(() => {
+    const publicPaths = ['/', '/login', '/register', '/pricing', '/docs', '/blog', '/contact', '/about', '/privacy', '/terms', '/forgot-password'];
+    const isPublicPath = publicPaths.includes(pathname) || pathname.startsWith('/blog/');
+    
+    // Disable smooth scrolling on dashboard/console pages
+    if (!isPublicPath) {
+      return;
+    }
+
     let targetY = window.scrollY;
     let currentY = window.scrollY;
     let rafId: number | null = null;

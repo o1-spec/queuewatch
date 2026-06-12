@@ -410,7 +410,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         className={`
           fixed inset-y-0 left-0 z-50 w-64 border-r border-zinc-900 bg-zinc-950 flex flex-col justify-between h-screen
           transform transition-transform duration-300 ease-in-out
-          md:sticky md:top-0 md:translate-x-0 md:z-auto md:w-56 lg:w-60 md:shrink-0
+          md:fixed md:translate-x-0 md:w-56 lg:w-60 md:shrink-0
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
@@ -427,7 +427,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* ── Main Content Area ─────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen">
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen md:pl-56 lg:pl-60">
         <header className="h-14 border-b border-zinc-900 px-4 md:px-6 flex items-center justify-between bg-zinc-950/40 backdrop-blur-md sticky top-0 z-30 font-sans">
 
           {/* Left: Hamburger + Project Name + Health Status */}
@@ -521,7 +521,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main data-scroll-native className="flex-1 p-4 md:p-6 overflow-y-auto bg-zinc-950">
+        <main className="flex-1 p-4 md:p-6 bg-zinc-950">
           {children}
         </main>
       </div>
