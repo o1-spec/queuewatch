@@ -42,6 +42,12 @@ export class WorkersService implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleInit() {
+    const enableSimulator = this.configService.get<string>('ENABLE_SIMULATOR') === 'true';
+    if (!enableSimulator) {
+      this.logger.log('Background worker simulator is disabled (set ENABLE_SIMULATOR=true to enable).');
+      return;
+    }
+
     const queueNames = [
       'email_notifications',
       'webhook_delivery',

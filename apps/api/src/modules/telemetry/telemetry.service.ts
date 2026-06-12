@@ -24,7 +24,9 @@ export class TelemetryService {
 
     // Broadcast telemetry via WS gateway with projectId attached
     this.wsGateway.broadcast('telemetry.event', { ...fullEvent, projectId });
-    this.logger.debug(`[Telemetry] Persisted ${fullEvent.type} on ${fullEvent.queueName} for project ${projectId || 'proj_demo'}`);
+    if (fullEvent.type !== 'worker.status') {
+      this.logger.debug(`[Telemetry] Persisted ${fullEvent.type} on ${fullEvent.queueName} for project ${projectId || 'proj_demo'}`);
+    }
   }
 
   async getEvents(limit = 100, projectId?: string): Promise<TelemetryEvent[]> {

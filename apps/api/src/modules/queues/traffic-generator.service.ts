@@ -1,4 +1,5 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { QueuesService } from './queues.service';
 import { SimulationConfigService } from './simulation-config.service';
 
@@ -9,10 +10,17 @@ export class TrafficGeneratorService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private queuesService: QueuesService,
-    private simConfig: SimulationConfigService
+    private simConfig: SimulationConfigService,
+    private configService: ConfigService
   ) {}
 
   onModuleInit() {
+    const enableSimulator = this.configService.get<string>('ENABLE_SIMULATOR') === 'true';
+    if (!enableSimulator) {
+      this.logger.log('Traffic generator service is disabled (set ENABLE_SIMULATOR=true to enable).');
+      return;
+    }
+
     this.timer = setInterval(() => {
       this.tick();
     }, 3500);

@@ -67,6 +67,12 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       }));
     }
 
+    const enableSimulator = this.configService.get<string>('ENABLE_SIMULATOR') === 'true';
+    if (!enableSimulator) {
+      this.logger.log('Seed generator: Skipping demo project data seed (ENABLE_SIMULATOR is not true).');
+      return;
+    }
+
     // Seed default project proj_demo
     const demoProjExists = await this.redis.exists('queuewatch:project_metadata:proj_demo');
     if (!demoProjExists) {
