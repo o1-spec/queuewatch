@@ -435,6 +435,18 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     return projects;
   }
 
+  async getAllProjects(): Promise<Project[]> {
+    const keys = await this.redis.keys('queuewatch:project_metadata:*');
+    const projects: Project[] = [];
+    for (const key of keys) {
+      const raw = await this.redis.get(key);
+      if (raw) {
+        projects.push(JSON.parse(raw) as Project);
+      }
+    }
+    return projects;
+  }
+
   async getProject(projectId: string): Promise<Project | null> {
     const raw = await this.redis.get(`queuewatch:project_metadata:${projectId}`);
     return raw ? JSON.parse(raw) : null;
@@ -452,69 +464,96 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       project.firstTelemetryAt = Date.now();
       await this.redis.set(`queuewatch:project_metadata:${projectId}`, JSON.stringify(project));
       this.logger.log(`Project ${projectId} telemetry state marked as active.`);
+    }
+  }
 
-      // Automatically create the initial services, queues, and workers mapping!
-      if (projectId !== 'proj_demo') {
-        // Create payment-service
-        const paymentService: Service = {
-          id: 'svc_payment_service',
-          name: 'payment-service',
-          description: 'SRE mapped payment service processing checkouts, webhooks, and client receipts.',
-          environment: 'production',
-          owner: 'payment-team',
-          status: 'healthy',
-          createdAt: Date.now(),
-          queues: ['payment_queue', 'email_queue', 'webhook_queue'],
-          workers: ['worker-1', 'worker-2'],
-          deployments: [],
-          incidents: [],
-        };
-        await this.saveService(paymentService, projectId);
+  async discoverService(
+    projectId: string,
+    serviceName?: string,
+    queueName?: string,
+    workerId?: string,
+  ): Promise<void> {
+    let resolvedService = serviceName;
+    if (!resolvedService && queueName) {
+      if (['payment_queue', 'email_queue', 'webhook_queue'].includes(queueName)) {
+        resolvedService = 'payment-service';
+      } else if (['email_notifications'].includes(queueName)) {
+        resolvedService = 'email-service';
+      } else {
+        resolvedService = 'default-service';
+      }
+    }
 
-        // Register the queues under the project
-        await this.registerProjectQueue(projectId, 'payment_queue');
-        await this.registerProjectQueue(projectId, 'email_queue');
-        await this.registerProjectQueue(projectId, 'webhook_queue');
+    if (!resolvedService) return;
 
-        // Create the workers
-        await this.saveWorker({
-          workerId: 'worker-1',
-          queueName: 'payment_queue' as any,
-          status: 'healthy',
-          concurrency: 5,
-          cpuUsage: 12,
-          memoryUsage: 25,
-          lastActive: Date.now(),
-        }, projectId);
+    const serviceId = `svc_${resolvedService.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+    let service = await this.getService(serviceId, projectId);
+    let changed = false;
 
-        await this.saveWorker({
-          workerId: 'worker-2',
-          queueName: 'email_queue' as any,
-          status: 'healthy',
-          concurrency: 10,
-          cpuUsage: 8,
-          memoryUsage: 30,
-          lastActive: Date.now(),
-        }, projectId);
+    if (!service) {
+      service = {
+        id: serviceId,
+        name: resolvedService,
+        description: `Automatically discovered service from SDK telemetry.`,
+        environment: 'production',
+        owner: 'sre-team',
+        status: 'healthy',
+        createdAt: Date.now(),
+        queues: [],
+        workers: [],
+        deployments: [],
+        incidents: [],
+      };
+      changed = true;
+    }
 
-        // Seed default dependency graph for the project
-        const defaultGraph: DependencyGraph = {
-          nodes: [
-            { id: 'svc_payment_service', label: 'payment-service', type: 'service' },
-            { id: 'payment_queue', label: 'payment_queue', type: 'queue' },
-            { id: 'email_queue', label: 'email_queue', type: 'queue' },
-            { id: 'webhook_queue', label: 'webhook_queue', type: 'queue' }
-          ],
-          edges: [
-            { from: 'svc_payment_service', to: 'payment_queue' },
-            { from: 'svc_payment_service', to: 'email_queue' },
-            { from: 'svc_payment_service', to: 'webhook_queue' }
-          ],
-          serviceImpacts: {
-            svc_payment_service: ['payment_queue', 'email_queue', 'webhook_queue']
-          }
-        };
-        await this.saveDependencyGraph(defaultGraph, projectId);
+    if (queueName && !service.queues.includes(queueName)) {
+      service.queues.push(queueName);
+      changed = true;
+    }
+
+    if (workerId && !service.workers.includes(workerId)) {
+      service.workers.push(workerId);
+      changed = true;
+    }
+
+    if (changed) {
+      await this.saveService(service, projectId);
+
+      if (queueName) {
+        await this.registerProjectQueue(projectId, queueName);
+      }
+
+      const graph = await this.getDependencyGraph(projectId);
+      let graphChanged = false;
+
+      if (!graph.nodes.some(n => n.id === serviceId)) {
+        graph.nodes.push({ id: serviceId, label: resolvedService, type: 'service' });
+        graphChanged = true;
+      }
+
+      if (queueName && !graph.nodes.some(n => n.id === queueName)) {
+        graph.nodes.push({ id: queueName, label: queueName, type: 'queue' });
+        graphChanged = true;
+      }
+
+      if (queueName && !graph.edges.some(e => e.from === serviceId && e.to === queueName)) {
+        graph.edges.push({ from: serviceId, to: queueName });
+        graphChanged = true;
+      }
+
+      if (queueName) {
+        if (!graph.serviceImpacts[serviceId]) {
+          graph.serviceImpacts[serviceId] = [];
+        }
+        if (!graph.serviceImpacts[serviceId].includes(queueName)) {
+          graph.serviceImpacts[serviceId].push(queueName);
+          graphChanged = true;
+        }
+      }
+
+      if (graphChanged) {
+        await this.saveDependencyGraph(graph, projectId);
       }
     }
   }
@@ -705,13 +744,14 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   async getNotificationSettings(userId: string): Promise<NotificationSetting> {
     const raw = await this.redis.get(`queuewatch:notification_settings:${userId}`);
     if (raw) return JSON.parse(raw);
-    // Return default settings
+    // Default settings: empty queues array means "all queues" (no filter)
+    // emailEnabled defaults to false — set to true only when SMTP is configured
     return {
-      emailEnabled: true,
+      emailEnabled: false,
       dashboardEnabled: true,
       webhookEnabled: false,
       severities: ['low', 'medium', 'high', 'critical'],
-      queues: ['email_notifications', 'webhook_delivery', 'image_processing', 'ai_tasks'],
+      queues: [], // empty = notify for all queues
     };
   }
 

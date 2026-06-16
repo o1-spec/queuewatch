@@ -62,8 +62,8 @@ export class NotificationsService implements OnModuleInit {
       return;
     }
 
-    // Check queue filters
-    if (settings.queues && !settings.queues.includes(incident.affectedQueue)) {
+    // Check queue filters — empty array means "all queues" (no filter applied)
+    if (settings.queues && settings.queues.length > 0 && !settings.queues.includes(incident.affectedQueue)) {
       this.logger.log(`Skipping notification for ${incident.id}: queue ${incident.affectedQueue} filtered out.`);
       return;
     }

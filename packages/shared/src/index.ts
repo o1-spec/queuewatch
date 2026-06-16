@@ -1,13 +1,14 @@
-export type QueueName =
-  | 'email_notifications'
-  | 'webhook_delivery'
-  | 'image_processing'
-  | 'ai_tasks'
-  | 'payment_queue'
-  | 'email_queue'
-  | 'webhook_queue';
+export type QueueName = string;
 
-export type JobStatus = 'waiting' | 'active' | 'completed' | 'failed' | 'delayed' | 'retried' | 'stalled' | 'dead-letter';
+export type JobStatus =
+  | 'waiting'
+  | 'active'
+  | 'completed'
+  | 'failed'
+  | 'delayed'
+  | 'retried'
+  | 'stalled'
+  | 'dead-letter';
 
 export interface User {
   id: string;
@@ -20,7 +21,16 @@ export interface User {
 
 export interface TelemetryEvent {
   id: string;
-  type: 'job.created' | 'job.active' | 'job.completed' | 'job.failed' | 'job.retried' | 'job.stalled' | 'job.delayed' | 'job.deadlettered' | 'worker.status';
+  type:
+    | 'job.created'
+    | 'job.active'
+    | 'job.completed'
+    | 'job.failed'
+    | 'job.retried'
+    | 'job.stalled'
+    | 'job.delayed'
+    | 'job.deadlettered'
+    | 'worker.status';
   queueName: QueueName;
   jobId?: string;
   jobName?: string;
@@ -33,8 +43,9 @@ export interface TelemetryEvent {
   maxAttempts?: number;
   timestamp: number;
   payload?: any;
+  traceId?: string;
+  serviceName?: string;
 }
-
 
 export interface QueueMetrics {
   queueName: QueueName;
@@ -64,6 +75,7 @@ export interface Incident {
   title: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
   affectedQueue: QueueName;
+  fingerprint?: string;
   status: 'open' | 'acknowledged' | 'investigating' | 'resolved' | 'ignored';
   firstDetectedAt: number;
   lastUpdatedAt: number;
@@ -94,6 +106,7 @@ export interface LogEntry {
   metadata?: any;
   traceId?: string;
   jobId?: string;
+  serviceName?: string;
 }
 
 export interface InvestigationReport {
@@ -113,7 +126,13 @@ export interface AlertRule {
   id: string;
   name: string;
   queueName: QueueName;
-  metric: 'failureRate' | 'retryRate' | 'backlog' | 'avgLatency' | 'deadLetterCount' | 'workerHealthScore';
+  metric:
+    | 'failureRate'
+    | 'retryRate'
+    | 'backlog'
+    | 'avgLatency'
+    | 'deadLetterCount'
+    | 'workerHealthScore';
   operator: '>' | '<' | '==';
   threshold: number;
   durationSeconds: number;
@@ -306,4 +325,3 @@ export interface Project {
   hasReceivedTelemetry?: boolean;
   firstTelemetryAt?: number;
 }
-

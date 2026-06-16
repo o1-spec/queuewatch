@@ -56,19 +56,55 @@ export class IngestController {
       // Register queue name dynamically
       if (event.queueName) {
         await this.dbService.registerProjectQueue(projectId, event.queueName);
+        await this.dbService.discoverService(projectId, event.serviceName, event.queueName, event.workerId);
       }
 
       // Save to database
+      const traceId = event.traceId || event.payload?.traceId || (event.payload && typeof event.payload === 'object' ? event.payload.traceId : undefined);
       const telemetryEvent = {
         ...event,
         id: event.id || `tel_${Math.random().toString(36).substr(2, 9)}`,
         timestamp: event.timestamp || Date.now(),
+        traceId,
       };
       await this.dbService.saveTelemetry(telemetryEvent, projectId);
 
       // Record latency snapshot if completed
       if (event.type === 'job.completed' && typeof event.duration === 'number') {
         this.metricsService.recordLatency(event.queueName, event.duration);
+      }
+
+      // Generate structured SRE logs for anomalies/warnings/failures (skip completed/created/active)
+      if (['job.failed', 'job.stalled', 'job.delayed', 'job.deadlettered'].includes(event.type)) {
+        const level: 'info' | 'warn' | 'error' = (event.type === 'job.failed' || event.type === 'job.deadlettered') ? 'error' :
+                      (event.type === 'job.stalled') ? 'warn' : 'info';
+        
+        let msg = '';
+        if (event.type === 'job.failed') {
+          msg = event.errorMessage || 'Job execution failed';
+        } else if (event.type === 'job.deadlettered') {
+          msg = `Job dead-lettered: ${event.errorMessage || 'Threshold exceeded'}`;
+        } else if (event.type === 'job.stalled') {
+          msg = `Job stalled during execution`;
+        } else if (event.type === 'job.delayed') {
+          msg = `Job execution delayed`;
+        }
+
+        const logEntry = {
+          id: `log_${Math.random().toString(36).substr(2, 9)}`,
+          level,
+          message: msg,
+          queueName: event.queueName,
+          serviceName: event.serviceName || 'unknown-service',
+          workerName: event.workerId,
+          timestamp: Date.now(),
+          traceId,
+          jobId: event.jobId,
+          metadata: event.payload
+        };
+
+        await this.dbService.saveLog(logEntry, projectId);
+        this.wsGateway.broadcast('log.ingested', { ...logEntry, projectId });
       }
 
       // Broadcast event via WebSockets with projectId attached
@@ -93,6 +129,7 @@ export class IngestController {
     // Register queue name if present in metadata
     if (body.queueName) {
       await this.dbService.registerProjectQueue(projectId, body.queueName);
+      await this.dbService.discoverService(projectId, body.serviceName, body.queueName, body.workerName);
     }
 
     const logEntry = {
@@ -124,6 +161,7 @@ export class IngestController {
       await this.dbService.registerProjectQueue(projectId, body.queueName);
     }
 
+    const now = Date.now();
     const report = {
       workerId: body.workerId || 'sdk_worker',
       queueName: body.queueName,
@@ -131,11 +169,15 @@ export class IngestController {
       concurrency: body.concurrency || 5,
       cpuUsage: body.cpuUsage || 10,
       memoryUsage: body.memoryUsage || 15,
-      lastActive: Date.now(),
+      lastActive: now,
+      lastHeartbeatAt: now, // Track exact SDK heartbeat receipt time
     };
 
     // Save worker health report to DB
     await this.dbService.saveWorker(report, projectId);
+
+    // Discover SRE service mapping from heartbeat telemetry
+    await this.dbService.discoverService(projectId, body.serviceName, body.queueName, report.workerId);
 
     this.wsGateway.broadcast('worker.health.updated', [{ ...report, projectId }]);
     return { success: true };

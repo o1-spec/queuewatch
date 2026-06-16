@@ -71,7 +71,7 @@ export class IncidentsService {
 
     await this.dbService.saveIncident(updated, projectId);
     this.wsGateway.broadcast('incident.updated', { ...updated, projectId });
-    this.logger.log(`[Incident] Incident updated: ${updated.id} (${updated.status})`);
+    this.logger.debug(`[Incident] Incident updated: ${updated.id} (${updated.status})`);
     return updated;
   }
 
@@ -275,131 +275,104 @@ export class IncidentsService {
     return updated;
   }
 
-  async evaluateSystemState(metricsList: any[], workerHealthList: any[], dlqCount: number) {
-    // Keep baseline metrics checking
+  async evaluateSystemState(metricsList: any[], workerHealthList: any[], dlqCount: number, projectId = 'proj_demo') {
+    const capitalize = (s: string) => s.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+    // 1. Worker offline > 60s (use lastHeartbeatAt from SDK — fallback to lastActive)
     for (const worker of workerHealthList) {
-      const qName = worker.queueName as QueueName;
+      const qName = worker.queueName;
+      const heartbeatTime = worker.lastHeartbeatAt ?? worker.lastActive;
+      const isOffline = (Date.now() - heartbeatTime) > 60_000;
+      const fingerprint = `${projectId}:worker_offline:${qName}`;
       
-      if (worker.status === 'down') {
-        const title = `Worker thread offline on ${qName}`;
-        let existing = await this.getOpenIncidentByTitle(title);
-        if (!existing) {
-          const matchingEvents = await this.telemetryService.getQueueEvents(qName, 5);
-          const errors = matchingEvents
-            .filter(e => e.type === 'job.failed' || e.type === 'job.deadlettered')
-            .map(e => e.errorMessage || 'Unknown worker crash');
-
-          await this.createIncident({
-            title,
-            severity: 'critical',
-            affectedQueue: qName,
-            status: 'open',
-            summary: `Worker associated with queue ${qName} has stopped reporting health heartbeats.`,
-            evidence: `Worker ID ${worker.workerId} status: down.`,
-            suspectedRootCause: 'Underlying connection timeout, CPU throttling, or unhandled process exception.',
-            recommendation: 'Check server resource usage, check Redis network socket state, and restart worker node processes.',
-            impact: 'Background execution stalled. Workloads are buffering in Redis.',
-            relatedErrors: errors.slice(0, 3),
-          });
-        }
+      if (isOffline) {
+        const elapsed = Math.round((Date.now() - heartbeatTime) / 1000);
+        await this.triggerOrUpdateIncident(projectId, fingerprint, {
+          title: `Worker offline on ${qName}`,
+          severity: 'critical',
+          affectedQueue: qName,
+          summary: `The worker ${worker.workerId} processing queue ${qName} has not sent a heartbeat for ${elapsed}s (threshold: 60s).`,
+          evidence: `Worker ID: ${worker.workerId}, Last Heartbeat: ${new Date(heartbeatTime).toLocaleTimeString()}, CPU: ${worker.cpuUsage}%, Memory: ${worker.memoryUsage}%.`,
+          suspectedRootCause: 'Underlying worker thread process crash (OOM), host container restart, or network socket disconnection.',
+          recommendation: 'Verify the worker server daemon processes are actively running and analyze node heap limits.',
+          impact: 'Queue consumer thread execution is halted. Workloads will buffer until consumer workers check back in.',
+          relatedErrors: [],
+        });
       } else {
-        const title = `Worker thread offline on ${qName}`;
-        let existing = await this.getOpenIncidentByTitle(title);
-        if (existing) {
-          await this.updateIncident(existing.id, { status: 'resolved' });
-        }
-      }
-
-      if (worker.status === 'overloaded' || worker.cpuUsage > 80) {
-        const title = `Latency threshold bottleneck on ${qName}`;
-        let existing = await this.getOpenIncidentByTitle(title);
-        if (!existing) {
-          await this.createIncident({
-            title,
-            severity: 'high',
-            affectedQueue: qName,
-            status: 'open',
-            summary: `Processing latency on queue ${qName} is exceeding operational SLA bounds.`,
-            evidence: `Worker CPU: ${worker.cpuUsage}%, Memory: ${worker.memoryUsage}%.`,
-            suspectedRootCause: 'CPU saturation due to heavy payload computations or database locking delays.',
-            recommendation: 'Scale queue concurrency factor or spin up additional worker instances.',
-            impact: 'Job backlog growth speed increased. Slower page responses for end-users.',
-            relatedErrors: [],
-          });
-        }
-      } else {
-        const title = `Latency threshold bottleneck on ${qName}`;
-        let existing = await this.getOpenIncidentByTitle(title);
-        if (existing && worker.cpuUsage < 50) {
-          await this.updateIncident(existing.id, { status: 'resolved' });
-        }
+        await this.resolveIncidentByFingerprint(fingerprint, projectId);
       }
     }
 
+    // 2. Failure rate > 10% & Queue latency > 5s
     for (const metric of metricsList) {
-      const qName = metric.queueName as QueueName;
-
+      const qName = metric.queueName;
       const totalProcessed = metric.completedCount + metric.failedCount;
       const failureRate = totalProcessed > 0 ? (metric.failedCount / totalProcessed) * 100 : 0;
       
-      if (metric.failedCount > 3 && failureRate > 15) {
-        const title = `Elevated job execution failure rate on ${qName}`;
-        let existing = await this.getOpenIncidentByTitle(title);
-        if (!existing) {
-          const matchingEvents = await this.telemetryService.getQueueEvents(qName, 10);
-          const errors = matchingEvents
-            .filter(e => e.type === 'job.failed' || e.type === 'job.deadlettered')
-            .map(e => e.errorMessage || 'Execution failed');
-
-          await this.createIncident({
-            title,
-            severity: 'high',
-            affectedQueue: qName,
-            status: 'open',
-            summary: `Failure rate on ${qName} has reached ${Math.round(failureRate)}%.`,
-            evidence: `Total Failed: ${metric.failedCount} out of ${totalProcessed} processed.`,
-            suspectedRootCause: 'Persistent failures detected. Upstream API timeouts, missing validation keys, or database lock conditions.',
-            recommendation: 'Check API credentials, review payload validator rules, or verify external provider availability.',
-            impact: 'Transactions are failing to complete, resulting in retried queues and backlog growth.',
-            relatedErrors: Array.from(new Set(errors)).slice(0, 5),
-          });
-        }
+      // Rule A: Failure rate > 10%
+      const failFingerprint = `${projectId}:failure_rate:${qName}`;
+      if (totalProcessed > 0 && failureRate > 10) {
+        await this.triggerOrUpdateIncident(projectId, failFingerprint, {
+          title: `High Failure Rate on ${qName}`,
+          severity: 'high',
+          affectedQueue: qName,
+          summary: `The job failure rate on queue ${qName} is currently ${Math.round(failureRate)}%, exceeding the SLA threshold of 10%.`,
+          evidence: `Failed jobs count: ${metric.failedCount} out of ${totalProcessed} total runs processed.`,
+          suspectedRootCause: 'Persistent downstream exception triggers. Upstream service connection resets, authentication drops, or database transaction locks.',
+          recommendation: 'Inspect exception traces on the Logs page or click on the queue inspector to check error codes.',
+          impact: 'Active workflows are falling back to retry queues, leading to processing delays and dead-letter queue growth.',
+          relatedErrors: [],
+        });
+      } else {
+        await this.resolveIncidentByFingerprint(failFingerprint, projectId);
       }
 
-      if (metric.waitingCount > 30) {
-        const title = `Queue backlog backlog growth warning on ${qName}`;
-        let existing = await this.getOpenIncidentByTitle(title);
-        if (!existing) {
-          await this.createIncident({
-            title,
-            severity: 'medium',
-            affectedQueue: qName,
-            status: 'open',
-            summary: `Queue ${qName} backlog is buffering waiting jobs.`,
-            evidence: `Current Waiting: ${metric.waitingCount} jobs. Throughput: ${metric.throughput} jobs/min.`,
-            suspectedRootCause: 'Worker throughput is lower than the job production ingestion rate.',
-            recommendation: 'Increase BullMQ concurrency settings or restart frozen queue processors.',
-            impact: 'Processing delays for background tasks.',
-            relatedErrors: [],
-          });
-        }
+      // Rule B: Queue latency > 5s
+      const latencyFingerprint = `${projectId}:latency_spike:${qName}`;
+      if (metric.averageLatency > 5000) {
+        const formatted = capitalize(qName);
+        await this.triggerOrUpdateIncident(projectId, latencyFingerprint, {
+          title: `${formatted} Latency Spike`,
+          severity: 'high',
+          affectedQueue: qName,
+          summary: `Average job latency on queue ${qName} has reached ${Math.round(metric.averageLatency / 1000)} seconds, exceeding the SLA threshold of 5s.`,
+          evidence: `Average processing duration: ${metric.averageLatency} ms. Current backlog size: ${metric.waitingCount} waiting jobs.`,
+          suspectedRootCause: 'Worker process thread limits saturation, slow third-party API response hooks, or resource exhaustion.',
+          recommendation: 'Adjust worker concurrency pool scaling or deploy additional container instances.',
+          impact: 'Background processes take longer to finish, delaying real-time event updates.',
+          relatedErrors: [],
+        });
       } else {
-        const title = `Queue backlog backlog growth warning on ${qName}`;
-        let existing = await this.getOpenIncidentByTitle(title);
-        if (existing && metric.waitingCount < 5) {
-          await this.updateIncident(existing.id, { status: 'resolved' });
-        }
+        await this.resolveIncidentByFingerprint(latencyFingerprint, projectId);
       }
     }
 
-    // Run V3 escalation rule evaluation
-    await this.checkEscalations();
+    // 3. DLQ size > 100
+    const dlqFingerprint = `${projectId}:dlq_threshold:all`;
+    if (dlqCount > 100) {
+      await this.triggerOrUpdateIncident(projectId, dlqFingerprint, {
+        title: `DLQ size exceeds SLA bounds on project`,
+        severity: 'high',
+        affectedQueue: 'dead_letter_queue',
+        summary: `The dead-letter queue job count is currently ${dlqCount}, exceeding the alert threshold of 100.`,
+        evidence: `Total dead-letter jobs: ${dlqCount}.`,
+        suspectedRootCause: 'Repeated job execution failures resulting in permanent dead-letter drops.',
+        recommendation: 'Go to the Dead-Letter Queue page to audit and retry or purge failed jobs.',
+        impact: 'Risk of permanent transactional failures and processing gaps.',
+        relatedErrors: [],
+      });
+    } else {
+      await this.resolveIncidentByFingerprint(dlqFingerprint, projectId);
+    }
+
+    // Run V3 escalation rule evaluation (project-scoped)
+    await this.checkEscalations(projectId);
   }
 
-  async checkEscalations() {
+  async checkEscalations(projectId?: string) {
     try {
-      const rules = await this.dbService.getEscalationRules();
-      const openIncidents = (await this.dbService.getIncidents()).filter(
+      const rules = await this.dbService.getEscalationRules(projectId);
+      const openIncidents = (await this.dbService.getIncidents(projectId)).filter(
         i => i.status === 'open' || i.status === 'investigating'
       );
       const now = Date.now();
@@ -455,8 +428,48 @@ export class IncidentsService {
     }
   }
 
-  private async getOpenIncidentByTitle(title: string, projectId?: string): Promise<Incident | undefined> {
+  private async getIncidentByFingerprint(fingerprint: string, projectId?: string): Promise<Incident | undefined> {
     const list = await this.dbService.getIncidents(projectId);
-    return list.find((inc) => inc.title === title && inc.status === 'open');
+    return list.find((inc) => inc.fingerprint === fingerprint);
   }
+
+  async triggerOrUpdateIncident(
+    projectId: string,
+    fingerprint: string,
+    data: Omit<Incident, 'id' | 'firstDetectedAt' | 'lastUpdatedAt' | 'status'>
+  ) {
+    const existing = await this.getIncidentByFingerprint(fingerprint, projectId);
+    if (existing) {
+      if (existing.status === 'open' || existing.status === 'acknowledged' || existing.status === 'investigating') {
+        // Only write to Redis if something meaningful has actually changed
+        const summaryChanged = existing.summary !== data.summary;
+        const evidenceChanged = existing.evidence !== data.evidence;
+        const severityChanged = existing.severity !== data.severity;
+        const stale = (Date.now() - existing.lastUpdatedAt) > 30_000; // force refresh every 30s
+
+        if (summaryChanged || evidenceChanged || severityChanged || stale) {
+          await this.updateIncident(existing.id, {
+            summary: data.summary,
+            evidence: data.evidence,
+            severity: data.severity,
+          }, projectId);
+        }
+        return existing;
+      }
+    }
+    
+    return this.createIncident({
+      ...data,
+      fingerprint,
+      status: 'open'
+    }, projectId);
+  }
+
+  async resolveIncidentByFingerprint(fingerprint: string, projectId?: string) {
+    const existing = await this.getIncidentByFingerprint(fingerprint, projectId);
+    if (existing && (existing.status === 'open' || existing.status === 'acknowledged' || existing.status === 'investigating')) {
+      await this.resolveIncident(existing.id, 'Automated resolution: telemetry metrics returned below target SLA thresholds.', projectId);
+    }
+  }
+
 }

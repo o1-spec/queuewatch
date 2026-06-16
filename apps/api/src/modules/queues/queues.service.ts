@@ -119,13 +119,36 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
       const queue = this.getQueue(name);
       if (!queue) continue;
 
-      const [waiting, active, completed, failed, delayed] = await Promise.all([
-        queue.getWaitingCount(),
-        queue.getActiveCount(),
-        queue.getCompletedCount(),
-        queue.getFailedCount(),
-        queue.getDelayedCount(),
-      ]);
+      let waiting = 0;
+      let active = 0;
+      let completed = 0;
+      let failed = 0;
+      let delayed = 0;
+
+      if (projectId === 'proj_demo') {
+        [waiting, active, completed, failed, delayed] = await Promise.all([
+          queue.getWaitingCount(),
+          queue.getActiveCount(),
+          queue.getCompletedCount(),
+          queue.getFailedCount(),
+          queue.getDelayedCount(),
+        ]);
+      } else {
+        const telemetry = await this.dbService.getTelemetryByQueue(name, 500, projectId);
+        const jobStatuses = new Map<string, string>();
+        for (const event of telemetry) {
+          if (event.jobId && !jobStatuses.has(event.jobId)) {
+            jobStatuses.set(event.jobId, event.type);
+          }
+        }
+        for (const [jobId, type] of jobStatuses.entries()) {
+          if (type === 'job.created') waiting++;
+          else if (type === 'job.active') active++;
+          else if (type === 'job.completed') completed++;
+          else if (type === 'job.failed') failed++;
+          else if (type === 'job.delayed') delayed++;
+        }
+      }
 
       const isPaused = await queue.isPaused();
 

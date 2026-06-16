@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import useSocket from '../../hooks/useSocket';
 import Link from 'next/link';
 import { QueueMetrics, WorkerHealth, QueueName, Incident } from '@queuewatch/shared';
-import { CheckCircle2, Activity, Skull, Clock, AlertTriangle, Play, Sparkles, Server, GitCommit, BellRing, Loader2, Check, Copy, ArrowRight, Circle } from 'lucide-react';
+import { CheckCircle2, Activity, Skull, Clock, AlertTriangle, Play, Sparkles, Server, GitCommit, BellRing, Loader2, Check, Copy, ArrowRight, Circle, X, Layers, Terminal } from 'lucide-react';
 import { MetricCard } from '../../components/MetricCard';
 import { QueueCard } from '../../components/QueueCard';
 import { WorkerCard } from '../../components/WorkerCard';
@@ -54,6 +54,45 @@ export default function DashboardOverview() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [services, setServices] = useState<any[]>([]);
   const [lastTelemetryTime, setLastTelemetryTime] = useState<number | null>(null);
+
+  // SRE Queue Inspector Modal State
+  const [selectedQueueForInspector, setSelectedQueueForInspector] = useState<string | null>(null);
+  const [inspectorJobs, setInspectorJobs] = useState<any[]>([]);
+  const [inspectorLoadingJobs, setInspectorLoadingJobs] = useState(false);
+  const [inspectorTab, setInspectorTab] = useState<'jobs' | 'errors'>('jobs');
+
+  useEffect(() => {
+    if (selectedQueueForInspector) {
+      const loadInspectorJobs = async () => {
+        try {
+          setInspectorLoadingJobs(true);
+          const res = await authFetch(`${API_URL}/api/queues/${selectedQueueForInspector}/jobs?limit=50`);
+          if (res.ok) {
+            setInspectorJobs(await res.json());
+          }
+        } catch (e) {
+          console.error('Failed to load SRE queue inspector jobs:', e);
+        } finally {
+          setInspectorLoadingJobs(false);
+        }
+      };
+      loadInspectorJobs();
+      const interval = setInterval(loadInspectorJobs, 3000);
+      return () => clearInterval(interval);
+    } else {
+      setInspectorJobs([]);
+    }
+  }, [selectedQueueForInspector, authFetch]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedQueueForInspector(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const copyTextToClipboard = (text: string) => {
     if (typeof window === 'undefined') return;
@@ -333,6 +372,15 @@ export default function DashboardOverview() {
       if (data.projectId === activeProjectId) {
         fetchProjects();
         loadData();
+
+        // Immediate enqueued jobs list refresh inside open SRE Queue Inspector
+        if (selectedQueueForInspector && data.queueName === selectedQueueForInspector) {
+          authFetch(`${API_URL}/api/queues/${selectedQueueForInspector}/jobs?limit=50`)
+            .then((res) => {
+              if (res.ok) res.json().then(setInspectorJobs);
+            })
+            .catch(() => {});
+        }
 
         // Increment baseline events count
         setBaselineEventsCount((prev) => {
@@ -1265,8 +1313,70 @@ queuewatch.monitorQueue(emailQueue);`;
 
       {/* 4 & 5. Queue Health and Connected Workers Side-by-Side */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Queue Health */}
-        <div className="lg:col-span-2 space-y-4">
+        {/* Queue Health and Services Discovered Tree */}
+        <div className="lg:col-span-2 space-y-6">
+          
+          {/* Services Discovered Panel */}
+          <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-6 relative overflow-hidden shadow-xl">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none" />
+            <div className="flex items-center justify-between mb-4 border-b border-zinc-900 pb-3">
+              <div>
+                <h3 className="font-semibold text-white text-base tracking-tight flex items-center space-x-2">
+                  <Server className="w-4 h-4 text-indigo-400" />
+                  <span>Services Discovery Ledger</span>
+                </h3>
+                <p className="text-xs text-zinc-400 font-sans">Microservices dynamically discovered from SDK telemetry mapping</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-mono text-[10px] text-zinc-400">
+              {services.map((svc) => {
+                const serviceQueues = svc.queues || [];
+                const serviceWorkers = svc.workers || [];
+                const serviceErrors = serviceQueues.reduce((sum: number, qName: string) => {
+                  const qMetric = metrics.find(m => m.queueName === qName);
+                  return sum + (qMetric ? qMetric.failedCount : 0);
+                }, 0);
+
+                return (
+                  <div key={svc.id} className="p-4 bg-zinc-900/10 border border-zinc-900/80 rounded-lg space-y-3 relative hover:border-zinc-800 transition-all">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                        <strong className="text-white text-[11px] uppercase tracking-wide">{svc.name}</strong>
+                      </div>
+                      <span className="text-[8px] bg-zinc-900 border border-zinc-850 px-1.5 py-0.2 rounded text-zinc-450 uppercase">{svc.environment}</span>
+                    </div>
+
+                    <div className="pl-1 space-y-1 text-zinc-550 font-mono text-[9.5px]">
+                      <div>
+                        <span>├─ Queues: </span>
+                        <strong className="text-indigo-400 font-bold">{serviceQueues.length}</strong>
+                      </div>
+                      <div>
+                        <span>├─ Workers: </span>
+                        <strong className="text-zinc-350 font-bold">{serviceWorkers.length}</strong>
+                      </div>
+                      <div>
+                        <span>└─ Errors: </span>
+                        <strong className={`font-bold ${serviceErrors > 0 ? 'text-rose-500 animate-pulse' : 'text-zinc-650'}`}>
+                          {serviceErrors}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {services.length === 0 && (
+                <div className="col-span-full py-8 text-center text-zinc-600 font-bold animate-pulse">
+                  Waiting for SDK telemetry to map services architecture...
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Queue Health */}
           <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-6">
             <div className="flex items-center justify-between mb-4 border-b border-zinc-900 pb-3">
               <div>
@@ -1293,6 +1403,7 @@ queuewatch.monitorQueue(emailQueue);`;
                     metrics={queueMetrics}
                     onTogglePause={togglePause}
                     toggleLoading={toggleLoading}
+                    onInspect={(name) => setSelectedQueueForInspector(name)}
                   />
                 );
               })}
@@ -1304,6 +1415,7 @@ queuewatch.monitorQueue(emailQueue);`;
               )}
             </div>
           </div>
+
         </div>
 
         {/* Connected Workers and System Discovery Card */}
@@ -1381,6 +1493,241 @@ queuewatch.monitorQueue(emailQueue);`;
       <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-6">
         <ActivityFeed events={liveEvents} />
       </div>
+
+      {/* SRE Queue Inspector Modal Overlay */}
+      {selectedQueueForInspector && (() => {
+        const qMetrics = metrics.find(m => m.queueName === selectedQueueForInspector);
+        const qWorkers = workers.filter(w => w.queueName === selectedQueueForInspector);
+        
+        const waiting = qMetrics ? qMetrics.waitingCount : 0;
+        const active = qMetrics ? qMetrics.activeCount : 0;
+        const completed = qMetrics ? qMetrics.completedCount : 0;
+        const failed = qMetrics ? qMetrics.failedCount : 0;
+        const delayed = qMetrics ? qMetrics.delayedCount : 0;
+        const throughput = qMetrics ? qMetrics.throughput : 0;
+        const latency = qMetrics ? qMetrics.averageLatency : 0;
+
+        const failedJobs = inspectorJobs.filter(j => j.status === 'failed');
+
+        return (
+          <>
+            {/* Backdrop Blur */}
+            <div 
+              onClick={() => setSelectedQueueForInspector(null)}
+              className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 transition-opacity duration-300 animate-fade-in"
+            />
+
+            {/* Sidebar Inspector Drawer */}
+            <div className="fixed inset-y-0 right-0 w-full max-w-2xl bg-zinc-950 border-l border-zinc-900 shadow-2xl z-50 overflow-hidden flex flex-col font-sans text-xs text-zinc-300 animate-slide-left">
+              
+              {/* Header */}
+              <div className="p-6 border-b border-zinc-900/60 flex items-center justify-between bg-zinc-950/80 sticky top-0 z-10 backdrop-blur-md">
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <h2 className="text-sm font-bold text-white uppercase font-mono tracking-tight">{selectedQueueForInspector}</h2>
+                  </div>
+                  <p className="text-[10px] text-zinc-550 font-mono uppercase tracking-wider">Queue Inspector telemetry profile</p>
+                </div>
+                
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={async () => {
+                      if (qMetrics) {
+                        await togglePause(selectedQueueForInspector, qMetrics.paused);
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded border text-[10px] font-bold uppercase transition-all ${
+                      qMetrics?.paused 
+                        ? 'bg-emerald-950/20 text-emerald-400 border-emerald-900/40 hover:bg-emerald-950/30' 
+                        : 'bg-zinc-900 text-zinc-300 border-zinc-800 hover:bg-zinc-800'
+                    }`}
+                  >
+                    {qMetrics?.paused ? 'Resume Queue' : 'Pause Queue'}
+                  </button>
+                  <button
+                    onClick={() => setSelectedQueueForInspector(null)}
+                    className="p-1.5 rounded hover:bg-zinc-900 text-zinc-500 hover:text-white transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Scrollable Content */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                
+                {/* 5-Column SRE Scorecard row */}
+                <div className="grid grid-cols-5 gap-2.5 text-center font-mono">
+                  <div className="bg-zinc-900/35 border border-zinc-900/80 px-2 py-3 rounded-lg">
+                    <span className="text-[8.5px] text-zinc-500 uppercase tracking-widest font-bold block">Waiting</span>
+                    <strong className="text-sm text-blue-400 font-bold block mt-1.5">{waiting}</strong>
+                  </div>
+                  <div className="bg-zinc-900/35 border border-zinc-900/80 px-2 py-3 rounded-lg">
+                    <span className="text-[8.5px] text-zinc-500 uppercase tracking-widest font-bold block">Active</span>
+                    <strong className="text-sm text-indigo-400 font-bold block mt-1.5">{active}</strong>
+                  </div>
+                  <div className="bg-zinc-900/35 border border-zinc-900/80 px-2 py-3 rounded-lg">
+                    <span className="text-[8.5px] text-zinc-500 uppercase tracking-widest font-bold block">Completed</span>
+                    <strong className="text-sm text-emerald-400 font-bold block mt-1.5">{completed}</strong>
+                  </div>
+                  <div className="bg-zinc-900/35 border border-zinc-900/80 px-2 py-3 rounded-lg">
+                    <span className="text-[8.5px] text-zinc-500 uppercase tracking-widest font-bold block">Failed</span>
+                    <strong className="text-sm text-rose-500 font-bold block mt-1.5">{failed}</strong>
+                  </div>
+                  <div className="bg-zinc-900/35 border border-zinc-900/80 px-2 py-3 rounded-lg">
+                    <span className="text-[8.5px] text-zinc-500 uppercase tracking-widest font-bold block">Delayed</span>
+                    <strong className="text-sm text-amber-500 font-bold block mt-1.5">{delayed}</strong>
+                  </div>
+                </div>
+
+                {/* Performance Stats row */}
+                <div className="grid grid-cols-2 gap-4 bg-zinc-900/20 border border-zinc-900 p-4 rounded-lg text-xs font-mono">
+                  <div className="flex items-center justify-between border-r border-zinc-900 pr-4">
+                    <span className="text-zinc-500">THROUGHPUT:</span>
+                    <strong className="text-white">{throughput} jobs / min</strong>
+                  </div>
+                  <div className="flex items-center justify-between pl-4">
+                    <span className="text-zinc-500">AVERAGE LATENCY:</span>
+                    <strong className="text-white">{latency} ms</strong>
+                  </div>
+                </div>
+
+                {/* Tab Controls */}
+                <div className="flex border-b border-zinc-900">
+                  <button
+                    onClick={() => setInspectorTab('jobs')}
+                    className={`pb-2.5 px-4 text-xs font-bold uppercase tracking-wider font-mono border-b-2 transition-all ${
+                      inspectorTab === 'jobs' 
+                        ? 'border-indigo-500 text-white' 
+                        : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    Recent Jobs ({inspectorJobs.length})
+                  </button>
+                  <button
+                    onClick={() => setInspectorTab('errors')}
+                    className={`pb-2.5 px-4 text-xs font-bold uppercase tracking-wider font-mono border-b-2 transition-all ${
+                      inspectorTab === 'errors' 
+                        ? 'border-indigo-500 text-white' 
+                        : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    Recent Errors ({failedJobs.length})
+                  </button>
+                </div>
+
+                {/* Tab Content */}
+                {inspectorLoadingJobs && inspectorJobs.length === 0 ? (
+                  <div className="text-center py-12 text-zinc-650 font-bold animate-pulse font-mono">
+                    Resolving enqueued indexes...
+                  </div>
+                ) : inspectorTab === 'jobs' ? (
+                  /* Recent Jobs Table */
+                  <div className="space-y-3">
+                    <div className="overflow-x-auto border border-zinc-900 rounded-lg">
+                      <table className="w-full text-left border-collapse font-mono text-[10px]">
+                        <thead>
+                          <tr className="bg-zinc-900/30 border-b border-zinc-900 text-zinc-550 font-bold uppercase text-[8.5px]">
+                            <th className="p-3">Job ID</th>
+                            <th className="p-3">Job Name</th>
+                            <th className="p-3">Status</th>
+                            <th className="p-3">Attempts</th>
+                            <th className="p-3 text-right">Age</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {inspectorJobs.map((job) => {
+                            const ageMs = Date.now() - job.timestamp;
+                            const ageText = ageMs < 5000 ? 'Just now' : `${Math.floor(ageMs / 1000)}s ago`;
+                            
+                            return (
+                              <tr key={job.id} className="border-b border-zinc-900/40 last:border-0 hover:bg-zinc-900/10">
+                                <td className="p-3 font-bold text-zinc-300 select-all">{job.id}</td>
+                                <td className="p-3 text-white font-semibold">{job.name}</td>
+                                <td className="p-3">
+                                  <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold border uppercase ${
+                                    job.status === 'completed' 
+                                      ? 'bg-emerald-950/20 text-emerald-450 border-emerald-900/20' 
+                                      : job.status === 'active'
+                                        ? 'bg-indigo-950/20 text-indigo-400 border-indigo-900/20'
+                                        : job.status === 'failed'
+                                          ? 'bg-rose-950/20 text-rose-455 border-rose-900/20'
+                                          : 'bg-zinc-900 text-zinc-400 border-zinc-800'
+                                  }`}>
+                                    {job.status}
+                                  </span>
+                                </td>
+                                <td className="p-3 text-zinc-400">{job.attemptsMade} / {job.maxAttempts}</td>
+                                <td className="p-3 text-right text-zinc-500">{ageText}</td>
+                              </tr>
+                            );
+                          })}
+
+                          {inspectorJobs.length === 0 && (
+                            <tr>
+                              <td colSpan={5} className="p-8 text-center text-zinc-650 font-bold">
+                                No active job states enqueued in this queue.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  /* Recent Errors list with Stacktraces */
+                  <div className="space-y-4">
+                    {failedJobs.map((job) => (
+                      <div key={job.id} className="bg-zinc-950 border border-zinc-900 rounded-lg p-4 space-y-3">
+                        <div className="flex items-center justify-between border-b border-zinc-900 pb-2">
+                          <span className="font-mono text-zinc-400 font-bold uppercase">{job.id} - {job.name}</span>
+                          <span className="px-1.5 py-0.5 rounded text-[8px] font-bold border bg-rose-950/20 text-rose-455 border-rose-900/20 uppercase">FAILED</span>
+                        </div>
+
+                        <div className="space-y-1.5 text-xs">
+                          <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold block font-mono">Error Message</span>
+                          <p className="text-rose-400 font-mono font-bold leading-normal p-2.5 bg-rose-950/5 border border-rose-950/25 rounded">
+                            {job.failedReason || 'Stripe API Connection Timeout'}
+                          </p>
+                        </div>
+
+                        {job.stackTrace && job.stackTrace.length > 0 && (
+                          <div className="space-y-1.5">
+                            <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold block font-mono">Stacktrace</span>
+                            <pre className="p-3 bg-black/45 border border-zinc-900 rounded text-[9.5px] font-mono overflow-x-auto text-zinc-500 max-h-40 leading-relaxed">
+                              {job.stackTrace.join('\n')}
+                            </pre>
+                          </div>
+                        )}
+
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold block font-mono">Payload Audit</span>
+                          <pre className="p-2.5 bg-zinc-900/20 border border-zinc-900 rounded text-[9px] font-mono text-zinc-400">
+                            {JSON.stringify(job.data, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    ))}
+
+                    {failedJobs.length === 0 && (
+                      <div className="text-center py-12 text-zinc-650 font-bold font-mono">
+                        No recent exceptions logged inside Redis database indexing.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              
+              {/* Footer */}
+              <div className="p-4 border-t border-zinc-900 bg-zinc-950 flex items-center justify-between text-[10px] text-zinc-550 font-mono">
+                <span>Auto-refreshing enqueued indices...</span>
+                <span>ESC to dismiss</span>
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
     </div>
   );

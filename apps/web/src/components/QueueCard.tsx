@@ -15,6 +15,7 @@ interface QueueCardProps {
   metrics?: QueueMetrics;
   onTogglePause: (name: string, isCurrentlyPaused: boolean) => Promise<void>;
   toggleLoading?: string | null;
+  onInspect?: (name: string) => void;
 }
 
 export function QueueCard({
@@ -22,6 +23,7 @@ export function QueueCard({
   metrics,
   onTogglePause,
   toggleLoading,
+  onInspect,
 }: QueueCardProps) {
   const isPending = toggleLoading === queue.name;
   const [showConfirm, setShowConfirm] = useState(false);
@@ -30,19 +32,28 @@ export function QueueCard({
     <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-5 flex flex-col justify-between h-56 hover:border-zinc-800 transition-all relative font-sans">
       <div>
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <span className={`w-1.5 h-1.5 rounded-full ${queue.paused ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`}></span>
-            <h3 className="text-sm font-semibold text-white tracking-tight">{queue.name}</h3>
-          </div>
-          
+          {onInspect ? (
+            <div
+              onClick={() => onInspect(queue.name)}
+              className="flex items-center space-x-2 cursor-pointer group"
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${queue.paused ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`}></span>
+              <h3 className="text-sm font-semibold text-white tracking-tight group-hover:text-indigo-400 transition-colors">{queue.name}</h3>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-2">
+              <span className={`w-1.5 h-1.5 rounded-full ${queue.paused ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`}></span>
+              <h3 className="text-sm font-semibold text-white tracking-tight">{queue.name}</h3>
+            </div>
+          )}
+
           <button
             onClick={() => setShowConfirm(true)}
             disabled={isPending}
-            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all border ${
-              queue.paused
+            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all border ${queue.paused
                 ? 'bg-emerald-950/20 hover:bg-emerald-950/40 text-emerald-400 border-emerald-900/30'
                 : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800'
-            } disabled:opacity-50`}
+              } disabled:opacity-50`}
           >
             {isPending ? 'Syncing...' : queue.paused ? 'Resume' : 'Pause'}
           </button>
@@ -50,7 +61,7 @@ export function QueueCard({
 
         {showConfirm && (
           <>
-            <div 
+            <div
               onClick={() => setShowConfirm(false)}
               className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 transition-opacity animate-fade-in"
             ></div>
@@ -62,7 +73,7 @@ export function QueueCard({
                 </span>
               </div>
               <p className="leading-relaxed text-zinc-400 text-xs">
-                {queue.paused 
+                {queue.paused
                   ? `Confirm resuming telemetry streams on "${queue.name}". Active worker nodes will instantly process waiting Redis jobs.`
                   : `Confirm pausing telemetry streams on "${queue.name}". Active worker nodes will halt processing new jobs.`
                 }
@@ -79,11 +90,10 @@ export function QueueCard({
                     setShowConfirm(false);
                     await onTogglePause(queue.name, queue.paused);
                   }}
-                  className={`flex-1 py-2 rounded-md font-semibold border text-xs transition-all ${
-                    queue.paused
+                  className={`flex-1 py-2 rounded-md font-semibold border text-xs transition-all ${queue.paused
                       ? 'bg-emerald-950/20 hover:bg-emerald-950/40 text-emerald-400 border-emerald-900/30'
                       : 'bg-amber-950/20 hover:bg-amber-950/40 text-amber-400 border-amber-900/30'
-                  }`}
+                    }`}
                 >
                   Confirm
                 </button>
@@ -124,13 +134,23 @@ export function QueueCard({
           <span>Throughput: <strong className="text-white font-medium">{metrics?.throughput ?? 0}/min</strong></span>
         </div>
 
-        <Link
-          href={`/queues/${queue.name}`}
-          className="text-xs font-semibold text-zinc-400 hover:text-white transition-colors flex items-center space-x-1"
-        >
-          <span>Inspect</span>
-          <span>&rarr;</span>
-        </Link>
+        {onInspect ? (
+          <button
+            onClick={() => onInspect(queue.name)}
+            className="text-xs font-semibold text-zinc-400 hover:text-white transition-colors flex items-center space-x-1 focus:outline-none"
+          >
+            <span>Inspect</span>
+            <span>&rarr;</span>
+          </button>
+        ) : (
+          <Link
+            href={`/queues/${queue.name}`}
+            className="text-xs font-semibold text-zinc-400 hover:text-white transition-colors flex items-center space-x-1"
+          >
+            <span>Inspect</span>
+            <span>&rarr;</span>
+          </Link>
+        )}
       </div>
     </div>
   );
