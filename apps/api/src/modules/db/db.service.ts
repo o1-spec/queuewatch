@@ -272,6 +272,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
           workers: [],
           deployments: [],
           incidents: [],
+          businessCapability: 'Order Checkout & Ingestion',
         },
         {
           id: 'svc_payment',
@@ -285,6 +286,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
           workers: ['webhook_delivery'],
           deployments: [],
           incidents: [],
+          businessCapability: 'Customer Payments',
         },
         {
           id: 'svc_notification',
@@ -298,6 +300,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
           workers: ['email_notifications'],
           deployments: [],
           incidents: [],
+          businessCapability: 'Customer Notifications',
         },
         {
           id: 'svc_media',
@@ -311,6 +314,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
           workers: ['image_processing'],
           deployments: [],
           incidents: [],
+          businessCapability: 'User Profile & Assets',
         },
         {
           id: 'svc_ai',
@@ -324,6 +328,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
           workers: ['ai_tasks'],
           deployments: [],
           incidents: [],
+          businessCapability: 'AI Operational Insight',
         }
       ];
       for (const svc of defaultServices) {
@@ -348,14 +353,14 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
           { id: 'ai_tasks', label: 'ai_tasks', type: 'queue' }
         ],
         edges: [
-          { from: 'svc_order', to: 'webhook_delivery' },
-          { from: 'webhook_delivery', to: 'svc_payment' },
-          { from: 'svc_payment', to: 'email_notifications' },
-          { from: 'email_notifications', to: 'svc_notification' },
-          { from: 'svc_order', to: 'image_processing' },
-          { from: 'image_processing', to: 'svc_media' },
-          { from: 'svc_notification', to: 'ai_tasks' },
-          { from: 'ai_tasks', to: 'svc_ai' }
+          { from: 'svc_order', to: 'webhook_delivery', observations: 150 },
+          { from: 'webhook_delivery', to: 'svc_payment', observations: 120 },
+          { from: 'svc_payment', to: 'email_notifications', observations: 95 },
+          { from: 'email_notifications', to: 'svc_notification', observations: 80 },
+          { from: 'svc_order', to: 'image_processing', observations: 45 },
+          { from: 'image_processing', to: 'svc_media', observations: 35 },
+          { from: 'svc_notification', to: 'ai_tasks', observations: 12 },
+          { from: 'ai_tasks', to: 'svc_ai', observations: 10 }
         ],
         serviceImpacts: {
           svc_order: ['svc_payment', 'svc_notification', 'svc_media'],
@@ -479,6 +484,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     serviceName?: string,
     queueName?: string,
     workerId?: string,
+    isConsumer?: boolean,
   ): Promise<void> {
     let resolvedService = serviceName;
     if (!resolvedService && queueName) {
@@ -495,7 +501,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
     const serviceId = `svc_${resolvedService.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
     let service = await this.getService(serviceId, projectId);
-    let changed = false;
+    let serviceChanged = false;
 
     if (!service) {
       service = {
@@ -511,57 +517,155 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         deployments: [],
         incidents: [],
       };
-      changed = true;
+      serviceChanged = true;
     }
 
     if (queueName && !service.queues.includes(queueName)) {
       service.queues.push(queueName);
-      changed = true;
+      serviceChanged = true;
     }
 
     if (workerId && !service.workers.includes(workerId)) {
       service.workers.push(workerId);
-      changed = true;
+      serviceChanged = true;
     }
 
-    if (changed) {
+    if (serviceChanged) {
       await this.saveService(service, projectId);
+    }
 
-      if (queueName) {
-        await this.registerProjectQueue(projectId, queueName);
-      }
+    if (queueName) {
+      await this.registerProjectQueue(projectId, queueName);
+    }
 
-      const graph = await this.getDependencyGraph(projectId);
-      let graphChanged = false;
+    // Always get and update dependency graph nodes and edges
+    const graph = await this.getDependencyGraph(projectId);
+    let graphChanged = false;
 
-      if (!graph.nodes.some(n => n.id === serviceId)) {
-        graph.nodes.push({ id: serviceId, label: resolvedService, type: 'service' });
+    if (!graph.nodes.some(n => n.id === serviceId)) {
+      graph.nodes.push({ id: serviceId, label: resolvedService, type: 'service' });
+      graphChanged = true;
+    }
+
+    if (queueName && !graph.nodes.some(n => n.id === queueName)) {
+      graph.nodes.push({ id: queueName, label: queueName, type: 'queue' });
+      graphChanged = true;
+    }
+
+    if (queueName) {
+      const fromNode = isConsumer ? queueName : serviceId;
+      const toNode = isConsumer ? serviceId : queueName;
+
+      let edge = graph.edges.find(e => e.from === fromNode && e.to === toNode);
+      if (!edge) {
+        edge = { from: fromNode, to: toNode, observations: 0 };
+        graph.edges.push(edge);
         graphChanged = true;
       }
+      edge.observations = (edge.observations || 0) + 1;
+      graphChanged = true;
 
-      if (queueName && !graph.nodes.some(n => n.id === queueName)) {
-        graph.nodes.push({ id: queueName, label: queueName, type: 'queue' });
+      if (!graph.serviceImpacts) {
+        graph.serviceImpacts = {};
+      }
+      if (!graph.serviceImpacts[fromNode]) {
+        graph.serviceImpacts[fromNode] = [];
+      }
+      if (!graph.serviceImpacts[fromNode].includes(toNode)) {
+        graph.serviceImpacts[fromNode].push(toNode);
         graphChanged = true;
       }
+    }
 
-      if (queueName && !graph.edges.some(e => e.from === serviceId && e.to === queueName)) {
-        graph.edges.push({ from: serviceId, to: queueName });
-        graphChanged = true;
-      }
+    if (graphChanged) {
+      await this.saveDependencyGraph(graph, projectId);
+    }
+  }
 
-      if (queueName) {
-        if (!graph.serviceImpacts[serviceId]) {
-          graph.serviceImpacts[serviceId] = [];
-        }
-        if (!graph.serviceImpacts[serviceId].includes(queueName)) {
-          graph.serviceImpacts[serviceId].push(queueName);
-          graphChanged = true;
-        }
-      }
+  async discoverWorkflowEdge(
+    projectId: string,
+    fromNode: string,
+    toNode: string,
+    fromLabel?: string,
+    toLabel?: string,
+  ): Promise<void> {
+    const fromId = fromNode.startsWith('svc_') ? fromNode : `svc_${fromNode.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+    const toId = toNode.startsWith('svc_') ? toNode : `svc_${toNode.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
 
-      if (graphChanged) {
-        await this.saveDependencyGraph(graph, projectId);
-      }
+    const fromName = fromLabel || (fromNode.startsWith('svc_') ? fromNode.slice(4) : fromNode);
+    const toName = toLabel || (toNode.startsWith('svc_') ? toNode.slice(4) : toNode);
+
+    let fromService = await this.getService(fromId, projectId);
+    if (!fromService) {
+      fromService = {
+        id: fromId,
+        name: fromName,
+        description: `Workflow service discovered from SDK telemetry.`,
+        environment: 'production',
+        owner: 'sre-team',
+        status: 'healthy',
+        createdAt: Date.now(),
+        queues: [],
+        workers: [],
+        deployments: [],
+        incidents: [],
+      };
+      await this.saveService(fromService, projectId);
+    }
+
+    let toService = await this.getService(toId, projectId);
+    if (!toService) {
+      toService = {
+        id: toId,
+        name: toName,
+        description: `Workflow service discovered from SDK telemetry.`,
+        environment: 'production',
+        owner: 'sre-team',
+        status: 'healthy',
+        createdAt: Date.now(),
+        queues: [],
+        workers: [],
+        deployments: [],
+        incidents: [],
+      };
+      await this.saveService(toService, projectId);
+    }
+
+    const graph = await this.getDependencyGraph(projectId);
+    let graphChanged = false;
+
+    if (!graph.nodes.some(n => n.id === fromId)) {
+      graph.nodes.push({ id: fromId, label: fromName, type: 'service' });
+      graphChanged = true;
+    }
+
+    if (!graph.nodes.some(n => n.id === toId)) {
+      graph.nodes.push({ id: toId, label: toName, type: 'service' });
+      graphChanged = true;
+    }
+
+    let edge = graph.edges.find(e => e.from === fromId && e.to === toId);
+    if (!edge) {
+      edge = { from: fromId, to: toId, observations: 0 };
+      graph.edges.push(edge);
+      graphChanged = true;
+    }
+    edge.observations = (edge.observations || 0) + 1;
+    graphChanged = true;
+
+    if (!graph.serviceImpacts) {
+      graph.serviceImpacts = {};
+    }
+    if (!graph.serviceImpacts[fromId]) {
+      graph.serviceImpacts[fromId] = [];
+    }
+    if (!graph.serviceImpacts[fromId].includes(toId)) {
+      graph.serviceImpacts[fromId].push(toId);
+      graphChanged = true;
+    }
+
+    if (graphChanged) {
+      await this.saveDependencyGraph(graph, projectId);
     }
   }
 

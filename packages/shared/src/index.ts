@@ -294,11 +294,12 @@ export interface Service {
   workers: string[];
   deployments: string[];
   incidents: string[];
+  businessCapability?: string;
 }
 
 export interface DependencyGraph {
   nodes: { id: string; label: string; type: 'service' | 'queue' | 'worker' }[];
-  edges: { from: string; to: string }[];
+  edges: { from: string; to: string; observations?: number }[];
   serviceImpacts: Record<string, string[]>;
 }
 

@@ -56,7 +56,17 @@ export class IngestController {
       // Register queue name dynamically
       if (event.queueName) {
         await this.dbService.registerProjectQueue(projectId, event.queueName);
-        await this.dbService.discoverService(projectId, event.serviceName, event.queueName, event.workerId);
+        const isConsumer = !(['job.created', 'job.added'].includes(event.type));
+        await this.dbService.discoverService(projectId, event.serviceName, event.queueName, event.workerId, isConsumer);
+      }
+
+      // Track workflow-derived edges if present
+      if (event.type && (event.type === 'workflow.step' || event.type.startsWith('workflow.'))) {
+        const step = event.step || event.payload?.step || event.metadata?.step;
+        const nextStep = event.nextStep || event.payload?.nextStep || event.metadata?.nextStep;
+        if (step && nextStep) {
+          await this.dbService.discoverWorkflowEdge(projectId, step, nextStep);
+        }
       }
 
       // Save to database
@@ -129,7 +139,7 @@ export class IngestController {
     // Register queue name if present in metadata
     if (body.queueName) {
       await this.dbService.registerProjectQueue(projectId, body.queueName);
-      await this.dbService.discoverService(projectId, body.serviceName, body.queueName, body.workerName);
+      await this.dbService.discoverService(projectId, body.serviceName, body.queueName, body.workerName, true);
     }
 
     const logEntry = {
@@ -176,8 +186,8 @@ export class IngestController {
     // Save worker health report to DB
     await this.dbService.saveWorker(report, projectId);
 
-    // Discover SRE service mapping from heartbeat telemetry
-    await this.dbService.discoverService(projectId, body.serviceName, body.queueName, report.workerId);
+    // Discover SRE service mapping from heartbeat telemetry (heartbeats are from consumers/workers)
+    await this.dbService.discoverService(projectId, body.serviceName, body.queueName, report.workerId, true);
 
     this.wsGateway.broadcast('worker.health.updated', [{ ...report, projectId }]);
     return { success: true };

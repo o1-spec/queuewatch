@@ -196,7 +196,10 @@ export default function IncidentsRegistry() {
 
   const handleTabChange = (incidentId: string, queueName: string, tab: string) => {
     setActiveTabs(prev => ({ ...prev, [incidentId]: tab }));
-    if (tab === 'overview') loadDeployments(incidentId);
+    if (tab === 'overview') {
+      loadDeployments(incidentId);
+      loadBlastRadius(incidentId);
+    }
     if (tab === 'timeline') loadTimeline(incidentId);
     if (tab === 'investigation') loadInvestigation(incidentId);
     if (tab === 'logs') loadIncidentLogs(incidentId, queueName);
@@ -599,9 +602,134 @@ export default function IncidentsRegistry() {
                               </div>
                             );
                           })()}
+ 
+                           {/* SRE Blast Radius & Business Impact Cascade Card */}
+                           {(() => {
+                             const blast = blastRadii[inc.id];
+                             if (!blast) return null;
 
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                            {/* Left Side: Root Cause & Diagnostics */}
+                             return (
+                               <div className="p-4 border border-zinc-800 bg-zinc-950/20 backdrop-blur-md rounded-lg space-y-4 shadow-xl">
+                                 <div className="flex items-center justify-between border-b border-zinc-900 pb-3 flex-wrap gap-2">
+                                   <div className="space-y-1">
+                                     <h4 className="text-[10px] font-bold text-white uppercase tracking-wider flex items-center space-x-1.5">
+                                       <ShieldAlert className="w-3.5 h-3.5 text-rose-500" />
+                                       <span>Downstream Blast Radius & Business Impact</span>
+                                     </h4>
+                                     <p className="text-[9px] text-zinc-500 font-sans">
+                                       Topological impact cascade discovered via live telemetry edge tracking.
+                                     </p>
+                                   </div>
+                                   
+                                   <div className="flex items-center space-x-2">
+                                     <span className="text-[9px] text-zinc-500 uppercase">Impact Scale:</span>
+                                     <span className={`px-2 py-0.5 rounded text-[9px] font-bold border uppercase tracking-widest font-mono ${
+                                       blast.estimatedBlastRadius === 'critical' ? 'bg-rose-950/40 border-rose-500 text-rose-450 animate-pulse' :
+                                       blast.estimatedBlastRadius === 'high' ? 'bg-orange-950/40 border-orange-500 text-orange-400' :
+                                       blast.estimatedBlastRadius === 'medium' ? 'bg-amber-950/40 border-amber-500 text-amber-450' :
+                                       'bg-zinc-900 border-zinc-700 text-zinc-400'
+                                     }`}>
+                                       {blast.estimatedBlastRadius}
+                                     </span>
+                                   </div>
+                                 </div>
+
+                                 {/* Direct Outage Owner */}
+                                 <div className="flex flex-col sm:flex-row gap-4 justify-between bg-black/40 border border-zinc-900/60 p-3 rounded font-sans text-xs">
+                                   <div className="space-y-1">
+                                     <span className="text-[8px] font-bold font-mono text-zinc-500 uppercase tracking-wider block">Core Outage Service</span>
+                                     <span className="text-white font-bold text-[11px] font-mono">
+                                       {blast.affectedService ? blast.affectedService.name : 'Unknown Service'}
+                                     </span>
+                                     <span className="text-zinc-550 text-[10px] block">
+                                       {blast.affectedService?.description || 'Determining owner service from queue consumers...'}
+                                     </span>
+                                   </div>
+                                   {blast.affectedService?.businessCapability && (
+                                     <div className="space-y-1 sm:text-right">
+                                       <span className="text-[8px] font-bold font-mono text-zinc-500 uppercase tracking-wider block">Primary Capability</span>
+                                       <span className="text-zinc-300 font-semibold text-[11px] font-mono">
+                                         {blast.affectedService.businessCapability}
+                                       </span>
+                                     </div>
+                                   )}
+                                 </div>
+
+                                 {/* Downstream Cascade Flowchart */}
+                                 <div className="space-y-2">
+                                   <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-wider font-mono block">Outage Cascade Path</span>
+                                   <div className="bg-black/35 border border-zinc-900 p-4 rounded-lg flex items-center gap-2 flex-wrap min-h-[70px] justify-start">
+                                     {blast.cascadePath && blast.cascadePath.map((node: string, index: number) => {
+                                       const isService = node.startsWith('svc_');
+                                       const nodeDetails = isService 
+                                         ? (blast.affectedService?.id === node ? blast.affectedService : blast.impactedServicesDetails?.find((s: any) => s.id === node))
+                                         : null;
+                                       const displayName = isService ? (nodeDetails?.name || node.slice(4).replace(/_/g, '-')) : node;
+
+                                       const edge = index > 0 ? blast.edges?.find((e: any) => e.to === node && e.from === blast.cascadePath[index - 1]) : null;
+
+                                       return (
+                                         <React.Fragment key={node}>
+                                           {index > 0 && (
+                                             <div className="flex flex-col items-center justify-center px-1 font-mono text-[8px] shrink-0">
+                                               <span className="text-zinc-650 font-bold">&rarr;</span>
+                                               {edge && (
+                                                 <span className={`text-[7.5px] px-1 rounded font-bold ${
+                                                   edge.confidence === 'Strong' ? 'text-indigo-400 bg-indigo-950/20' :
+                                                   edge.confidence === 'Moderate' ? 'text-amber-400 bg-amber-950/20' :
+                                                   'text-zinc-550 bg-zinc-900/40'
+                                                 }`} title={`${edge.observations} telemetry events observed`}>
+                                                   {edge.confidence} ({edge.observations})
+                                                 </span>
+                                               )}
+                                             </div>
+                                           )}
+                                           
+                                           <div className={`px-2.5 py-1.5 border rounded flex items-center space-x-1.5 shrink-0 ${
+                                             isService 
+                                               ? 'border-indigo-900 bg-indigo-950/10 text-indigo-300' 
+                                               : 'border-zinc-800 bg-zinc-900/30 text-zinc-300'
+                                           }`} title={nodeDetails?.description || undefined}>
+                                             {isService ? (
+                                               <Activity className="w-3.5 h-3.5 text-indigo-400" />
+                                             ) : (
+                                               <Terminal className="w-3.5 h-3.5 text-zinc-500" />
+                                             )}
+                                             <span className="font-bold font-mono text-[10px]">{displayName}</span>
+                                           </div>
+                                         </React.Fragment>
+                                       );
+                                     })}
+                                   </div>
+                                 </div>
+
+                                 {/* Business Impact Analysis list */}
+                                 <div className="space-y-2">
+                                   <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-wider font-mono block">Business Impact Analysis</span>
+                                   <div className="bg-black/20 border border-zinc-900 p-3 rounded space-y-2">
+                                     {blast.businessImpacts && blast.businessImpacts.length > 0 ? (
+                                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-sans">
+                                         {blast.businessImpacts.map((impact: string, idx: number) => (
+                                           <div key={idx} className="flex items-start space-x-2 border-l border-zinc-800 pl-2 py-0.5">
+                                             <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0 mt-1.5"></span>
+                                             <div className="space-y-0.5">
+                                               <span className="text-zinc-200 font-bold block">{impact}</span>
+                                               <span className="text-[10px] text-zinc-500">Service capability degraded</span>
+                                             </div>
+                                           </div>
+                                         ))}
+                                       </div>
+                                     ) : (
+                                       <p className="text-zinc-650 text-[10px] font-sans">No customer-facing capabilities are determined to be degraded.</p>
+                                     )}
+                                   </div>
+                                 </div>
+                               </div>
+                             );
+                           })()}
+
+                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                             {/* Left Side: Root Cause & Diagnostics */}
                             <div className="space-y-3">
                               <div className="p-3.5 bg-black/40 border border-zinc-900 rounded space-y-2">
                                 <h4 className="text-[9.5px] font-bold text-white uppercase border-b border-zinc-900 pb-1.5 flex items-center space-x-1">
@@ -1173,7 +1301,7 @@ export default function IncidentsRegistry() {
                                     <span className={`text-2xl font-bold uppercase ${
                                       blastRadii[inc.id].estimatedBlastRadius === 'critical' || blastRadii[inc.id].estimatedBlastRadius === 'high'
                                         ? 'text-rose-500 animate-pulse'
-                                        : 'text-amber-500'
+                                        : 'text-amber-550'
                                     }`}>
                                       {blastRadii[inc.id].estimatedBlastRadius}
                                     </span>
@@ -1188,38 +1316,86 @@ export default function IncidentsRegistry() {
                                 </div>
                               </div>
 
+                              {/* Outage Cascade Path Flowchart */}
+                              <div className="bg-black/35 border border-zinc-900 p-4 rounded-lg flex items-center gap-2 flex-wrap min-h-[70px] justify-start">
+                                {blastRadii[inc.id].cascadePath && blastRadii[inc.id].cascadePath.map((node: string, index: number) => {
+                                  const isService = node.startsWith('svc_');
+                                  const nodeDetails = isService 
+                                    ? (blastRadii[inc.id].affectedService?.id === node ? blastRadii[inc.id].affectedService : blastRadii[inc.id].impactedServicesDetails?.find((s: any) => s.id === node))
+                                    : null;
+                                  const displayName = isService ? (nodeDetails?.name || node.slice(4).replace(/_/g, '-')) : node;
+
+                                  const edge = index > 0 ? blastRadii[inc.id].edges?.find((e: any) => e.to === node && e.from === blastRadii[inc.id].cascadePath[index - 1]) : null;
+
+                                  return (
+                                    <React.Fragment key={node}>
+                                      {index > 0 && (
+                                        <div className="flex flex-col items-center justify-center px-1 font-mono text-[8px] shrink-0">
+                                          <span className="text-zinc-650 font-bold">&rarr;</span>
+                                          {edge && (
+                                            <span className={`text-[7.5px] px-1 rounded font-bold ${
+                                              edge.confidence === 'Strong' ? 'text-indigo-400 bg-indigo-950/20' :
+                                              edge.confidence === 'Moderate' ? 'text-amber-400 bg-amber-950/20' :
+                                              'text-zinc-550 bg-zinc-900/40'
+                                            }`} title={`${edge.observations} telemetry events observed`}>
+                                              {edge.confidence} ({edge.observations})
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                      
+                                      <div className={`px-2.5 py-1.5 border rounded flex items-center space-x-1.5 shrink-0 ${
+                                        isService 
+                                          ? 'border-indigo-900 bg-indigo-950/10 text-indigo-300' 
+                                          : 'border-zinc-800 bg-zinc-900/30 text-zinc-300'
+                                      }`} title={nodeDetails?.description || undefined}>
+                                        {isService ? (
+                                          <Activity className="w-3.5 h-3.5 text-indigo-400" />
+                                        ) : (
+                                          <Terminal className="w-3.5 h-3.5 text-zinc-500" />
+                                        )}
+                                        <span className="font-bold font-mono text-[10px]">{displayName}</span>
+                                      </div>
+                                    </React.Fragment>
+                                  );
+                                })}
+                              </div>
+
                               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                {/* Impacted Services */}
+                                {/* Business Impact list */}
                                 <div className="bg-zinc-900/20 border border-zinc-900 p-4 rounded-lg space-y-2.5">
-                                  <span className="text-zinc-555 uppercase text-[9px] font-bold block">IMPACTED DOWNSTREAM SERVICES</span>
-                                  {blastRadii[inc.id].impactedServices && blastRadii[inc.id].impactedServices.length > 0 ? (
-                                    <ul className="space-y-1.5 font-sans text-zinc-350 text-xs">
-                                      {blastRadii[inc.id].impactedServices.map((svc: string, idx: number) => (
-                                        <li key={idx} className="flex items-start space-x-2 text-rose-450">
-                                          <span className="font-bold font-mono text-[10px] shrink-0 mt-0.5">&bull;</span>
-                                          <span>{svc}</span>
+                                  <span className="text-zinc-555 uppercase text-[9px] font-bold block">BUSINESS CAPABILITY DEGRADATION</span>
+                                  {blastRadii[inc.id].businessImpacts && blastRadii[inc.id].businessImpacts.length > 0 ? (
+                                    <ul className="space-y-2 font-sans text-zinc-350 text-xs">
+                                      {blastRadii[inc.id].businessImpacts.map((impact: string, idx: number) => (
+                                        <li key={idx} className="flex items-start space-x-2 border-l border-rose-950 pl-2 py-0.5">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0 mt-1.5"></span>
+                                          <div className="space-y-0.5">
+                                            <span className="text-zinc-200 font-bold block">{impact}</span>
+                                            <span className="text-[10px] text-zinc-500">Service capability degraded</span>
+                                          </div>
                                         </li>
                                       ))}
                                     </ul>
                                   ) : (
-                                    <p className="text-zinc-550 text-xs font-sans">No downstream microservices are directly impacted by this outage.</p>
+                                    <p className="text-zinc-650 text-xs font-sans">No customer-facing capabilities are determined to be degraded.</p>
                                   )}
                                 </div>
 
-                                {/* Impacted Queues */}
-                                <div className="bg-zinc-900/20 border border-zinc-900 p-4 rounded-lg space-y-2.5">
-                                  <span className="text-zinc-555 uppercase text-[9px] font-bold block">IMPACTED QUEUES</span>
-                                  {blastRadii[inc.id].impactedQueues && blastRadii[inc.id].impactedQueues.length > 0 ? (
-                                    <ul className="space-y-1.5 font-sans text-zinc-350 text-xs">
-                                      {blastRadii[inc.id].impactedQueues.map((q: string, idx: number) => (
-                                        <li key={idx} className="flex items-start space-x-2 text-rose-450">
-                                          <span className="font-bold font-mono text-[10px] shrink-0 mt-0.5">&bull;</span>
-                                          <span>{q}</span>
-                                        </li>
+                                {/* Raw Details */}
+                                <div className="bg-zinc-900/20 border border-zinc-900 p-4 rounded-lg space-y-2.5 font-mono text-[9px]">
+                                  <span className="text-zinc-555 uppercase text-[9px] font-bold block font-sans">Topological Edge Observations</span>
+                                  {blastRadii[inc.id].edges && blastRadii[inc.id].edges.length > 0 ? (
+                                    <div className="space-y-1">
+                                      {blastRadii[inc.id].edges.map((e: any, idx: number) => (
+                                        <div key={idx} className="flex justify-between border-b border-zinc-900/40 pb-1 last:border-0">
+                                          <span className="text-zinc-400">{e.from} &rarr; {e.to}</span>
+                                          <span className="text-zinc-500">{e.confidence} ({e.observations} obs)</span>
+                                        </div>
                                       ))}
-                                    </ul>
+                                    </div>
                                   ) : (
-                                    <p className="text-zinc-555 text-xs font-sans">No additional queues impacted.</p>
+                                    <p className="text-zinc-650 font-sans">No direct observations stored.</p>
                                   )}
                                 </div>
                               </div>

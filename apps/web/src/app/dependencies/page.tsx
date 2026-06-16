@@ -98,7 +98,7 @@ export default function DependenciesOverview() {
                       <div 
                         key={node.id} 
                         onClick={() => handleSelectService(node.id)}
-                        className={`p-3 rounded border cursor-pointer transition-all flex items-center justify-between gap-4 ${
+                        className={`p-3 rounded border cursor-pointer transition-all flex flex-col md:flex-row md:items-center md:justify-between gap-3 ${
                           isSelected ? 'bg-indigo-950/10 border-indigo-500 text-white' : 'bg-zinc-900/20 border-zinc-900 hover:border-zinc-800 text-zinc-400'
                         }`}
                       >
@@ -108,13 +108,24 @@ export default function DependenciesOverview() {
                         </div>
 
                         {linkedQueues.length > 0 && (
-                          <div className="flex items-center space-x-2 text-[9px] font-mono text-zinc-550">
+                          <div className="flex items-center space-x-2 text-[9px] font-mono text-zinc-550 flex-wrap gap-y-1">
                             <span>Writes to:</span>
-                            {linkedQueues.map(q => (
-                              <span key={q} className="bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-800 text-indigo-300 font-bold uppercase select-all">
-                                {q}
-                              </span>
-                            ))}
+                            {linkedQueues.map(q => {
+                              const edge = graph?.edges.find(e => e.from === node.id && e.to === q);
+                              const obs = edge?.observations || 0;
+                              const confidence = obs > 50 ? 'Strong' : obs > 5 ? 'Moderate' : 'Weak';
+                              const confidenceColor = confidence === 'Strong' ? 'text-indigo-400 bg-indigo-950/20 border-indigo-900/40' :
+                                                      confidence === 'Moderate' ? 'text-amber-400 bg-amber-950/20 border-amber-900/40' :
+                                                      'text-zinc-500 bg-zinc-900/40 border-zinc-850';
+                              return (
+                                <div key={q} className="inline-flex items-center space-x-1.5 border border-zinc-800 rounded bg-zinc-900 px-1.5 py-0.5 select-all">
+                                  <span className="text-zinc-300 uppercase font-bold">{q}</span>
+                                  <span className={`px-1.5 py-0.2 rounded text-[7.5px] font-bold border uppercase ${confidenceColor}`} title={`${obs} telemetry events observed`}>
+                                    {confidence} ({obs})
+                                  </span>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -131,16 +142,27 @@ export default function DependenciesOverview() {
                       <th className="p-3">Source Node</th>
                       <th className="p-3 text-center">&rarr;</th>
                       <th className="p-3">Dependent Target Node</th>
+                      <th className="p-3 text-right">Telemetry Observations</th>
+                      <th className="p-3 text-right">Edge Strength</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {graph?.edges.map((edge, idx) => (
-                      <tr key={idx} className="border-b border-zinc-900/40 last:border-0 hover:bg-zinc-900/5">
-                        <td className="p-3 font-bold text-zinc-400">{edge.from}</td>
-                        <td className="p-3 text-center text-zinc-650">&rarr;</td>
-                        <td className="p-3 text-white font-semibold">{edge.to}</td>
-                      </tr>
-                    ))}
+                    {graph?.edges.map((edge, idx) => {
+                      const obs = edge.observations || 0;
+                      const confidence = obs > 50 ? 'Strong' : obs > 5 ? 'Moderate' : 'Weak';
+                      const confidenceColor = confidence === 'Strong' ? 'text-indigo-400 font-bold' :
+                                              confidence === 'Moderate' ? 'text-amber-400' :
+                                              'text-zinc-500';
+                      return (
+                        <tr key={idx} className="border-b border-zinc-900/40 last:border-0 hover:bg-zinc-900/5 text-[10px]">
+                          <td className="p-3 font-bold text-zinc-400 select-all">{edge.from}</td>
+                          <td className="p-3 text-center text-zinc-650">&rarr;</td>
+                          <td className="p-3 text-white font-semibold select-all">{edge.to}</td>
+                          <td className="p-3 text-right text-zinc-350 font-mono">{obs}</td>
+                          <td className={`p-3 text-right font-bold uppercase ${confidenceColor}`}>{confidence}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
