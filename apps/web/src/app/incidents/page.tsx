@@ -385,7 +385,7 @@ export default function IncidentsRegistry() {
                 }`}
               >
                 {/* Header block */}
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="flex flex-col gap-3">
                   <div className="flex items-start space-x-2.5 min-w-0">
                     <button
                       onClick={() => {
@@ -435,24 +435,24 @@ export default function IncidentsRegistry() {
                     </div>
                   </div>
 
-                  {/* Workflow buttons */}
-                  <div className="flex flex-wrap items-center gap-2 shrink-0 self-end lg:self-center">
+                  {/* Workflow buttons — scrollable on mobile */}
+                  <div className="flex flex-wrap items-center gap-2 overflow-x-auto pb-0.5">
                     {inc.status === 'open' && (
                       <button
                         onClick={() => handleAcknowledge(inc.id)}
-                        className="px-2 py-1 rounded bg-indigo-900 hover:bg-indigo-950 border border-indigo-850 text-white font-bold transition-all flex items-center space-x-1"
+                        className="px-2 py-1 rounded bg-indigo-900 hover:bg-indigo-950 border border-indigo-800 text-white font-bold transition-all flex items-center gap-1 shrink-0"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>ACKNOWLEDGE</span>
+                        <span className="hidden xs:inline">ACK</span>
+                        <span className="hidden sm:inline">NOWLEDGE</span>
                       </button>
                     )}
 
                     {inc.status !== 'resolved' && (
                       <>
-                        {/* Assign to Dev */}
                         <button
                           onClick={() => handleAssign(inc.id, 'admin', 'Admin Owner')}
-                          className="px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 font-bold transition-all flex items-center space-x-1"
+                          className="px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 font-bold transition-all flex items-center gap-1 shrink-0"
                         >
                           <User className="w-3.5 h-3.5" />
                           <span>CLAIM</span>
@@ -461,15 +461,15 @@ export default function IncidentsRegistry() {
                         <button
                           onClick={() => handleEscalate(inc.id)}
                           disabled={!!inc.escalatedAt}
-                          className="px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-amber-500 font-bold transition-all disabled:opacity-50 flex items-center space-x-1"
+                          className="px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-amber-500 font-bold transition-all disabled:opacity-50 flex items-center gap-1 shrink-0"
                         >
                           <ShieldAlert className="w-3.5 h-3.5" />
-                          <span>ESCALATE</span>
+                          <span className="hidden sm:inline">ESCALATE</span>
                         </button>
 
                         <button
                           onClick={() => setShowResolveModal(inc.id)}
-                          className="px-2 py-1 rounded bg-emerald-950/20 hover:bg-emerald-950/40 border border-emerald-900 text-emerald-400 font-bold transition-all flex items-center space-x-1"
+                          className="px-2 py-1 rounded bg-emerald-950/20 hover:bg-emerald-950/40 border border-emerald-900 text-emerald-400 font-bold transition-all flex items-center gap-1 shrink-0"
                         >
                           <Check className="w-3.5 h-3.5" />
                           <span>RESOLVE</span>
@@ -480,14 +480,15 @@ export default function IncidentsRegistry() {
                     <button
                       onClick={() => runInvestigation(inc.id, inc.affectedQueue)}
                       disabled={isAnalyzing || inc.status === 'resolved'}
-                      className="px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-zinc-400 hover:text-white font-bold transition-all disabled:opacity-50 flex items-center space-x-1"
+                      className="px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white font-bold transition-all disabled:opacity-50 flex items-center gap-1 shrink-0"
                     >
                       {isAnalyzing ? (
-                        <RefreshCw className="w-3 h-3.5 animate-spin" />
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                       ) : (
                         <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
                       )}
-                      <span>AI DIAGNOSTICS</span>
+                      <span className="hidden sm:inline">AI DIAGNOSTICS</span>
+                      <span className="sm:hidden">AI</span>
                     </button>
                   </div>
                 </div>
@@ -495,97 +496,32 @@ export default function IncidentsRegistry() {
                 {/* Details / Tabs Panel */}
                 {isExpanded && (
                   <div className="mt-4 border-t border-zinc-900 pt-4 space-y-4">
-                    {/* Tab Navigation */}
-                    <div className="flex border-b border-zinc-900 text-[9px] font-bold flex-wrap">
-                      <button
-                        onClick={() => handleTabChange(inc.id, inc.affectedQueue, 'overview')}
-                        className={`px-3 py-1.5 border-t-2 -mb-px transition-all uppercase flex items-center space-x-1 ${
-                          currentTab === 'overview' ? 'border-indigo-500 text-white bg-zinc-900/40' : 'border-transparent text-zinc-500 hover:text-zinc-300'
-                        }`}
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                        <span>Overview</span>
-                      </button>
-                      
-                      <button
-                        onClick={() => handleTabChange(inc.id, inc.affectedQueue, 'timeline')}
-                        className={`px-3 py-1.5 border-t-2 -mb-px transition-all uppercase flex items-center space-x-1 ${
-                          currentTab === 'timeline' ? 'border-indigo-500 text-white bg-zinc-900/40' : 'border-transparent text-zinc-500 hover:text-zinc-300'
-                        }`}
-                      >
-                        <History className="w-3.5 h-3.5" />
-                        <span>SRE Timeline</span>
-                      </button>
-
-                      <button
-                        onClick={() => handleTabChange(inc.id, inc.affectedQueue, 'investigation')}
-                        className={`px-3 py-1.5 border-t-2 -mb-px transition-all uppercase flex items-center space-x-1 ${
-                          currentTab === 'investigation' ? 'border-indigo-500 text-white bg-zinc-900/40' : 'border-transparent text-zinc-500 hover:text-zinc-300'
-                        }`}
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>AI Investigation</span>
-                      </button>
-
-                      <button
-                        onClick={() => handleTabChange(inc.id, inc.affectedQueue, 'comments')}
-                        className={`px-3 py-1.5 border-t-2 -mb-px transition-all uppercase flex items-center space-x-1 ${
-                          currentTab === 'comments' ? 'border-indigo-500 text-white bg-zinc-900/40' : 'border-transparent text-zinc-500 hover:text-zinc-300'
-                        }`}
-                      >
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        <span>Notes ({comments[inc.id]?.length || 0})</span>
-                      </button>
-
-                      <button
-                        onClick={() => handleTabChange(inc.id, inc.affectedQueue, 'deployments')}
-                        className={`px-3 py-1.5 border-t-2 -mb-px transition-all uppercase flex items-center space-x-1 ${
-                          currentTab === 'deployments' ? 'border-indigo-500 text-white bg-zinc-900/40' : 'border-transparent text-zinc-500 hover:text-zinc-300'
-                        }`}
-                      >
-                        <GitCommit className="w-3.5 h-3.5" />
-                        <span>Deployments</span>
-                      </button>
-
-                      <button
-                        onClick={() => handleTabChange(inc.id, inc.affectedQueue, 'logs')}
-                        className={`px-3 py-1.5 border-t-2 -mb-px transition-all uppercase flex items-center space-x-1 ${
-                          currentTab === 'logs' ? 'border-indigo-500 text-white bg-zinc-900/40' : 'border-transparent text-zinc-500 hover:text-zinc-300'
-                        }`}
-                      >
-                        <Terminal className="w-3.5 h-3.5" />
-                        <span>Queue Logs</span>
-                      </button>
-
-                      <button
-                        onClick={() => handleTabChange(inc.id, inc.affectedQueue, 'dlq')}
-                        className={`px-3 py-1.5 border-t-2 -mb-px transition-all uppercase flex items-center space-x-1 ${
-                          currentTab === 'dlq' ? 'border-indigo-500 text-white bg-zinc-900/40' : 'border-transparent text-zinc-500 hover:text-zinc-300'
-                        }`}
-                      >
-                        <ShieldAlert className="w-3.5 h-3.5" />
-                        <span>DLQ Jobs</span>
-                      </button>
-
-                      <button
-                        onClick={() => handleTabChange(inc.id, inc.affectedQueue, 'copilot')}
-                        className={`px-3 py-1.5 border-t-2 -mb-px transition-all uppercase flex items-center space-x-1 ${
-                          currentTab === 'copilot' ? 'border-indigo-500 text-white bg-zinc-900/40' : 'border-transparent text-zinc-500 hover:text-zinc-300'
-                        }`}
-                      >
-                        <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
-                        <span>Reliability Copilot</span>
-                      </button>
-
-                      <button
-                        onClick={() => handleTabChange(inc.id, inc.affectedQueue, 'blast-radius')}
-                        className={`px-3 py-1.5 border-t-2 -mb-px transition-all uppercase flex items-center space-x-1 ${
-                          currentTab === 'blast-radius' ? 'border-indigo-500 text-white bg-zinc-900/40' : 'border-transparent text-zinc-500 hover:text-zinc-300'
-                        }`}
-                      >
-                        <ShieldAlert className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
-                        <span>Blast Radius</span>
-                      </button>
+                    {/* Tab Navigation — horizontally scrollable on mobile */}
+                    <div className="flex border-b border-zinc-900 text-[9px] font-bold overflow-x-auto scrollbar-none">
+                      {[
+                        { id: 'overview',      icon: <FileText className="w-3.5 h-3.5" />,                            label: 'Overview' },
+                        { id: 'timeline',      icon: <History className="w-3.5 h-3.5" />,                             label: 'Timeline' },
+                        { id: 'investigation', icon: <Sparkles className="w-3.5 h-3.5" />,                            label: 'AI Invest.' },
+                        { id: 'comments',      icon: <MessageSquare className="w-3.5 h-3.5" />,                       label: `Notes (${comments[inc.id]?.length || 0})` },
+                        { id: 'deployments',   icon: <GitCommit className="w-3.5 h-3.5" />,                           label: 'Deploys' },
+                        { id: 'logs',          icon: <Terminal className="w-3.5 h-3.5" />,                            label: 'Logs' },
+                        { id: 'dlq',           icon: <ShieldAlert className="w-3.5 h-3.5" />,                         label: 'DLQ' },
+                        { id: 'copilot',       icon: <Sparkles className="w-3.5 h-3.5 text-indigo-400" />,            label: 'Copilot' },
+                        { id: 'blast-radius',  icon: <ShieldAlert className="w-3.5 h-3.5 text-rose-500" />,           label: 'Blast' },
+                      ].map(tab => (
+                        <button
+                          key={tab.id}
+                          onClick={() => handleTabChange(inc.id, inc.affectedQueue, tab.id)}
+                          className={`px-3 py-2 border-t-2 -mb-px transition-all uppercase flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
+                            currentTab === tab.id
+                              ? 'border-indigo-500 text-white bg-zinc-900/40'
+                              : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                          }`}
+                        >
+                          {tab.icon}
+                          <span className="hidden sm:inline">{tab.label}</span>
+                        </button>
+                      ))}
                     </div>
 
                     {/* Tab Contents */}
@@ -802,7 +738,7 @@ export default function IncidentsRegistry() {
                             )}
                           </div>
 
-                          <div className="flex gap-2">
+                          <div className="flex flex-col sm:flex-row gap-2">
                             <input
                               type="text"
                               placeholder="Write a diagnostic note or updates..."
@@ -812,7 +748,7 @@ export default function IncidentsRegistry() {
                             />
                             <button
                               onClick={() => handleAddComment(inc.id)}
-                              className="px-3 py-1.5 rounded bg-zinc-900 hover:bg-zinc-800 text-white font-bold border border-zinc-800"
+                              className="sm:shrink-0 px-3 py-1.5 rounded bg-zinc-900 hover:bg-zinc-800 text-white font-bold border border-zinc-800 text-[10px]"
                             >
                               POST NOTE
                             </button>
@@ -829,25 +765,26 @@ export default function IncidentsRegistry() {
                               const delay = inc.firstDetectedAt - dep.deployedAt;
                               const isRelated = delay >= 0 && delay <= 30 * 60 * 1000;
                               return (
-                                <div key={dep.id} className={`p-3 border rounded flex items-center justify-between gap-4 ${
+                                <div key={dep.id} className={`p-3 border rounded flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
                                   isRelated ? 'border-rose-900 bg-rose-950/5' : 'border-zinc-900 bg-zinc-900/5'
                                 }`}>
-                                  <div>
-                                    <div className="flex items-center space-x-2">
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
                                       <strong className="text-white uppercase">{dep.service}</strong>
                                       <span className="text-indigo-400 font-bold">{dep.version}</span>
                                     </div>
-                                    <p className="text-zinc-550 font-sans text-xs mt-0.5">
-                                      Commit SHA: <code className="font-mono text-zinc-400">{dep.commitSha}</code> &bull; Deployed by {dep.deployedBy} at {new Date(dep.deployedAt).toLocaleTimeString()}
+                                    <p className="text-zinc-500 font-sans text-xs mt-0.5 break-all">
+                                      <code className="font-mono text-zinc-400">{dep.commitSha?.slice(0,8)}</code>
+                                      {' '}&bull;{' '}{dep.deployedBy} &bull; {new Date(dep.deployedAt).toLocaleTimeString()}
                                     </p>
                                   </div>
                                   
                                   {isRelated ? (
-                                    <span className="px-2 py-0.5 bg-rose-950/30 border border-rose-900 text-rose-450 font-bold text-[8.5px] rounded uppercase shrink-0">
-                                      ⚠️ Suspected Cause
+                                    <span className="px-2 py-0.5 bg-rose-950/30 border border-rose-900 text-rose-400 font-bold text-[8.5px] rounded uppercase self-start sm:self-center shrink-0">
+                                      ⚠️ Cause
                                     </span>
                                   ) : (
-                                    <span className="text-zinc-600 font-bold text-[8.5px] uppercase shrink-0">Unrelated</span>
+                                    <span className="text-zinc-600 font-bold text-[8.5px] uppercase self-start sm:self-center shrink-0">Unrelated</span>
                                   )}
                                 </div>
                               );
@@ -1166,10 +1103,10 @@ export default function IncidentsRegistry() {
                       )}
                     </div>
 
-                    <div className="flex items-center space-x-4 text-[9px] text-zinc-500 font-bold border-t border-zinc-900/40 pt-2.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4 gap-1 text-[9px] text-zinc-500 font-bold border-t border-zinc-900/40 pt-2.5">
                       <span>DETECTED AT: <span className="text-zinc-400 font-sans">{new Date(inc.firstDetectedAt).toLocaleString()}</span></span>
-                      <span>&bull;</span>
-                      <span>LAST RECALCULATED: <span className="text-zinc-400 font-sans">{new Date(inc.lastUpdatedAt).toLocaleString()}</span></span>
+                      <span className="hidden sm:inline">&bull;</span>
+                      <span>UPDATED: <span className="text-zinc-400 font-sans">{new Date(inc.lastUpdatedAt).toLocaleString()}</span></span>
                     </div>
                   </div>
                 )}
@@ -1195,7 +1132,7 @@ export default function IncidentsRegistry() {
       {showResolveModal && (
         <>
           <div onClick={() => setShowResolveModal(null)} className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 transition-opacity"></div>
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-zinc-950 border border-zinc-900 p-5 rounded-lg shadow-2xl z-50 font-mono text-[10px] text-zinc-350 space-y-4">
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-md bg-zinc-950 border border-zinc-900 p-5 rounded-lg shadow-2xl z-50 font-mono text-[10px] text-zinc-350 space-y-4">
             <div className="border-b border-zinc-900 pb-3 flex items-center justify-between">
               <span className="text-[11px] font-bold text-white uppercase">Acknowledge Incident Resolution</span>
               <button onClick={() => setShowResolveModal(null)} className="text-zinc-500 hover:text-white">&times;</button>
@@ -1233,7 +1170,7 @@ export default function IncidentsRegistry() {
       {showActionConfirmation && (
         <>
           <div onClick={() => setShowActionConfirmation(null)} className="fixed inset-0 bg-black/75 backdrop-blur-xs z-50 transition-opacity"></div>
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-zinc-950 border border-rose-900 p-6 rounded-lg shadow-2xl z-50 font-mono text-[10px] text-zinc-350 space-y-4">
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-md bg-zinc-950 border border-rose-900 p-5 rounded-lg shadow-2xl z-50 font-mono text-[10px] text-zinc-350 space-y-4">
             <div className="border-b border-rose-950 pb-3 flex items-center space-x-2 text-rose-400">
               <ShieldAlert className="w-5 h-5 shrink-0 animate-bounce" />
               <span className="text-[11px] font-bold uppercase tracking-wider">Manual Action Warning</span>
