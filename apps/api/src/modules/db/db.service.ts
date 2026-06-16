@@ -616,6 +616,20 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     await this.redis.hset(this.getScopedKey(projectId, 'incidents'), incident.id, JSON.stringify(incident));
   }
 
+  // --- Incident Timeline Storage ---
+  async getIncidentTimeline(incidentId: string, projectId?: string): Promise<any[]> {
+    const raw = await this.redis.get(this.getScopedKey(projectId, `incident:${incidentId}:timeline`));
+    return raw ? JSON.parse(raw) : [];
+  }
+
+  async saveIncidentTimeline(incidentId: string, timeline: any[], projectId?: string) {
+    await this.redis.set(this.getScopedKey(projectId, `incident:${incidentId}:timeline`), JSON.stringify(timeline));
+  }
+
+  async deleteIncidentTimeline(incidentId: string, projectId?: string) {
+    await this.redis.del(this.getScopedKey(projectId, `incident:${incidentId}:timeline`));
+  }
+
   // --- Telemetry Storage ---
   async saveTelemetry(event: TelemetryEvent, projectId?: string) {
     const key = this.getScopedKey(projectId, 'telemetry');
@@ -945,6 +959,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
   async deleteIncident(incidentId: string, projectId?: string): Promise<void> {
     await this.redis.hdel(this.getScopedKey(projectId, 'incidents'), incidentId);
+    await this.deleteIncidentTimeline(incidentId, projectId);
   }
 
   async deleteInvestigation(incidentId: string, projectId?: string): Promise<void> {

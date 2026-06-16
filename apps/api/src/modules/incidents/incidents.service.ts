@@ -44,6 +44,14 @@ export class IncidentsService {
     };
 
     await this.dbService.saveIncident(newIncident, projectId);
+    
+    try {
+      const timeline = await this.buildTimeline(newIncident, projectId || 'proj_demo');
+      await this.dbService.saveIncidentTimeline(newIncident.id, timeline, projectId || 'proj_demo');
+    } catch (err) {
+      this.logger.error(`Failed to generate initial timeline for incident ${newIncident.id}: ${err.message}`);
+    }
+
     this.wsGateway.broadcast('incident.created', { ...newIncident, projectId });
     this.logger.warn(`[Incident] New incident created: ${newIncident.title} on queue ${newIncident.affectedQueue}`);
 
@@ -70,6 +78,14 @@ export class IncidentsService {
     };
 
     await this.dbService.saveIncident(updated, projectId);
+
+    try {
+      const timeline = await this.buildTimeline(updated, projectId || 'proj_demo');
+      await this.dbService.saveIncidentTimeline(id, timeline, projectId || 'proj_demo');
+    } catch (err) {
+      this.logger.error(`Failed to update timeline snapshot for incident ${id}: ${err.message}`);
+    }
+
     this.wsGateway.broadcast('incident.updated', { ...updated, projectId });
     this.logger.debug(`[Incident] Incident updated: ${updated.id} (${updated.status})`);
     return updated;
@@ -470,6 +486,170 @@ export class IncidentsService {
     if (existing && (existing.status === 'open' || existing.status === 'acknowledged' || existing.status === 'investigating')) {
       await this.resolveIncident(existing.id, 'Automated resolution: telemetry metrics returned below target SLA thresholds.', projectId);
     }
+  }
+
+  async getDeploymentCorrelation(incident: Incident, projectId: string) {
+    const allDeps = await this.dbService.getDeploymentEvents(projectId);
+    const incidentTime = incident.firstDetectedAt;
+
+    // We check deployments that occurred up to 24 hours before the incident
+    const windowStart = incidentTime - 24 * 60 * 60 * 1000;
+    const candidateDeps = allDeps
+      .filter((dep) => dep.deployedAt >= windowStart && dep.deployedAt <= incidentTime)
+      .sort((a, b) => b.deployedAt - a.deployedAt); // most recent first
+
+    if (candidateDeps.length === 0) return null;
+
+    // Find the most relevant candidate. We prefer candidates that match the affectedQueue name
+    const matchingDep = candidateDeps.find(
+      (d) => d.service === incident.affectedQueue || incident.title.toLowerCase().includes(d.service)
+    ) || candidateDeps[0];
+
+    const delayMs = incidentTime - matchingDep.deployedAt;
+    const delayMin = Math.round(delayMs / 60000);
+
+    let confidence: 'strong' | 'possible' | 'context' = 'context';
+    let confidenceLabel = 'Context only';
+    let label = 'Historical context';
+    let explanation = `Deployment occurred ${delayMin} minutes before incident.`;
+
+    if (delayMs <= 30 * 60 * 1000) {
+      confidence = 'strong';
+      confidenceLabel = 'Strong correlation';
+      label = 'Likely regression';
+      explanation = `Deployment occurred ${delayMin} minutes before first failure.`;
+    } else if (delayMs <= 2 * 60 * 60 * 1000) {
+      confidence = 'possible';
+      confidenceLabel = 'Possible correlation';
+      label = 'Weak correlation';
+      explanation = `Deployment occurred ${delayMin} minutes before incident.`;
+    }
+
+    return {
+      service: matchingDep.service,
+      version: matchingDep.version,
+      commitSha: matchingDep.commitSha,
+      branch: matchingDep.branch,
+      deployedBy: matchingDep.deployedBy,
+      deployedAt: matchingDep.deployedAt,
+      confidence,
+      confidenceLabel,
+      label,
+      explanation,
+    };
+  }
+
+  async buildTimeline(incident: Incident, projectId: string): Promise<any[]> {
+    const firstTime = incident.firstDetectedAt;
+    const lastTime = incident.resolvedAt ?? incident.lastUpdatedAt ?? Date.now();
+    const timeline: any[] = [];
+
+    // 1. Get deployment correlation
+    const correlation = await this.getDeploymentCorrelation(incident, projectId);
+    if (correlation) {
+      timeline.push({
+        event: 'deployment',
+        title: `Service Deployed (${correlation.label})`,
+        desc: `${correlation.explanation} (Version: ${correlation.version}, Commit: ${correlation.commitSha}${correlation.branch ? `, Branch: ${correlation.branch}` : ''}) by ${correlation.deployedBy}.`,
+        timestamp: correlation.deployedAt,
+        metadata: { correlation }
+      });
+    }
+
+    // 2. Fetch telemetry events in range [firstTime - 30m, lastTime]
+    const allTelemetry = await this.dbService.getTelemetry(1000, projectId);
+    const relatedTelemetry = allTelemetry.filter(
+      (e) => e.queueName === incident.affectedQueue && e.timestamp >= firstTime - 30 * 60 * 1000 && e.timestamp <= lastTime
+    );
+
+    // Identify first error
+    const firstFailed = [...relatedTelemetry].reverse().find((e) => e.type === 'job.failed');
+    if (firstFailed) {
+      timeline.push({
+        event: 'first.error',
+        title: 'First Failure Detected',
+        desc: `Earliest exception recorded on queue [${incident.affectedQueue}]: "${firstFailed.errorMessage || 'Unknown execution failure'}" (Job ID: ${firstFailed.jobId})`,
+        timestamp: firstFailed.timestamp,
+      });
+    }
+
+    // 3. Incident Anomaly Detected / Failure Spike
+    timeline.push({
+      event: 'failures.spiked',
+      title: 'Failure Rate Spike & Incident Opened',
+      desc: `SLA violation rules triggered active incident #${incident.id}. Details: "${incident.summary}"`,
+      timestamp: firstTime,
+    });
+
+    // 4. Alert notifications dispatched
+    const notifications = await this.dbService.getNotifications(200, projectId);
+    const relatedNotifs = notifications.filter(
+      (n) => n.incidentId === incident.id && n.timestamp >= firstTime && n.timestamp <= firstTime + 10 * 60 * 1000
+    );
+
+    for (const notif of relatedNotifs) {
+      timeline.push({
+        event: 'alert.sent',
+        title: `Alert Dispatched (${notif.channel})`,
+        desc: `Notification successfully routed: "${notif.message}"`,
+        timestamp: notif.timestamp,
+      });
+    }
+
+    // 5. Incident Acknowledged
+    if (incident.acknowledgedAt) {
+      timeline.push({
+        event: 'incident.acknowledged',
+        title: 'Incident Acknowledged',
+        desc: `Incident response owner assigned: ${incident.responseOwner || 'SRE Operator'}. Active diagnostics started.`,
+        timestamp: incident.acknowledgedAt,
+      });
+    }
+
+    // 6. AI SRE Investigation
+    const report = await this.dbService.getInvestigation(incident.id, projectId);
+    if (report) {
+      timeline.push({
+        event: 'investigation.started',
+        title: 'AI SRE Diagnostics Active',
+        desc: 'SRE AI Copilot started E2E telemetry inspection and code correlation.',
+        timestamp: report.timestamp - 1000,
+      });
+      timeline.push({
+        event: 'investigation.completed',
+        title: 'AI Diagnostics Completed',
+        desc: `Root cause identified with confidence score ${report.confidenceScore}%. Suspected cause: "${report.rootCause}"`,
+        timestamp: report.timestamp,
+      });
+    }
+
+    // 7. Incident Resolved
+    if (incident.status === 'resolved') {
+      timeline.push({
+        event: 'incident.resolved',
+        title: 'Incident Resolved',
+        desc: `Incident resolved. Summary: "${incident.resolutionSummary || 'Active queues returned to healthy state.'}"`,
+        timestamp: incident.resolvedAt || incident.lastUpdatedAt,
+      });
+    }
+
+    // Sort chronologically
+    return timeline.sort((a, b) => a.timestamp - b.timestamp);
+  }
+
+  async getIncidentTimeline(id: string, projectId: string): Promise<any[]> {
+    const incident = await this.dbService.getIncident(id, projectId);
+    if (!incident) throw new Error(`Incident ${id} not found`);
+
+    if (incident.status === 'resolved') {
+      const persisted = await this.dbService.getIncidentTimeline(id, projectId);
+      if (persisted && persisted.length > 0) return persisted.sort((a, b) => a.timestamp - b.timestamp);
+    }
+
+    // Rebuild dynamically
+    const timeline = await this.buildTimeline(incident, projectId);
+    await this.dbService.saveIncidentTimeline(id, timeline, projectId);
+    return timeline;
   }
 
 }

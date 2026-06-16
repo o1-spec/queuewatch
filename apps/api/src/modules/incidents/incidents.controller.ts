@@ -28,6 +28,17 @@ export class IncidentsController {
     return incident;
   }
 
+  @Get(':id/timeline')
+  @ApiOperation({ summary: 'Retrieve chronological SRE timeline events for an incident' })
+  @ApiParam({ name: 'id', description: 'Incident ID' })
+  async getTimeline(@ProjectId() projectId: string, @Param('id') id: string) {
+    try {
+      return await this.incidentsService.getIncidentTimeline(id, projectId);
+    } catch (e) {
+      throw new NotFoundException(e.message);
+    }
+  }
+
   @Post(':id/analyze')
   @ApiOperation({ summary: 'Trigger AI assisted diagnosis for an incident' })
   @ApiParam({ name: 'id', description: 'Incident ID' })

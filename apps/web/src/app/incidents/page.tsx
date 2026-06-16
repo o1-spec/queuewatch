@@ -196,6 +196,7 @@ export default function IncidentsRegistry() {
 
   const handleTabChange = (incidentId: string, queueName: string, tab: string) => {
     setActiveTabs(prev => ({ ...prev, [incidentId]: tab }));
+    if (tab === 'overview') loadDeployments(incidentId);
     if (tab === 'timeline') loadTimeline(incidentId);
     if (tab === 'investigation') loadInvestigation(incidentId);
     if (tab === 'logs') loadIncidentLogs(incidentId, queueName);
@@ -529,6 +530,76 @@ export default function IncidentsRegistry() {
                       {/* Overview Tab */}
                       {currentTab === 'overview' && (
                         <div className="space-y-4">
+                          {/* Correlated Deployment Warning Card */}
+                          {(() => {
+                            const relatedDeps = deployments[inc.id] || [];
+                            const candidate = relatedDeps.find(dep => {
+                              const delay = inc.firstDetectedAt - dep.deployedAt;
+                              return delay >= 0 && delay <= 24 * 60 * 60 * 1000;
+                            });
+                            if (!candidate) return null;
+                            const delayMs = inc.firstDetectedAt - candidate.deployedAt;
+                            const delayMin = Math.round(delayMs / 60000);
+
+                            let confidence: 'strong' | 'possible' | 'context' = 'context';
+                            let confidenceLabel = 'Context only';
+                            let label = 'Historical context';
+                            let explanation = `Deployment occurred ${delayMin} minutes before incident.`;
+                            let cardStyle = 'border-zinc-800 bg-zinc-950/40 text-zinc-400';
+                            let badgeStyle = 'bg-zinc-900 border-zinc-850 text-zinc-450';
+
+                            if (delayMs <= 30 * 60 * 1000) {
+                              confidence = 'strong';
+                              confidenceLabel = 'Strong correlation';
+                              label = 'Likely regression';
+                              explanation = `Deployment occurred ${delayMin} minutes before first failure.`;
+                              cardStyle = 'border-rose-900/60 bg-rose-950/10 text-rose-200';
+                              badgeStyle = 'bg-rose-950/40 border-rose-900 text-rose-400';
+                            } else if (delayMs <= 2 * 60 * 60 * 1000) {
+                              confidence = 'possible';
+                              confidenceLabel = 'Possible correlation';
+                              label = 'Weak correlation';
+                              explanation = `Deployment occurred ${delayMin} minutes before incident.`;
+                              cardStyle = 'border-amber-900/40 bg-amber-950/5 text-amber-200';
+                              badgeStyle = 'bg-amber-950/40 border-amber-900 text-amber-400';
+                            }
+
+                            return (
+                              <div className={`p-4 border rounded-lg flex items-start space-x-3 text-xs mb-1 ${cardStyle}`}>
+                                <GitCommit className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
+                                <div className="space-y-1.5 flex-1 min-w-0">
+                                  <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                                    <span className={`px-1.5 py-0.5 rounded text-[8.5px] font-bold border uppercase tracking-wider font-mono ${badgeStyle}`}>
+                                      {label} &bull; {confidenceLabel}
+                                    </span>
+                                    <span className="text-zinc-550 font-mono text-[9px]">{new Date(candidate.deployedAt).toLocaleTimeString()}</span>
+                                  </div>
+                                  <p className="font-sans leading-relaxed">
+                                    {explanation}
+                                  </p>
+                                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-zinc-500 text-[10px] pt-1">
+                                    <span className="flex items-center space-x-1">
+                                      <span className="font-bold text-zinc-400 font-mono uppercase">{candidate.service}</span>
+                                      <span className="text-zinc-650">&bull;</span>
+                                      <code className="font-mono text-zinc-550">{candidate.version}</code>
+                                    </span>
+                                    <span className="flex items-center space-x-1">
+                                      <GitCommit className="w-3.5 h-3.5" />
+                                      <code className="font-mono text-zinc-550">{candidate.commitSha?.slice(0, 8)}</code>
+                                    </span>
+                                    {candidate.branch && (
+                                      <span className="flex items-center space-x-1">
+                                        <GitBranch className="w-3.5 h-3.5" />
+                                        <code className="font-mono text-zinc-550">{candidate.branch}</code>
+                                      </span>
+                                    )}
+                                    <span className="text-zinc-650">Deployed by {candidate.deployedBy}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             {/* Left Side: Root Cause & Diagnostics */}
                             <div className="space-y-3">
@@ -618,25 +689,71 @@ export default function IncidentsRegistry() {
                           )}
                         </div>
                       )}
-
                       {/* Timeline Tab */}
                       {currentTab === 'timeline' && (
                         <div className="space-y-4 max-w-2xl">
                           <div className="border-l-2 border-zinc-800 ml-3.5 space-y-5 py-2">
-                            {(timelines[inc.id] || []).map((t, idx) => (
-                              <div key={idx} className="relative pl-6">
-                                <div className="absolute -left-[7px] top-1 w-3 h-3 rounded-full bg-zinc-900 border border-zinc-700 flex items-center justify-center">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></div>
-                                </div>
-                                <div className="space-y-1 bg-zinc-900/20 border border-zinc-900/60 p-3 rounded-lg">
-                                  <div className="flex justify-between items-center">
-                                    <h4 className="font-bold text-white uppercase text-[10px]">{t.title}</h4>
-                                    <span className="text-zinc-500 font-sans">{new Date(t.timestamp).toLocaleTimeString()}</span>
+                            {(timelines[inc.id] || []).map((t, idx) => {
+                              // Style mapping per event type
+                              let colorClass = 'bg-zinc-500 text-zinc-400';
+                              let borderClass = 'border-zinc-900/60 bg-zinc-900/20';
+                              let iconElement = <div className="w-1.5 h-1.5 rounded-full bg-zinc-500"></div>;
+
+                              switch (t.event) {
+                                case 'deployment':
+                                  colorClass = 'text-indigo-400';
+                                  borderClass = 'border-indigo-900/40 bg-indigo-950/5';
+                                  iconElement = <GitCommit className="w-2.5 h-2.5 text-indigo-400" />;
+                                  break;
+                                case 'first.error':
+                                  colorClass = 'text-rose-450';
+                                  borderClass = 'border-rose-950/40 bg-rose-950/5';
+                                  iconElement = <AlertTriangle className="w-2.5 h-2.5 text-rose-500" />;
+                                  break;
+                                case 'failures.spiked':
+                                case 'anomaly.detected':
+                                  colorClass = 'text-orange-400 font-bold';
+                                  borderClass = 'border-orange-950/40 bg-orange-950/5';
+                                  iconElement = <ShieldAlert className="w-2.5 h-2.5 text-orange-500" />;
+                                  break;
+                                case 'alert.sent':
+                                  colorClass = 'text-amber-400';
+                                  borderClass = 'border-amber-950/30 bg-amber-950/5';
+                                  iconElement = <Activity className="w-2.5 h-2.5 text-amber-500" />;
+                                  break;
+                                case 'incident.acknowledged':
+                                  colorClass = 'text-sky-400';
+                                  borderClass = 'border-sky-950/30 bg-sky-950/5';
+                                  iconElement = <User className="w-2.5 h-2.5 text-sky-400" />;
+                                  break;
+                                case 'investigation.started':
+                                case 'investigation.completed':
+                                  colorClass = 'text-purple-400';
+                                  borderClass = 'border-purple-950/30 bg-purple-950/5';
+                                  iconElement = <Sparkles className="w-2.5 h-2.5 text-purple-400" />;
+                                  break;
+                                case 'incident.resolved':
+                                  colorClass = 'text-emerald-400';
+                                  borderClass = 'border-emerald-950/30 bg-emerald-950/5';
+                                  iconElement = <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />;
+                                  break;
+                              }
+
+                              return (
+                                <div key={idx} className="relative pl-7">
+                                  <div className="absolute -left-[9px] top-1.5 w-4 h-4 rounded-full bg-zinc-950 border border-zinc-800 flex items-center justify-center">
+                                    {iconElement}
                                   </div>
-                                  <p className="text-zinc-450 font-sans text-xs">{t.desc}</p>
+                                  <div className={`space-y-1 border p-3 rounded-lg ${borderClass}`}>
+                                    <div className="flex justify-between items-center gap-2">
+                                      <h4 className={`font-mono text-[9.5px] uppercase tracking-wider ${colorClass}`}>{t.title}</h4>
+                                      <span className="text-zinc-550 font-mono text-[9px]">{new Date(t.timestamp).toLocaleTimeString()}</span>
+                                    </div>
+                                    <p className="text-zinc-350 font-sans text-xs leading-relaxed">{t.desc}</p>
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       )}
