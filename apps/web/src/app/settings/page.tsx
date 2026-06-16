@@ -5,9 +5,9 @@ import useSocket from '../../hooks/useSocket';
 import { 
   Sliders, Plus, Trash2, ShieldAlert, CheckCircle2, Save, 
   Mail, Terminal, Send, Check, Activity, Sparkles, 
-  RefreshCw, Radio, ServerCrash, Loader2 
+  RefreshCw, Radio, ServerCrash, Loader2, Database, Clock, AlertTriangle, Zap
 } from 'lucide-react';
-import { QueueName, EscalationRule, NotificationSetting } from '@queuewatch/shared';
+import { QueueName, EscalationRule, NotificationSetting, RetentionTier } from '@queuewatch/shared';
 import { useAuth } from '../../context/AuthContext';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -16,7 +16,7 @@ const SEVERITIES = ['low', 'medium', 'high', 'critical'] as const;
 
 export default function ConsolidatedSettings() {
   const { authFetch } = useAuth();
-  const [activeTab, setActiveTab] = useState<'sandbox' | 'escalation' | 'notifications'>('sandbox');
+  const [activeTab, setActiveTab] = useState<'sandbox' | 'escalation' | 'notifications' | 'retention'>('sandbox');
 
   // --- Sandbox State ---
   const [simConfig, setSimConfig] = useState({
@@ -57,6 +57,23 @@ export default function ConsolidatedSettings() {
   const [selectedSeverities, setSelectedSeverities] = useState<string[]>([]);
   const [selectedQueues, setSelectedQueues] = useState<string[]>([]);
 
+  // --- Retention State ---
+  const [retentionLoading, setRetentionLoading] = useState(true);
+  const [retentionTier, setRetentionTier] = useState<RetentionTier>('30d');
+  const [retentionSaving, setRetentionSaving] = useState(false);
+  const [retentionSaved, setRetentionSaved] = useState(false);
+  const [retentionStats, setRetentionStats] = useState<{
+    telemetryCount: number;
+    logCount: number;
+    incidentCount: number;
+    resolvedIncidentCount: number;
+    workerCount: number;
+    policy: { tier: RetentionTier; telemetryDays: number; logsDays: number; incidentDays: number; updatedAt?: number };
+  } | null>(null);
+  const [purgeConfirmOpen, setPurgeConfirmOpen] = useState(false);
+  const [purging, setPurging] = useState(false);
+  const [lastPurgeResult, setLastPurgeResult] = useState<{ incidentsPurged: number; prunedAt: number } | null>(null);
+
   // Sync state to simulation toggle switches automatically
   useSocket({
     'worker.health.updated': (data: any[]) => {
@@ -80,6 +97,8 @@ export default function ConsolidatedSettings() {
       loadEscRules();
     } else if (activeTab === 'notifications') {
       loadNotifSettings();
+    } else if (activeTab === 'retention') {
+      loadRetentionStats();
     }
   }, [activeTab]);
 
@@ -315,6 +334,63 @@ export default function ConsolidatedSettings() {
     );
   };
 
+  // --- Retention Logic ---
+  const loadRetentionStats = async () => {
+    setRetentionLoading(true);
+    try {
+      const res = await authFetch(`${API_URL}/api/projects/proj_demo/retention`);
+      if (res.ok) {
+        const data = await res.json();
+        setRetentionStats(data);
+        setRetentionTier(data.policy?.tier ?? '30d');
+      }
+    } catch (e) {
+      console.error('Failed to load retention stats:', e);
+    } finally {
+      setRetentionLoading(false);
+    }
+  };
+
+  const handleSaveRetention = async () => {
+    setRetentionSaving(true);
+    setRetentionSaved(false);
+    try {
+      const res = await authFetch(`${API_URL}/api/projects/proj_demo/retention`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier: retentionTier }),
+      });
+      if (res.ok) {
+        setRetentionSaved(true);
+        setTimeout(() => setRetentionSaved(false), 3000);
+        await loadRetentionStats();
+      }
+    } catch (e) {
+      console.error('Failed to save retention policy:', e);
+    } finally {
+      setRetentionSaving(false);
+    }
+  };
+
+  const handlePurgeNow = async () => {
+    setPurging(true);
+    setPurgeConfirmOpen(false);
+    try {
+      const res = await authFetch(`${API_URL}/api/projects/proj_demo/retention/purge`, {
+        method: 'POST',
+      });
+      if (res.ok) {
+        const result = await res.json();
+        setLastPurgeResult(result);
+        await loadRetentionStats();
+      }
+    } catch (e) {
+      console.error('Failed to trigger purge:', e);
+    } finally {
+      setPurging(false);
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-6 font-sans text-sm text-zinc-350">
       
@@ -359,6 +435,16 @@ export default function ConsolidatedSettings() {
           }`}
         >
           Notification Preferences
+        </button>
+        <button
+          onClick={() => setActiveTab('retention')}
+          className={`pb-3 border-b-2 transition-all ${
+            activeTab === 'retention' 
+              ? 'border-white text-white font-semibold' 
+              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          Data &amp; Retention
         </button>
       </div>
 
@@ -923,6 +1009,212 @@ export default function ConsolidatedSettings() {
           </div>
 
         </form>
+      )}
+
+      {/* --- Retention Tab --- */}
+      {activeTab === 'retention' && (
+        <div className="space-y-6">
+
+          {retentionLoading ? (
+            <div className="flex justify-center py-16">
+              <Loader2 className="w-5 h-5 text-zinc-500 animate-spin" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+              {/* Left: Tier selector + save */}
+              <div className="lg:col-span-2 space-y-6">
+
+                {/* Tier cards */}
+                <div className="bg-zinc-900/10 border border-zinc-900 p-6 rounded-lg space-y-4">
+                  <div className="border-b border-zinc-900 pb-3">
+                    <h3 className="font-semibold text-white text-base flex items-center gap-2">
+                      <Database className="w-4 h-4 text-indigo-400" />
+                      Data Retention Policy
+                    </h3>
+                    <p className="text-xs text-zinc-500 mt-1">
+                      Sets how long telemetry events, logs, and resolved incidents are kept before automatic expiry.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {([
+                      { tier: '7d' as RetentionTier,  label: '7 Days',  desc: 'Minimal footprint. Suitable for high-volume sandbox environments.' },
+                      { tier: '30d' as RetentionTier, label: '30 Days', desc: 'Balanced default. Good for most production deployments.' },
+                      { tier: '90d' as RetentionTier, label: '90 Days', desc: 'Extended history. Required for SLA audits and trend analysis.' },
+                    ]).map(({ tier, label, desc }) => (
+                      <button
+                        key={tier}
+                        onClick={() => setRetentionTier(tier)}
+                        className={`p-4 rounded-lg border text-left transition-all ${
+                          retentionTier === tier
+                            ? 'border-indigo-700 bg-indigo-950/20 ring-1 ring-indigo-800'
+                            : 'border-zinc-800 bg-zinc-900/10 hover:border-zinc-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-bold text-white text-sm">{label}</span>
+                          {retentionTier === tier && (
+                            <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+                          )}
+                        </div>
+                        <p className="text-zinc-500 text-xs leading-relaxed">{desc}</p>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-2">
+                    <button
+                      onClick={handleSaveRetention}
+                      disabled={retentionSaving}
+                      className="px-4 py-2 rounded-md bg-indigo-900 hover:bg-indigo-800 text-white font-semibold border border-indigo-800 text-xs transition-all flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {retentionSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                      <span>{retentionSaving ? 'Saving...' : 'Save Policy'}</span>
+                    </button>
+                    {retentionSaved && (
+                      <span className="text-emerald-400 text-xs flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Policy saved
+                      </span>
+                    )}
+                    {retentionStats?.policy?.updatedAt && (
+                      <span className="text-zinc-600 text-xs ml-auto">
+                        Last changed: {new Date(retentionStats.policy.updatedAt).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* What each tier covers */}
+                <div className="bg-zinc-900/10 border border-zinc-900 p-6 rounded-lg">
+                  <h3 className="font-semibold text-white text-sm border-b border-zinc-900 pb-3 mb-4">What this policy controls</h3>
+                  <div className="space-y-3 text-xs">
+                    {[
+                      { icon: <Zap className="w-3.5 h-3.5 text-indigo-400" />, label: 'Telemetry Events', desc: `Rolling EXPIRE applied on every write. Keys expire after ${retentionTier === '7d' ? '7' : retentionTier === '30d' ? '30' : '90'} days of inactivity.` },
+                      { icon: <Terminal className="w-3.5 h-3.5 text-emerald-400" />, label: 'Log Entries', desc: `Same window as telemetry. Logs older than ${retentionTier === '7d' ? '7' : retentionTier === '30d' ? '30' : '90'} days are auto-evicted by Redis.` },
+                      { icon: <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />, label: 'Resolved Incidents', desc: `Purged on a 6-hour sweep. Open and acknowledged incidents are never deleted regardless of age.` },
+                      { icon: <Clock className="w-3.5 h-3.5 text-zinc-400" />, label: 'Worker Heartbeats', desc: 'Fixed 24-hour TTL. A worker that has not sent a heartbeat in 24h is considered offline and removed.' },
+                    ].map(({ icon, label, desc }) => (
+                      <div key={label} className="flex gap-3 p-3 bg-zinc-900/20 rounded-md border border-zinc-900">
+                        <div className="mt-0.5 shrink-0">{icon}</div>
+                        <div>
+                          <p className="font-semibold text-zinc-300 mb-0.5">{label}</p>
+                          <p className="text-zinc-500 leading-relaxed">{desc}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right: Usage stats + purge */}
+              <div className="space-y-4">
+
+                {/* Live usage stats */}
+                <div className="bg-zinc-900/10 border border-zinc-900 p-5 rounded-lg space-y-4">
+                  <h3 className="font-semibold text-white text-sm border-b border-zinc-900 pb-2">Current Usage</h3>
+
+                  {retentionStats && (
+                    <div className="space-y-3">
+                      {[
+                        { label: 'Telemetry Events',      value: retentionStats.telemetryCount,       color: 'text-indigo-400' },
+                        { label: 'Log Entries',           value: retentionStats.logCount,             color: 'text-emerald-400' },
+                        { label: 'Total Incidents',       value: retentionStats.incidentCount,        color: 'text-white' },
+                        { label: 'Resolved Incidents',    value: retentionStats.resolvedIncidentCount, color: 'text-amber-400' },
+                        { label: 'Active Workers',        value: retentionStats.workerCount,          color: 'text-zinc-300' },
+                      ].map(({ label, value, color }) => (
+                        <div key={label} className="flex items-center justify-between">
+                          <span className="text-zinc-500 text-xs">{label}</span>
+                          <span className={`font-bold text-sm font-mono ${color}`}>{value.toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={loadRetentionStats}
+                    className="text-xs text-zinc-600 hover:text-zinc-400 flex items-center gap-1 transition-colors"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Refresh
+                  </button>
+                </div>
+
+                {/* Manual purge */}
+                <div className="bg-zinc-900/10 border border-rose-900/40 p-5 rounded-lg space-y-3">
+                  <h3 className="font-semibold text-white text-sm flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-rose-400" />
+                    Manual Purge
+                  </h3>
+                  <p className="text-zinc-500 text-xs leading-relaxed">
+                    Immediately deletes all resolved incidents older than your current retention window.
+                    This cannot be undone.
+                  </p>
+
+                  {lastPurgeResult && (
+                    <div className="p-3 bg-emerald-950/20 border border-emerald-900 rounded text-xs space-y-1">
+                      <p className="text-emerald-400 font-semibold">Purge complete</p>
+                      <p className="text-zinc-400">{lastPurgeResult.incidentsPurged} resolved incidents removed</p>
+                      <p className="text-zinc-600">{new Date(lastPurgeResult.prunedAt).toLocaleTimeString()}</p>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => setPurgeConfirmOpen(true)}
+                    disabled={purging}
+                    className="w-full py-2 rounded-md bg-rose-950/20 hover:bg-rose-950/40 text-rose-400 border border-rose-900/50 text-xs font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {purging ? (
+                      <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Purging...</span></>
+                    ) : (
+                      <><Trash2 className="w-3.5 h-3.5" /><span>Purge Expired Data Now</span></>
+                    )}
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Purge confirmation modal */}
+      {purgeConfirmOpen && (
+        <div
+          onClick={() => setPurgeConfirmOpen(false)}
+          className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 flex items-center justify-center p-4 transition-opacity animate-fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-zinc-950 border border-rose-900 p-6 rounded-lg w-[calc(100%-2rem)] max-w-sm shadow-2xl font-sans text-xs space-y-4 animate-slide-up text-zinc-300"
+          >
+            <div className="flex items-center gap-2 border-b border-rose-950 pb-3">
+              <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+              <span className="text-sm font-semibold text-white">Confirm Purge</span>
+            </div>
+            <p className="leading-relaxed text-zinc-400 text-xs">
+              This will permanently delete all <strong className="text-white">resolved incidents</strong> older
+              than your <strong className="text-white">{retentionTier}</strong> retention window, along with
+              their associated investigation reports and comments.
+              <br /><br />
+              Open and acknowledged incidents will not be affected.
+            </p>
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setPurgeConfirmOpen(false)}
+                className="flex-1 py-2 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 text-xs font-semibold transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePurgeNow}
+                className="flex-1 py-2 rounded-md bg-rose-950/30 hover:bg-rose-950/50 text-rose-400 border border-rose-900/50 text-xs font-semibold transition-all"
+              >
+                Yes, Purge
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {ruleToDelete && (

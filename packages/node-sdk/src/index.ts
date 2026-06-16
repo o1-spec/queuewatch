@@ -43,6 +43,16 @@ export interface WorkflowOptions {
   metadata?: any;
 }
 
+export interface TrackDeploymentOptions {
+  service: string;
+  version: string;
+  commit: string;
+  branch?: string;
+  environment?: string;
+  deployedBy?: string;
+  metadata?: any;
+}
+
 export interface CaptureErrorContext {
   service?: string;
   traceId?: string;
@@ -213,6 +223,24 @@ Monitoring Active
         metadata: { crashType: 'unhandledRejection', fatal: true }
       });
     });
+  }
+
+  public async trackDeployment(options: TrackDeploymentOptions) {
+    const config = this.config;
+    if (!config || !config.projectId) return;
+
+    const payload = {
+      projectId: config.projectId,
+      service: options.service,
+      version: options.version,
+      commitSha: options.commit,
+      branch: options.branch,
+      environment: options.environment || process.env.NODE_ENV || 'production',
+      deployedBy: options.deployedBy || process.env.USER || 'SDK Operator',
+      metadata: options.metadata || {},
+    };
+
+    await this.sendPayload('/api/ingest/deployments', payload);
   }
 
   public trackEvent(options: TrackEventOptions) {

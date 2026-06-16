@@ -10,6 +10,28 @@ export type JobStatus =
   | 'stalled'
   | 'dead-letter';
 
+// ─── Retention ────────────────────────────────────────────────────────────────
+
+export type RetentionTier = '7d' | '30d' | '90d';
+
+export interface RetentionPolicy {
+  tier: RetentionTier;
+  telemetryDays: number;
+  logsDays: number;
+  incidentDays: number; // resolved incidents only
+  updatedAt?: number;
+}
+
+export interface PurgeResult {
+  projectId: string;
+  incidentsPurged: number;
+  investigationsPurged: number;
+  commentsPurged: number;
+  prunedAt: number;
+}
+
+// ─── Core types ───────────────────────────────────────────────────────────────
+
 export interface User {
   id: string;
   name: string;
@@ -187,6 +209,7 @@ export interface DeploymentEvent {
   version: string;
   service: string;
   commitSha: string;
+  branch?: string;
   environment: string;
   deployedBy: string;
   deployedAt: number;
@@ -324,4 +347,5 @@ export interface Project {
   createdAt: number;
   hasReceivedTelemetry?: boolean;
   firstTelemetryAt?: number;
+  retention?: RetentionPolicy;
 }

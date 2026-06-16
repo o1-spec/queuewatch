@@ -5,7 +5,7 @@ import useSocket from '../../hooks/useSocket';
 import { 
   AlertTriangle, Clock, RefreshCw, ChevronDown, ChevronUp, Sparkles, 
   Terminal, Activity, CheckCircle2, History, ShieldAlert, FileText, 
-  Play, User, MessageSquare, ExternalLink, GitCommit, Check 
+  Play, User, MessageSquare, ExternalLink, GitCommit, GitBranch, Check 
 } from 'lucide-react';
 import { Incident } from '@queuewatch/shared';
 import { useAuth } from '../../context/AuthContext';
@@ -773,9 +773,18 @@ export default function IncidentsRegistry() {
                                       <strong className="text-white uppercase">{dep.service}</strong>
                                       <span className="text-indigo-400 font-bold">{dep.version}</span>
                                     </div>
-                                    <p className="text-zinc-500 font-sans text-xs mt-0.5 break-all">
-                                      <code className="font-mono text-zinc-400">{dep.commitSha?.slice(0,8)}</code>
-                                      {' '}&bull;{' '}{dep.deployedBy} &bull; {new Date(dep.deployedAt).toLocaleTimeString()}
+                                    <p className="text-zinc-500 font-sans text-xs mt-0.5 break-all flex items-center gap-1.5 flex-wrap">
+                                      <span className="flex items-center gap-0.5 font-mono text-zinc-400">
+                                        <GitCommit className="w-3 h-3 text-zinc-600" />
+                                        {dep.commitSha?.slice(0,8)}
+                                      </span>
+                                      {dep.branch && (
+                                        <span className="flex items-center gap-0.5 font-mono text-zinc-400">
+                                          <GitBranch className="w-3 h-3 text-zinc-650" />
+                                          {dep.branch}
+                                        </span>
+                                      )}
+                                      <span className="text-zinc-550">&bull; {dep.deployedBy} &bull; {new Date(dep.deployedAt).toLocaleTimeString()}</span>
                                     </p>
                                   </div>
                                   

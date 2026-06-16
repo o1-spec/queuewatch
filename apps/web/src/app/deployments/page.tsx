@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import useSocket from '../../hooks/useSocket';
-import { GitCommit, Calendar, User, Cpu, RefreshCw, Plus, Check } from 'lucide-react';
+import { GitCommit, GitBranch, Calendar, User, Cpu, RefreshCw, Plus, Check } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { DeploymentEvent } from '@queuewatch/shared';
 
@@ -17,6 +17,7 @@ export default function DeploymentsOverview() {
   const [service, setService] = useState('email_notifications');
   const [version, setVersion] = useState('v1.2.4');
   const [commitSha, setCommitSha] = useState('d0dad1d7f');
+  const [branch, setBranch] = useState('main');
   const [environment, setEnvironment] = useState('production');
   const [deployedBy, setDeployedBy] = useState('SRE Engineer');
 
@@ -55,6 +56,7 @@ export default function DeploymentsOverview() {
           service,
           version,
           commitSha,
+          branch,
           environment,
           deployedBy,
           metadata: { trigger: 'Manual registry panel' },
@@ -144,6 +146,17 @@ export default function DeploymentsOverview() {
             </div>
 
             <div className="space-y-1">
+              <label className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider">Git Branch</label>
+              <input
+                type="text"
+                placeholder="e.g. main"
+                value={branch}
+                onChange={(e) => setBranch(e.target.value)}
+                className="w-full bg-zinc-900/25 border border-zinc-900 rounded px-2.5 py-1.5 text-white focus:outline-none"
+              />
+            </div>
+
+            <div className="space-y-1">
               <label className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider">Environment</label>
               <select
                 value={environment}
@@ -203,6 +216,12 @@ export default function DeploymentsOverview() {
                           <GitCommit className="w-3 h-3 text-zinc-650" />
                           <code className="font-mono text-zinc-400">{dep.commitSha}</code>
                         </span>
+                        {dep.branch && (
+                          <span className="flex items-center space-x-1">
+                            <GitBranch className="w-3 h-3 text-zinc-650" />
+                            <code className="font-mono text-zinc-400">{dep.branch}</code>
+                          </span>
+                        )}
                         <span className="flex items-center space-x-1">
                           <User className="w-3 h-3 text-zinc-650" />
                           <span>{dep.deployedBy}</span>

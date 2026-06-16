@@ -6,13 +6,20 @@ import {
   InvestigationReport, DeadLetterJob, IncidentComment, NotificationSetting, 
   EscalationRule, DeploymentEvent, Notification, KnowledgeEntry, Runbook,
   Service, Environment, DependencyGraph, ReliabilityScore, Prediction, GlobalHealth,
-  WorkerHealth, QueueName, Project
+  WorkerHealth, QueueName, Project, RetentionPolicy
 } from '@queuewatch/shared';
 
 @Injectable()
 export class DbService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DbService.name);
   private redis: Redis;
+
+  // Lazily injected to break circular dependency with RetentionModule
+  private retentionService: import('../retention/retention.service').RetentionService | null = null;
+
+  setRetentionService(svc: import('../retention/retention.service').RetentionService) {
+    this.retentionService = svc;
+  }
 
   constructor(private configService: ConfigService) {}
 
@@ -613,7 +620,11 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   async saveTelemetry(event: TelemetryEvent, projectId?: string) {
     const key = this.getScopedKey(projectId, 'telemetry');
     await this.redis.lpush(key, JSON.stringify(event));
-    await this.redis.ltrim(key, 0, 999); // Keep last 1000 events
+    await this.redis.ltrim(key, 0, 999); // keep last 1000 events
+    if (this.retentionService) {
+      const ttl = await this.retentionService.getTtlSeconds(projectId || 'proj_demo', 'telemetry');
+      await this.redis.expire(key, ttl);
+    }
   }
 
   async getTelemetry(limit = 100, projectId?: string): Promise<TelemetryEvent[]> {
@@ -647,14 +658,21 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   }
 
   async saveWorker(worker: WorkerHealth, projectId?: string) {
-    await this.redis.hset(this.getScopedKey(projectId, 'workers'), worker.workerId, JSON.stringify(worker));
+    const key = this.getScopedKey(projectId, 'workers');
+    await this.redis.hset(key, worker.workerId, JSON.stringify(worker));
+    // Workers are ephemeral — expire the whole hash after 24h of no updates
+    await this.redis.expire(key, 86_400);
   }
 
   // --- Logs Storage ---
   async saveLog(entry: LogEntry, projectId?: string) {
     const key = this.getScopedKey(projectId, 'logs');
     await this.redis.lpush(key, JSON.stringify(entry));
-    await this.redis.ltrim(key, 0, 1999); // Keep last 2000 log lines
+    await this.redis.ltrim(key, 0, 1999); // keep last 2000 log lines
+    if (this.retentionService) {
+      const ttl = await this.retentionService.getTtlSeconds(projectId || 'proj_demo', 'logs');
+      await this.redis.expire(key, ttl);
+    }
   }
 
   async getLogs(queueName?: string, limit = 100, projectId?: string): Promise<LogEntry[]> {
@@ -704,7 +722,11 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   async saveAlertNotification(notif: AlertNotification, projectId?: string) {
     const key = this.getScopedKey(projectId, 'alert_notifications');
     await this.redis.lpush(key, JSON.stringify(notif));
-    await this.redis.ltrim(key, 0, 99); // Keep last 100 notifications
+    await this.redis.ltrim(key, 0, 99); // keep last 100 notifications
+    if (this.retentionService) {
+      const ttl = await this.retentionService.getTtlSeconds(projectId || 'proj_demo', 'notifications');
+      await this.redis.expire(key, ttl);
+    }
   }
 
   // --- Dead Letter Jobs ---
@@ -788,6 +810,10 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     const key = this.getScopedKey(projectId, 'deployments');
     await this.redis.lpush(key, JSON.stringify(event));
     await this.redis.ltrim(key, 0, 99); // Keep last 100 deployments
+    if (this.retentionService) {
+      const ttl = await this.retentionService.getTtlSeconds(projectId || 'proj_demo', 'deployments');
+      await this.redis.expire(key, ttl);
+    }
   }
 
   // --- V3 Notifications ---
@@ -799,7 +825,11 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   async saveNotification(notif: Notification, projectId?: string) {
     const key = this.getScopedKey(projectId, 'notifications');
     await this.redis.lpush(key, JSON.stringify(notif));
-    await this.redis.ltrim(key, 0, 499); // Keep last 500 notifications
+    await this.redis.ltrim(key, 0, 499); // keep last 500 notifications
+    if (this.retentionService) {
+      const ttl = await this.retentionService.getTtlSeconds(projectId || 'proj_demo', 'notifications');
+      await this.redis.expire(key, ttl);
+    }
   }
 
   // --- V4 Knowledge Base ---
@@ -898,5 +928,36 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
   async savePrediction(pred: Prediction, projectId?: string) {
     await this.redis.hset(this.getScopedKey(projectId, 'predictions'), pred.id, JSON.stringify(pred));
+  }
+
+  // ─── Retention Policy Storage ────────────────────────────────────────────────
+
+  async getRetentionPolicy(projectId: string): Promise<RetentionPolicy | null> {
+    const raw = await this.redis.get(`queuewatch:retention:${projectId}`);
+    return raw ? JSON.parse(raw) : null;
+  }
+
+  async saveRetentionPolicy(projectId: string, policy: RetentionPolicy): Promise<void> {
+    await this.redis.set(`queuewatch:retention:${projectId}`, JSON.stringify(policy));
+  }
+
+  // ─── Incident deletion (used by retention purge) ──────────────────────────
+
+  async deleteIncident(incidentId: string, projectId?: string): Promise<void> {
+    await this.redis.hdel(this.getScopedKey(projectId, 'incidents'), incidentId);
+  }
+
+  async deleteInvestigation(incidentId: string, projectId?: string): Promise<void> {
+    await this.redis.del(this.getScopedKey(projectId, `investigations:${incidentId}`));
+  }
+
+  // ─── Count helpers (for retention UI usage stats) ─────────────────────────
+
+  async countTelemetry(projectId: string): Promise<number> {
+    return this.redis.llen(this.getScopedKey(projectId, 'telemetry'));
+  }
+
+  async countLogs(projectId: string): Promise<number> {
+    return this.redis.llen(this.getScopedKey(projectId, 'logs'));
   }
 }

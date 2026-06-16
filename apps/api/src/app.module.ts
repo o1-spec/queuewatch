@@ -19,6 +19,7 @@ import { EscalationModule } from './modules/escalation/escalation.module';
 import { CopilotModule } from './modules/copilot/copilot.module';
 import { ServiceRegistryModule } from './modules/service-registry/service-registry.module';
 import { ProjectsModule } from './modules/projects/projects.module';
+import { RetentionModule } from './modules/retention/retention.module';
 import { TelemetryGateInterceptor } from './modules/auth/telemetry-gate.interceptor';
 
 @Module({
@@ -45,6 +46,7 @@ import { TelemetryGateInterceptor } from './modules/auth/telemetry-gate.intercep
     CopilotModule,
     ServiceRegistryModule,
     ProjectsModule,
+    RetentionModule,
   ],
   providers: [
     {

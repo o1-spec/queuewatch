@@ -4,7 +4,7 @@ import { DbService } from '../db/db.service';
 import { TelemetryService } from './telemetry.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { QueueWebSocketGateway } from '../websocket/websocket.gateway';
-import { QueueName } from '@queuewatch/shared';
+import { QueueName, DeploymentEvent } from '@queuewatch/shared';
 
 @ApiTags('SDK Telemetry Ingestion')
 @Controller('ingest')
@@ -181,6 +181,44 @@ export class IngestController {
 
     this.wsGateway.broadcast('worker.health.updated', [{ ...report, projectId }]);
     return { success: true };
+  }
+
+  @Post('deployments')
+  @ApiOperation({ summary: 'Ingest deployment event from SDK' })
+  async ingestDeployment(
+    @Headers('authorization') authHeader: string,
+    @Body() body: {
+      projectId: string;
+      service: string;
+      version: string;
+      commitSha: string;
+      branch?: string;
+      environment?: string;
+      deployedBy?: string;
+      metadata?: any;
+    }
+  ) {
+    const projectId = body.projectId;
+    await this.authorize(authHeader, projectId);
+
+    // Mark project as telemetry received
+    await this.dbService.markProjectTelemetryReceived(projectId);
+
+    const event: DeploymentEvent = {
+      id: `dep_${Math.random().toString(36).substr(2, 9)}`,
+      version: body.version || 'v1.0.0',
+      service: body.service || 'unknown-service',
+      commitSha: body.commitSha || 'unknown',
+      branch: body.branch,
+      environment: body.environment || 'production',
+      deployedBy: body.deployedBy || 'Unknown',
+      deployedAt: Date.now(),
+      metadata: body.metadata || {},
+    };
+
+    await this.dbService.saveDeploymentEvent(event, projectId);
+    this.wsGateway.broadcast('deployment.created', { ...event, projectId });
+    return { success: true, event };
   }
 
   @Post('verify')
