@@ -6,7 +6,7 @@ import {
   InvestigationReport, DeadLetterJob, IncidentComment, NotificationSetting, 
   EscalationRule, DeploymentEvent, Notification, KnowledgeEntry, Runbook,
   Service, Environment, DependencyGraph, ReliabilityScore, Prediction, GlobalHealth,
-  WorkerHealth, QueueName, Project, RetentionPolicy
+  WorkerHealth, QueueName, Project, RetentionPolicy, CopilotLogEntry
 } from '@queuewatch/shared';
 
 @Injectable()
@@ -1078,5 +1078,19 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
   async countLogs(projectId: string): Promise<number> {
     return this.redis.llen(this.getScopedKey(projectId, 'logs'));
+  }
+
+  // ─── Copilot History Storage ──────────────────────────────────────────────
+
+  async saveCopilotLog(log: CopilotLogEntry, projectId?: string): Promise<void> {
+    const key = this.getScopedKey(projectId, 'copilot_history');
+    await this.redis.lpush(key, JSON.stringify(log));
+    await this.redis.ltrim(key, 0, 99); // Cap at 100 history logs
+  }
+
+  async getCopilotLogs(projectId?: string): Promise<CopilotLogEntry[]> {
+    const key = this.getScopedKey(projectId, 'copilot_history');
+    const raw = await this.redis.lrange(key, 0, -1);
+    return raw.map(item => JSON.parse(item));
   }
 }

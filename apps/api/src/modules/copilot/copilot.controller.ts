@@ -82,4 +82,10 @@ export class CopilotController {
   async getKnowledgeBase(@ProjectId() projectId: string) {
     return this.copilotService.getKnowledgeBase(projectId);
   }
+
+  @Get('logs')
+  @ApiOperation({ summary: 'Retrieve copilot investigation log history' })
+  async getLogs(@ProjectId() projectId: string) {
+    return this.copilotService.getCopilotLogs(projectId);
+  }
 }

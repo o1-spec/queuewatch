@@ -267,13 +267,43 @@ export interface RecurringIncident {
   incidentIds: string[];
 }
 
+export interface EvidenceItem {
+  type: 'log' | 'metric' | 'deployment' | 'incident' | 'score' | 'graph';
+  message: string;
+  timestamp?: number;
+  metadata?: any;
+}
+
+export interface ActionRecommendation {
+  type: 'pause_queue' | 'replay_dlq' | 'reduce_concurrency' | 'ack_incident' | 'scale_workers' | 'investigate_deployment';
+  queueName?: string;
+  incidentId?: string;
+  description: string;
+  command?: string;
+  payload?: any;
+}
+
 export interface CopilotResponse {
   answer: string;
-  evidence: string[];
+  confidence: 'low' | 'medium' | 'high';
   confidenceScore: number;
-  recommendedActions: string[];
-  relatedIncidents: string[];
-  relatedDeployments: string[];
+  evidence: EvidenceItem[];
+  recommendedActions: ActionRecommendation[];
+  requiresConfirmation: boolean;
+  relatedIncidents?: string[];
+  relatedDeployments?: string[];
+}
+
+export interface CopilotLogEntry {
+  id: string;
+  question: string;
+  contextUsed: any;
+  evidence: EvidenceItem[];
+  answer: string;
+  confidence: 'low' | 'medium' | 'high';
+  timestamp: number;
+  incidentId?: string;
+  queueName?: string;
 }
 
 export interface Environment {
@@ -315,6 +345,14 @@ export interface ReliabilityScore {
   incidentFrequency: number;
   mttrMinutes: number;
   timestamp: number;
+  contributors?: {
+    failureRate: number;
+    latency: number;
+    workerHealth: number;
+    incidents: number;
+    blastRadius: number;
+    deployments: number;
+  };
 }
 
 export interface Prediction {
