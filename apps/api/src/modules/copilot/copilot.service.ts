@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DbService } from '../db/db.service';
 import { ConfigService } from '@nestjs/config';
-import { CopilotResponse, EvidenceItem, ActionRecommendation, CopilotLogEntry } from '@queuewatch/shared';
+import { CopilotResponse, EvidenceItem, ActionRecommendation, CopilotLogEntry, CopilotHypothesis, InvestigationGraph } from '@queuewatch/shared';
 import { CorrelationService } from './correlation.service';
 
 @Injectable()
@@ -92,7 +92,9 @@ export class CopilotService {
       const qScore = reliabilityScores.find(s => s.targetId === targetQueue && s.targetType === 'queue');
       if (qScore) {
         evidence.push({
+          id: `ev_score_q_${targetQueue}`,
           type: 'score',
+          rank: 'context',
           message: `Reliability score for queue "${targetQueue}" is at ${qScore.score}%.`,
           metadata: { score: qScore.score }
         });
@@ -100,7 +102,9 @@ export class CopilotService {
           for (const [key, val] of Object.entries(qScore.contributors)) {
             if (val < 0) {
               evidence.push({
+                id: `ev_score_contr_${targetQueue}_${key}`,
                 type: 'score',
+                rank: 'context',
                 message: `Deduction: ${val} points on "${targetQueue}" due to ${key}.`
               });
             }
@@ -114,7 +118,9 @@ export class CopilotService {
       const sScore = reliabilityScores.find(s => s.targetId === targetService && s.targetType === 'service');
       if (sScore) {
         evidence.push({
+          id: `ev_score_s_${targetService}`,
           type: 'score',
+          rank: 'context',
           message: `Reliability score for service "${targetService}" is at ${sScore.score}%.`,
           metadata: { score: sScore.score }
         });
@@ -128,7 +134,9 @@ export class CopilotService {
     );
     for (const inc of activeIncidents) {
       evidence.push({
+        id: `ev_inc_${inc.id}`,
         type: 'incident',
+        rank: 'primary',
         message: `Active ${inc.severity} incident #${inc.id} (${inc.title}) affecting queue "${inc.affectedQueue}".`,
         timestamp: inc.firstDetectedAt,
         metadata: { incidentId: inc.id }
@@ -151,7 +159,9 @@ export class CopilotService {
     ).slice(0, 3);
     for (const err of queueErrors) {
       evidence.push({
+        id: `ev_log_${err.id || err.timestamp || Math.random().toString(36).substring(2, 9)}`,
         type: 'log',
+        rank: 'primary',
         message: `Error message: "${err.message}" inside queue "${err.queueName}".`,
         timestamp: err.timestamp,
         metadata: { jobId: err.jobId, traceId: err.traceId }
@@ -170,7 +180,9 @@ export class CopilotService {
     }
     if (correlatedDeployment) {
       evidence.push({
+        id: `ev_dep_${correlatedDeployment.id || correlatedDeployment.commitSha}`,
         type: 'deployment',
+        rank: 'secondary',
         message: `Deployment regression detected: Service "${correlatedDeployment.service}" version ${correlatedDeployment.version} was deployed ${Math.round((firstActiveIncident.firstDetectedAt - correlatedDeployment.deployedAt) / 60000)} minutes before the incident first detected time.`,
         timestamp: correlatedDeployment.deployedAt,
         metadata: { version: correlatedDeployment.version, commitSha: correlatedDeployment.commitSha }
@@ -208,7 +220,9 @@ export class CopilotService {
     }
     if (downstreamAffected.length > 0) {
       evidence.push({
+        id: `ev_graph_blast_${targetQueue}`,
         type: 'graph',
+        rank: 'context',
         message: `Blast radius analysis: Outage affects downstream components [${downstreamAffected.join(', ')}].`,
         metadata: { downstream: downstreamAffected }
       });
@@ -254,7 +268,134 @@ export class CopilotService {
       }
     }
 
-    // H. Dynamic Response text generation (Fallback Answer)
+    // H. Generate Hypotheses deterministically
+    const hypotheses: CopilotHypothesis[] = [];
+    if (evidence.length > 0) {
+      if (correlatedDeployment) {
+        const depEv = evidence.find(e => e.type === 'deployment');
+        const incEvs = evidence.filter(e => e.type === 'incident' || e.type === 'log').map(e => e.id);
+        const evidenceIds = depEv ? [depEv.id, ...incEvs] : incEvs;
+        
+        hypotheses.push({
+          id: 'hyp_dep_regression',
+          title: 'Deployment Regression',
+          description: `The deployment of service "${correlatedDeployment.service}" v${correlatedDeployment.version} occurred just before the failure. It is highly likely that this deployment introduced a bug or configuration issue.`,
+          confidence: activeIncidents.length > 0 ? 85 : 50,
+          evidenceIds
+        });
+      }
+      
+      if (queueErrors.length > 0) {
+        const logEvs = evidence.filter(e => e.type === 'log').map(e => e.id);
+        const incEvs = evidence.filter(e => e.type === 'incident').map(e => e.id);
+        
+        hypotheses.push({
+          id: 'hyp_service_errors',
+          title: 'Exception Spike in Worker',
+          description: `Multiple error logs were recorded in queue "${targetQueue || 'unknown'}". Workers are throwing unhandled exceptions during job execution.`,
+          confidence: activeIncidents.length > 0 ? 90 : 70,
+          evidenceIds: [...logEvs, ...incEvs]
+        });
+      }
+      
+      if (downstreamAffected.length > 0) {
+        const graphEv = evidence.find(e => e.type === 'graph');
+        hypotheses.push({
+          id: 'hyp_downstream_cascade',
+          title: 'Downstream Cascade Risk',
+          description: `The queue outage on "${targetQueue}" is propagating downstream, impacting dependent components: [${downstreamAffected.join(', ')}].`,
+          confidence: 60,
+          evidenceIds: graphEv ? [graphEv.id] : []
+        });
+      }
+      
+      // Fallback hypothesis if none generated
+      if (hypotheses.length === 0) {
+        hypotheses.push({
+          id: 'hyp_unknown_degradation',
+          title: 'Unclassified Performance Degradation',
+          description: `The queue "${targetQueue}" is showing indicators of degradation, but no recent error logs or deployments directly correlate to a single root cause.`,
+          confidence: 30,
+          evidenceIds: evidence.map(e => e.id)
+        });
+      }
+    }
+
+    // I. Generate Investigation Graph deterministically
+    const graphNodes: any[] = [];
+    const graphEdges: { from: string; to: string }[] = [];
+    let lastNodeId = '';
+    
+    if (correlatedDeployment) {
+      const id = `node_dep_${correlatedDeployment.commitSha}`;
+      graphNodes.push({
+        id,
+        type: 'deployment',
+        label: `Deploy: ${correlatedDeployment.service} (${correlatedDeployment.version})`,
+        timestamp: correlatedDeployment.deployedAt
+      });
+      lastNodeId = id;
+    }
+    
+    if (queueErrors.length > 0) {
+      const id = 'node_log_err';
+      graphNodes.push({
+        id,
+        type: 'log',
+        label: `Errors: ${queueErrors[0].message.substring(0, 40)}...`,
+        timestamp: queueErrors[0].timestamp
+      });
+      if (lastNodeId) {
+        graphEdges.push({ from: lastNodeId, to: id });
+      }
+      lastNodeId = id;
+    }
+    
+    if (activeIncidents.length > 0) {
+      const id = `node_inc_${activeIncidents[0].id}`;
+      graphNodes.push({
+        id,
+        type: 'incident',
+        label: `Incident: ${activeIncidents[0].title}`,
+        timestamp: activeIncidents[0].firstDetectedAt
+      });
+      if (lastNodeId) {
+        graphEdges.push({ from: lastNodeId, to: id });
+      }
+      lastNodeId = id;
+    }
+    
+    if (downstreamAffected.length > 0) {
+      const id = 'node_blast_radius';
+      graphNodes.push({
+        id,
+        type: 'blast_radius',
+        label: `Blast Radius: ${downstreamAffected.length} downstream components`
+      });
+      if (lastNodeId) {
+        graphEdges.push({ from: lastNodeId, to: id });
+      }
+      lastNodeId = id;
+    }
+    
+    if (recommendedActions.length > 0) {
+      const id = 'node_action_remed';
+      graphNodes.push({
+        id,
+        type: 'action',
+        label: `Action: ${recommendedActions[0].description}`
+      });
+      if (lastNodeId) {
+        graphEdges.push({ from: lastNodeId, to: id });
+      }
+    }
+    
+    const investigationGraph = {
+      nodes: graphNodes,
+      edges: graphEdges
+    };
+
+    // J. Dynamic Response text generation (Fallback Answer)
     let answer = '';
     if (evidence.length === 0) {
       answer = `I could not find any active incidents, recent deployments, or matching error logs for the specified queue context. More telemetry or target keywords are needed before I can make a reliable reliability diagnosis.`;
@@ -314,6 +455,8 @@ System Evidence context:
 - Evidence Gathered: ${JSON.stringify(evidence)}
 - Recommended Actions Base: ${JSON.stringify(recommendedActions)}
 - Confidence: ${confidence} (${confidenceScore}%)
+- Deterministic Hypotheses: ${JSON.stringify(hypotheses)}
+- Deterministic Investigation Graph: ${JSON.stringify(investigationGraph)}
 
 Question: ${prompt}
 
@@ -321,9 +464,14 @@ Format your response strictly as JSON matching this structure:
 {
   "answer": "Concise Markdown answer citing logs, incident IDs, deployments, reliability scores, and blast radius.",
   "confidence": "low" | "medium" | "high",
-  "evidence": [{"type": "log"|"metric"|"deployment"|"incident"|"score"|"graph", "message": "string", "timestamp": number}],
+  "evidence": [{"id": "string", "type": "log"|"metric"|"deployment"|"incident"|"score"|"graph", "rank": "primary"|"secondary"|"context", "message": "string", "timestamp": number}],
   "recommendedActions": [{"type": "pause_queue"|"replay_dlq"|"reduce_concurrency"|"ack_incident"|"scale_workers"|"investigate_deployment", "queueName": "string", "incidentId": "string", "description": "string", "command": "string"}],
-  "requiresConfirmation": true
+  "requiresConfirmation": true,
+  "hypotheses": [{"id": "string", "title": "string", "description": "string", "confidence": number, "evidenceIds": ["string"]}],
+  "investigationGraph": {
+    "nodes": [{"id": "string", "type": "deployment"|"log"|"incident"|"blast_radius"|"action", "label": "string", "timestamp": number}],
+    "edges": [{"from": "string", "to": "string"}]
+  }
 }`;
 
     let copilotResponse: CopilotResponse;
@@ -350,7 +498,9 @@ Format your response strictly as JSON matching this structure:
           confidenceScore: parsed.confidence === 'high' ? 90 : parsed.confidence === 'medium' ? 60 : 30,
           evidence: parsed.evidence || evidence,
           recommendedActions: parsed.recommendedActions || recommendedActions,
-          requiresConfirmation: parsed.requiresConfirmation !== undefined ? parsed.requiresConfirmation : true
+          requiresConfirmation: parsed.requiresConfirmation !== undefined ? parsed.requiresConfirmation : true,
+          hypotheses: parsed.hypotheses || hypotheses,
+          investigationGraph: parsed.investigationGraph || investigationGraph
         };
       } else {
         throw new Error(`Ollama status: ${response.status}`);
@@ -363,7 +513,9 @@ Format your response strictly as JSON matching this structure:
         confidenceScore,
         evidence,
         recommendedActions,
-        requiresConfirmation: true
+        requiresConfirmation: true,
+        hypotheses,
+        investigationGraph
       };
     }
 
@@ -384,7 +536,9 @@ Format your response strictly as JSON matching this structure:
       confidence: copilotResponse.confidence,
       timestamp: Date.now(),
       incidentId: contextIncidentId || (activeIncidents[0] ? activeIncidents[0].id : undefined),
-      queueName: targetQueue || undefined
+      queueName: targetQueue || undefined,
+      hypotheses: copilotResponse.hypotheses,
+      investigationGraph: copilotResponse.investigationGraph
     };
     await this.dbService.saveCopilotLog(logEntry, projectId);
 
@@ -400,7 +554,9 @@ Format your response strictly as JSON matching this structure:
         confidenceScore: 0,
         evidence: [],
         recommendedActions: [],
-        requiresConfirmation: false
+        requiresConfirmation: false,
+        hypotheses: [],
+        investigationGraph: { nodes: [], edges: [] }
       };
     }
 

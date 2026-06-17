@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
+import {
   Sparkles, Send, RefreshCw, Terminal, CheckCircle2, ShieldAlert, Cpu, GitCommit,
   AlertTriangle, GitMerge, Percent, FileText, Play, Activity, Clock
 } from 'lucide-react';
@@ -18,6 +18,7 @@ export default function ReliabilityCopilot() {
   const [response, setResponse] = useState<CopilotResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [logsList, setLogsList] = useState<CopilotLogEntry[]>([]);
+  const [highlightedEvidenceIds, setHighlightedEvidenceIds] = useState<string[]>([]);
 
   // Recommended Action Confirmation states
   const [selectedAction, setSelectedAction] = useState<ActionRecommendation | null>(null);
@@ -59,6 +60,7 @@ export default function ReliabilityCopilot() {
     setSelectedAction(null);
     setExecutionLogs([]);
     setConfirmedAction(null);
+    setHighlightedEvidenceIds([]);
 
     try {
       const res = await authFetch(`${API_URL}/api/copilot/query`, {
@@ -162,9 +164,39 @@ export default function ReliabilityCopilot() {
     }
   };
 
+  const getRank = (ev: EvidenceItem) => ev.rank || (ev.type === 'incident' || ev.type === 'log' ? 'primary' : ev.type === 'deployment' ? 'secondary' : 'context');
+
+  const getConfidenceColorClass = (confidence: number) => {
+    if (confidence >= 80) return 'from-emerald-500 to-teal-500';
+    if (confidence >= 50) return 'from-amber-500 to-orange-500';
+    return 'from-rose-500 to-red-500';
+  };
+
+  const getNodeIcon = (type: string) => {
+    switch (type) {
+      case 'deployment': return <GitCommit className="w-3.5 h-3.5 text-indigo-400" />;
+      case 'log': return <Terminal className="w-3.5 h-3.5 text-amber-400" />;
+      case 'incident': return <AlertTriangle className="w-3.5 h-3.5 text-rose-450" />;
+      case 'blast_radius': return <GitMerge className="w-3.5 h-3.5 text-purple-400" />;
+      case 'action': return <Play className="w-3.5 h-3.5 text-emerald-400" />;
+      default: return <FileText className="w-3.5 h-3.5 text-zinc-500" />;
+    }
+  };
+
+  const getNodeColor = (type: string) => {
+    switch (type) {
+      case 'deployment': return 'border-indigo-500/30 text-indigo-400 bg-indigo-950/20';
+      case 'log': return 'border-amber-500/30 text-amber-400 bg-amber-950/20';
+      case 'incident': return 'border-rose-500/30 text-rose-450 bg-rose-950/20';
+      case 'blast_radius': return 'border-purple-500/30 text-purple-400 bg-purple-950/20';
+      case 'action': return 'border-emerald-500/30 text-emerald-400 bg-emerald-950/20';
+      default: return 'border-zinc-800 text-zinc-400 bg-zinc-900/40';
+    }
+  };
+
   return (
     <div className="space-y-6 font-mono text-[10px]">
-      
+
       {/* Header */}
       <div className="border-b border-zinc-900 pb-4">
         <h2 className="text-sm font-bold text-white uppercase tracking-tight flex items-center space-x-2">
@@ -177,10 +209,10 @@ export default function ReliabilityCopilot() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+
         {/* Left Side: Suggestions and Recent Context */}
         <div className="space-y-4">
-          
+
           {/* Suggestions */}
           <div className="bg-zinc-950/70 backdrop-blur-md border border-zinc-900/80 p-5 rounded-lg space-y-3 shadow">
             <h3 className="text-white text-xs font-bold uppercase tracking-wider border-b border-zinc-900 pb-2">
@@ -220,7 +252,7 @@ export default function ReliabilityCopilot() {
 
         {/* Center/Right: Chat console & structured response */}
         <div className="lg:col-span-2 space-y-5">
-          
+
           {/* Query Bar */}
           <div className="bg-zinc-950/70 backdrop-blur-md border border-zinc-900/80 p-4 rounded-lg flex items-center gap-3">
             <div className="flex-1 flex items-center space-x-2.5 bg-zinc-900/30 border border-zinc-900 rounded px-3 py-2">
@@ -253,7 +285,7 @@ export default function ReliabilityCopilot() {
 
           {response && (
             <div className="space-y-4">
-              
+
               {/* Answer Box */}
               <div className="bg-zinc-950/70 backdrop-blur-md border border-zinc-900/80 p-5 rounded-lg space-y-4 shadow-xl relative overflow-hidden">
                 <div className="flex justify-between items-center border-b border-zinc-900 pb-3">
@@ -261,14 +293,13 @@ export default function ReliabilityCopilot() {
                     <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
                     <span>Copilot Diagnosis</span>
                   </span>
-                  
+
                   <div className="flex items-center space-x-2">
                     <span className="text-zinc-500 uppercase text-[9px]">Confidence:</span>
-                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${
-                      response.confidence === 'high' ? 'bg-emerald-950/20 border-emerald-900 text-emerald-400' :
+                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${response.confidence === 'high' ? 'bg-emerald-950/20 border-emerald-900 text-emerald-400' :
                       response.confidence === 'medium' ? 'bg-amber-950/20 border-amber-900 text-amber-400' :
-                      'bg-rose-950/20 border-rose-900 text-rose-400'
-                    }`}>
+                        'bg-rose-950/20 border-rose-900 text-rose-400'
+                      }`}>
                       {response.confidence.toUpperCase()} ({response.confidenceScore}%)
                     </span>
                   </div>
@@ -279,26 +310,212 @@ export default function ReliabilityCopilot() {
                 </div>
               </div>
 
-              {/* Evidence & Recommendations */}
+              {/* Row 1: Root-Cause Investigation Graph & Hypotheses */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                
+
+                {/* Investigation Graph Card */}
+                <div className="bg-zinc-950/70 backdrop-blur-md border border-zinc-900/80 p-4 rounded-lg space-y-3">
+                  <span className="text-zinc-500 uppercase text-[9px] font-bold tracking-wider flex items-center space-x-1.5">
+                    <GitMerge className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                    <span>Root-Cause Investigation Chain</span>
+                  </span>
+
+                  {response.investigationGraph && response.investigationGraph.nodes && response.investigationGraph.nodes.length > 0 ? (
+                    <div className="relative pl-6 border-l border-zinc-800/40 space-y-4 py-1.5 ml-2">
+                      {/* Left vertical border with glow */}
+                      <div className="absolute left-[-1px] top-1.5 bottom-1.5 w-[1px] bg-gradient-to-b from-purple-500/50 via-indigo-500/40 to-emerald-500/30" />
+
+                      {response.investigationGraph.nodes.map((node, idx) => {
+                        const isLast = idx === response.investigationGraph.nodes.length - 1;
+                        return (
+                          <div key={node.id} className="relative group">
+                            {/* Bullet connector */}
+                            <div className={`absolute -left-[30px] top-1 w-5 h-5 rounded-full border flex items-center justify-center shadow-lg transition-transform group-hover:scale-110 ${getNodeColor(node.type)}`}>
+                              {getNodeIcon(node.type)}
+                            </div>
+
+                            {/* Node content box */}
+                            <div className="bg-zinc-900/30 border border-zinc-900/80 rounded-lg p-2.5 space-y-1 hover:border-zinc-800 hover:bg-zinc-900/40 transition-all duration-300">
+                              <div className="flex justify-between items-center text-[8px] text-zinc-550">
+                                <span className="font-bold uppercase tracking-wider">{node.type}</span>
+                                {node.timestamp && (
+                                  <span>{new Date(node.timestamp).toLocaleTimeString()}</span>
+                                )}
+                              </div>
+                              <p className="text-[10.5px] font-bold text-white font-sans leading-tight mt-0.5">
+                                {node.label}
+                              </p>
+                            </div>
+
+                            {/* Flow line down indicator arrow */}
+                            {!isLast && (
+                              <div className="absolute left-[-24px] bottom-[-18px] text-zinc-700 select-none pointer-events-none text-[8px] animate-pulse">
+                                &darr;
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <span className="text-zinc-650 italic block pt-2">No root-cause chain generated.</span>
+                  )}
+                </div>
+
+                {/* Hypotheses Card */}
+                <div className="bg-zinc-950/70 backdrop-blur-md border border-zinc-900/80 p-4 rounded-lg space-y-3">
+                  <span className="text-zinc-500 uppercase text-[9px] font-bold tracking-wider flex items-center space-x-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                    <span>SRE Hypotheses & Probable Causes</span>
+                  </span>
+
+                  <div className="space-y-3">
+                    {response.hypotheses && response.hypotheses.map((hyp) => {
+                      const isHighlighted = highlightedEvidenceIds.length > 0 &&
+                        hyp.evidenceIds.every(id => highlightedEvidenceIds.includes(id)) &&
+                        hyp.evidenceIds.length === highlightedEvidenceIds.length;
+
+                      return (
+                        <div
+                          key={hyp.id}
+                          onClick={() => {
+                            if (highlightedEvidenceIds.length > 0 && highlightedEvidenceIds[0] === hyp.evidenceIds[0] && highlightedEvidenceIds.length === hyp.evidenceIds.length) {
+                              setHighlightedEvidenceIds([]);
+                            } else {
+                              setHighlightedEvidenceIds(hyp.evidenceIds);
+                            }
+                          }}
+                          className={`p-3 rounded-lg border transition-all duration-300 cursor-pointer bg-zinc-900/30 ${highlightedEvidenceIds.length > 0 && hyp.evidenceIds.some(id => highlightedEvidenceIds.includes(id))
+                            ? 'border-indigo-500/50 bg-indigo-950/10'
+                            : 'border-zinc-900/80 hover:border-zinc-850 hover:bg-zinc-900/40'
+                            }`}
+                        >
+                          <div className="flex justify-between items-start">
+                            <span className="font-bold text-white text-[11px]">{hyp.title}</span>
+                            <span className="text-[10px] font-bold text-zinc-400">{hyp.confidence}% Confidence</span>
+                          </div>
+
+                          <p className="text-zinc-400 font-sans text-[10.5px] leading-relaxed mt-1">
+                            {hyp.description}
+                          </p>
+
+                          <div className="w-full bg-zinc-900 h-1.5 rounded-full overflow-hidden mt-2 border border-zinc-850">
+                            <div
+                              className={`h-full bg-gradient-to-r ${getConfidenceColorClass(hyp.confidence)} transition-all duration-500`}
+                              style={{ width: `${hyp.confidence}%` }}
+                            />
+                          </div>
+
+                          <div className="mt-2 flex items-center justify-between text-[8px] text-zinc-550">
+                            <span>{hyp.evidenceIds.length} Supporting Evidence Items</span>
+                            <span className="text-indigo-400 font-bold hover:underline">
+                              {highlightedEvidenceIds.length > 0 && hyp.evidenceIds.some(id => highlightedEvidenceIds.includes(id)) ? 'Click to Deselect' : 'Click to Highlight Evidence'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {(!response.hypotheses || response.hypotheses.length === 0) && (
+                      <span className="text-zinc-650 italic block pt-2">No hypotheses generated.</span>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Row 2: Grounded Evidence & Recommended Actions */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
                 {/* Evidence Source list */}
                 <div className="bg-zinc-950/70 backdrop-blur-md border border-zinc-900/80 p-4 rounded-lg space-y-3">
                   <span className="text-zinc-500 uppercase text-[9px] font-bold tracking-wider block">Grounded Telemetry Evidence</span>
-                  <ul className="space-y-2">
-                    {response.evidence.map((ev, idx) => (
-                      <li key={idx} className={`flex items-start space-x-2 p-2 rounded border font-sans text-[11px] leading-normal ${getEvidenceBadgeStyle(ev.type)}`}>
-                        {getEvidenceIcon(ev.type)}
-                        <div className="flex-1">
-                          <span className="font-bold uppercase text-[8px] mr-1">[{ev.type}]</span>
-                          <span>{ev.message}</span>
-                        </div>
-                      </li>
-                    ))}
+
+                  <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+                    {/* Primary Evidence */}
+                    {response.evidence.filter(ev => getRank(ev) === 'primary').length > 0 && (
+                      <div className="space-y-1.5">
+                        <span className="text-rose-400 font-bold text-[8px] uppercase tracking-wider block">&bull; Primary Indicators</span>
+                        <ul className="space-y-1.5">
+                          {response.evidence.filter(ev => getRank(ev) === 'primary').map((ev, idx) => {
+                            const isHighlighted = highlightedEvidenceIds.includes(ev.id);
+                            return (
+                              <li
+                                key={idx}
+                                className={`flex items-start space-x-2 p-2 rounded border font-sans text-[11px] leading-normal transition-all duration-300 ${isHighlighted
+                                  ? 'border-indigo-500 bg-indigo-950/45 shadow-[0_0_12px_rgba(99,102,241,0.45)] scale-[1.02]'
+                                  : getEvidenceBadgeStyle(ev.type)
+                                  }`}
+                              >
+                                {getEvidenceIcon(ev.type)}
+                                <div className="flex-1">
+                                  <span className="font-bold uppercase text-[8px] mr-1">[{ev.type}]</span>
+                                  <span>{ev.message}</span>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Secondary Evidence */}
+                    {response.evidence.filter(ev => getRank(ev) === 'secondary').length > 0 && (
+                      <div className="space-y-1.5">
+                        <span className="text-indigo-400 font-bold text-[8px] uppercase tracking-wider block">&bull; Secondary Correlations</span>
+                        <ul className="space-y-1.5">
+                          {response.evidence.filter(ev => getRank(ev) === 'secondary').map((ev, idx) => {
+                            const isHighlighted = highlightedEvidenceIds.includes(ev.id);
+                            return (
+                              <li
+                                key={idx}
+                                className={`flex items-start space-x-2 p-2 rounded border font-sans text-[11px] leading-normal transition-all duration-300 ${isHighlighted
+                                  ? 'border-indigo-500 bg-indigo-950/45 shadow-[0_0_12px_rgba(99,102,241,0.45)] scale-[1.02]'
+                                  : getEvidenceBadgeStyle(ev.type)
+                                  }`}
+                              >
+                                {getEvidenceIcon(ev.type)}
+                                <div className="flex-1">
+                                  <span className="font-bold uppercase text-[8px] mr-1">[{ev.type}]</span>
+                                  <span>{ev.message}</span>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Context Evidence */}
+                    {response.evidence.filter(ev => getRank(ev) === 'context').length > 0 && (
+                      <div className="space-y-1.5">
+                        <span className="text-zinc-500 font-bold text-[8px] uppercase tracking-wider block">&bull; Background Context</span>
+                        <ul className="space-y-1.5">
+                          {response.evidence.filter(ev => getRank(ev) === 'context').map((ev, idx) => {
+                            const isHighlighted = highlightedEvidenceIds.includes(ev.id);
+                            return (
+                              <li
+                                key={idx}
+                                className={`flex items-start space-x-2 p-2 rounded border font-sans text-[11px] leading-normal transition-all duration-300 ${isHighlighted
+                                  ? 'border-indigo-500 bg-indigo-950/45 shadow-[0_0_12px_rgba(99,102,241,0.45)] scale-[1.02]'
+                                  : getEvidenceBadgeStyle(ev.type)
+                                  }`}
+                              >
+                                {getEvidenceIcon(ev.type)}
+                                <div className="flex-1">
+                                  <span className="font-bold uppercase text-[8px] mr-1">[{ev.type}]</span>
+                                  <span>{ev.message}</span>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
+
                     {response.evidence.length === 0 && (
                       <span className="text-zinc-650 italic block pt-2">No direct telemetry records found.</span>
                     )}
-                  </ul>
+                  </div>
                 </div>
 
                 {/* Recommendations */}
@@ -309,9 +526,8 @@ export default function ReliabilityCopilot() {
                       <button
                         key={idx}
                         onClick={() => setSelectedAction(act)}
-                        className={`w-full text-left p-2.5 rounded border text-indigo-400 font-bold hover:text-white hover:border-zinc-700 transition-colors uppercase text-[8.5px] flex items-center justify-between ${
-                          selectedAction?.description === act.description ? 'bg-zinc-900 border-zinc-750 text-white' : 'bg-zinc-900/40 border-zinc-900/80'
-                        }`}
+                        className={`w-full text-left p-2.5 rounded border text-indigo-400 font-bold hover:text-white hover:border-zinc-700 transition-colors uppercase text-[8.5px] flex items-center justify-between ${selectedAction?.description === act.description ? 'bg-zinc-900 border-zinc-750 text-white' : 'bg-zinc-900/40 border-zinc-900/80'
+                          }`}
                       >
                         <span className="flex-1 pr-2">{act.description}</span>
                         <span className="text-[7.5px] text-zinc-500 shrink-0">SELECT &rarr;</span>
@@ -333,14 +549,14 @@ export default function ReliabilityCopilot() {
                       <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
                       <span>Confirm Action: {selectedAction.type.toUpperCase()}</span>
                     </span>
-                    <button 
+                    <button
                       onClick={() => setSelectedAction(null)}
                       className="text-zinc-600 hover:text-zinc-400 uppercase text-[8px]"
                     >
                       Cancel
                     </button>
                   </div>
-                  
+
                   <p className="text-zinc-400 font-sans text-xs leading-normal">
                     {selectedAction.description}
                   </p>
@@ -388,7 +604,7 @@ export default function ReliabilityCopilot() {
           <Clock className="w-4 h-4 text-zinc-400" />
           <span>Audit Log & Investigation History</span>
         </h3>
-        
+
         <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
           {logsList.map((log) => (
             <div key={log.id} className="p-3 bg-zinc-900/40 border border-zinc-900 rounded space-y-2 hover:border-zinc-800 transition-colors">
@@ -400,12 +616,12 @@ export default function ReliabilityCopilot() {
                 </div>
                 <span>{new Date(log.timestamp).toLocaleString()}</span>
               </div>
-              
+
               <div className="text-white font-sans text-xs">
                 <span className="text-zinc-500 font-mono text-[10px] mr-1">&gt;</span>
                 {log.question}
               </div>
-              
+
               <div className="p-2.5 bg-black/30 rounded border border-zinc-900/80 text-[9px] text-zinc-400 leading-relaxed font-sans">
                 <span className="text-[8px] font-bold font-mono uppercase text-zinc-550 block mb-1">Answer Summary</span>
                 {log.answer.length > 250 ? `${log.answer.substring(0, 250)}...` : log.answer}
@@ -413,10 +629,9 @@ export default function ReliabilityCopilot() {
 
               <div className="flex items-center space-x-2 text-[8px]">
                 <span className="text-zinc-600">CONFIDENCE:</span>
-                <span className={`font-bold ${
-                  log.confidence === 'high' ? 'text-emerald-400' :
+                <span className={`font-bold ${log.confidence === 'high' ? 'text-emerald-400' :
                   log.confidence === 'medium' ? 'text-amber-400' : 'text-rose-450'
-                }`}>
+                  }`}>
                   {log.confidence.toUpperCase()}
                 </span>
                 <span className="text-zinc-700">|</span>

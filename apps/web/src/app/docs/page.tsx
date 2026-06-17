@@ -21,7 +21,10 @@ import {
   ArrowUpRight,
   Menu,
   X,
-  ChevronRight
+  ChevronRight,
+  Percent,
+  GitMerge,
+  Sparkles
 } from 'lucide-react';
 
 // Searchable docs database
@@ -76,6 +79,27 @@ const docsItems = [
     snippet: 'queuewatchLogger.info(\'Job started processing\', { jobId, traceId })'
   },
   {
+    id: 'reliability-scoring',
+    category: 'Features',
+    title: 'SRE Reliability Scoring & SLOs',
+    description: 'Mathematically weighted 0-100 scoring based on failure rates, latency target breaches, worker health, incident severity, blast radius, and deployment regressions.',
+    snippet: 'SRE scoring engine runs background checks every 30 seconds and outputs explainable deductions.'
+  },
+  {
+    id: 'dependency-graphs',
+    category: 'Features',
+    title: 'Topological Dependency Graphs & Blast Radius',
+    description: 'Dynamic graph modeling that maps queues and services. Calculates downstream outage impact propagation using BFS cascades.',
+    snippet: 'Directed graph edge verification separating producer/consumer nodes.'
+  },
+  {
+    id: 'ai-copilot',
+    category: 'Features',
+    title: 'AI Investigation Copilot',
+    description: 'Zero-speculation evidence diagnostics query engine. Log every investigation, check regressions, and trigger human-confirmed recovery actions.',
+    snippet: 'Structured JSON response schema, confirmation-aware recovery action terminal.'
+  },
+  {
     id: 'troubleshooting',
     category: 'Guides',
     title: 'Troubleshooting & Support',
@@ -100,6 +124,14 @@ const sidebarCategories = [
       { id: 'bullmq', label: 'BullMQ Integration' },
       { id: 'events', label: 'Telemetry Events' },
       { id: 'logging', label: 'Structured Logs' },
+    ]
+  },
+  {
+    title: 'Core Features',
+    items: [
+      { id: 'reliability-scoring', label: 'Reliability Scoring' },
+      { id: 'dependency-graphs', label: 'Dependency Graphs' },
+      { id: 'ai-copilot', label: 'AI Investigation Copilot' },
     ]
   },
   {
@@ -794,7 +826,70 @@ worker.on('active', (job) => {
             </PremiumCodeBlock>
           </section>
 
-          {/* Section 8: Troubleshooting */}
+          {/* Section 8: SRE Reliability Scoring */}
+          <section 
+            id="reliability-scoring" 
+            className={`scroll-mt-20 space-y-4 transition-all duration-700 rounded-lg p-1.5 ${
+              highlightedSection === 'reliability-scoring' ? 'bg-[#4f46e5]/10 ring-1 ring-[#4f46e5]/30' : 'bg-transparent'
+            }`}
+          >
+            <h2 className="text-2xl font-bold text-zinc-100 tracking-tight flex items-center gap-2.5">
+              <Percent className="w-6 h-6 text-indigo-400" /> SRE Reliability Scoring & SLOs
+            </h2>
+            <p className="text-zinc-355 text-[15px] leading-7 font-sans">
+              QueueWatch calculates a mathematically weighted 0-100 reliability score for all Microservices and Queues, updating every 30 seconds.
+            </p>
+            <div className="bg-[#0b0b0d] border border-zinc-800 rounded-lg p-4 font-sans text-xs space-y-3">
+              <div className="font-bold text-zinc-200">Weighted Components Breakdown:</div>
+              <ul className="list-disc pl-5 space-y-1.5 text-zinc-400 text-[11px] leading-relaxed">
+                <li><b className="text-zinc-300">Failure Rate (25%):</b> Proportional penalty applied for job execution failures.</li>
+                <li><b className="text-zinc-300">Latency Target SLO (20%):</b> Deductions based on queue-specific SLA target breaches (e.g. <code className="text-indigo-400 font-mono text-[10px]">webhook_delivery</code> default target: 1500ms).</li>
+                <li><b className="text-zinc-300">Worker Health (15%):</b> Assessed dynamically based on active heartbeats, CPU overload, and thread status.</li>
+                <li><b className="text-zinc-300">Incident Severity (25%):</b> Deductions applied depending on the worst active unresolved incident (Critical: 100%, High: 60%).</li>
+                <li><b className="text-zinc-300">Downstream Blast Radius (10%):</b> Calculated penalty for system cascading failure reach.</li>
+                <li><b className="text-zinc-300">Deployment Regression (5%):</b> Flags potential regressions when incidents occur directly after software releases.</li>
+              </ul>
+            </div>
+          </section>
+
+          {/* Section 9: Topological Dependency Graphs */}
+          <section 
+            id="dependency-graphs" 
+            className={`scroll-mt-20 space-y-4 transition-all duration-700 rounded-lg p-1.5 ${
+              highlightedSection === 'dependency-graphs' ? 'bg-[#4f46e5]/10 ring-1 ring-[#4f46e5]/30' : 'bg-transparent'
+            }`}
+          >
+            <h2 className="text-2xl font-bold text-zinc-100 tracking-tight flex items-center gap-2.5">
+              <GitMerge className="w-6 h-6 text-indigo-400" /> Dependency Graph & Blast Radius
+            </h2>
+            <p className="text-zinc-355 text-[15px] leading-7 font-sans">
+              Our graph traversal engine compiles topological maps separating producer and consumer nodes. When a background node encounters a critical failure state, QueueWatch runs a Breadth-First Search (BFS) to dynamically trace downstream paths, isolating the outage blast radius and defining affected business capabilities.
+            </p>
+          </section>
+
+          {/* Section 10: AI Investigation Copilot */}
+          <section 
+            id="ai-copilot" 
+            className={`scroll-mt-20 space-y-4 transition-all duration-700 rounded-lg p-1.5 ${
+              highlightedSection === 'ai-copilot' ? 'bg-[#4f46e5]/10 ring-1 ring-[#4f46e5]/30' : 'bg-transparent'
+            }`}
+          >
+            <h2 className="text-2xl font-bold text-zinc-100 tracking-tight flex items-center gap-2.5">
+              <Sparkles className="w-6 h-6 text-indigo-400" /> AI Investigation Copilot & Investigation Engine
+            </h2>
+            <p className="text-zinc-355 text-[15px] leading-7 font-sans">
+              The SRE Reliability Copilot acts as an evidence-grounded query agent. Instead of speculating, it uses zero-speculation evidence binding to cross-reference logs, timelines, and metrics:
+            </p>
+            <ul className="list-disc pl-6 space-y-2 text-zinc-355 text-[14px] leading-relaxed font-sans">
+              <li><b className="text-zinc-150">Evidence Ranking:</b> Classifies signals into primary triggers (active incidents, error logs), secondary correlations (recent deployments, warnings), and background context (reliability scores, blast radius).</li>
+              <li><b className="text-zinc-150">Dynamic SRE Hypotheses:</b> Formulates distinct failure theories bound directly to supporting evidence IDs with confidence scores, complete with interactive highlight triggers in the console.</li>
+              <li><b className="text-zinc-150">Chronological Root-Cause DAG:</b> Automatically structures and visualizes failure propagation graphs: <code className="bg-zinc-900 border border-zinc-800 text-purple-400 px-1 py-0.5 rounded font-mono text-[11px]">Deployment ➔ Exception Log ➔ Active Incident ➔ Blast Radius ➔ Recovery Action</code>.</li>
+              <li><b className="text-zinc-150">Audit History Log:</b> Every investigation query is archived inside Redis, creating operational audit trails and historical SRE memory.</li>
+              <li><b className="text-zinc-150">Confirm-and-Execute Console:</b> Recommended recovery actions (like pausing queues or replaying failed DLQ jobs) require manual engineer-in-the-loop authorization inside the console.</li>
+            </ul>
+          </section>
+
+          {/* Section 11: Troubleshooting */}
           <section 
             id="troubleshooting" 
             className={`scroll-mt-20 space-y-4 border-t border-zinc-850 pt-12 transition-all duration-700 rounded-lg p-1.5 ${

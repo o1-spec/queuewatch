@@ -268,10 +268,33 @@ export interface RecurringIncident {
 }
 
 export interface EvidenceItem {
+  id: string;
   type: 'log' | 'metric' | 'deployment' | 'incident' | 'score' | 'graph';
+  rank: 'primary' | 'secondary' | 'context';
   message: string;
   timestamp?: number;
   metadata?: any;
+}
+
+export interface CopilotHypothesis {
+  id: string;
+  title: string;
+  description: string;
+  confidence: number; // percentage (0-100)
+  evidenceIds: string[]; // associated evidence items backing this hypothesis
+}
+
+export interface InvestigationGraphNode {
+  id: string;
+  type: 'deployment' | 'log' | 'incident' | 'blast_radius' | 'action';
+  label: string;
+  timestamp?: number;
+  metadata?: any;
+}
+
+export interface InvestigationGraph {
+  nodes: InvestigationGraphNode[];
+  edges: { from: string; to: string }[];
 }
 
 export interface ActionRecommendation {
@@ -290,6 +313,8 @@ export interface CopilotResponse {
   evidence: EvidenceItem[];
   recommendedActions: ActionRecommendation[];
   requiresConfirmation: boolean;
+  hypotheses: CopilotHypothesis[];
+  investigationGraph: InvestigationGraph;
   relatedIncidents?: string[];
   relatedDeployments?: string[];
 }
@@ -304,6 +329,8 @@ export interface CopilotLogEntry {
   timestamp: number;
   incidentId?: string;
   queueName?: string;
+  hypotheses?: CopilotHypothesis[];
+  investigationGraph?: InvestigationGraph;
 }
 
 export interface Environment {
