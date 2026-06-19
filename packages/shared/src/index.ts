@@ -142,6 +142,7 @@ export interface InvestigationReport {
   timelineSummary: string;
   nextSteps: string[];
   timestamp: number;
+  investigationGraph?: InvestigationGraph;
 }
 
 export interface AlertRule {
@@ -254,6 +255,11 @@ export interface KnowledgeEntry {
   runbooksExecuted?: string[];
   finalOutcome?: string;
   recoveryTime?: number;
+  lessonsLearned?: {
+    whatHappened: string;
+    whatFixedIt: string;
+    differentlyNextTime: string;
+  };
 }
 
 export interface Runbook {
@@ -289,6 +295,10 @@ export interface RecurringIncident {
   rootCause: string;
   recommendedPrevention: string;
   incidentIds: string[];
+  occurrences?: number;
+  averageRecoveryTime?: number;
+  recommendedResolution?: string;
+  successRate?: number;
 }
 
 export interface EvidenceItem {

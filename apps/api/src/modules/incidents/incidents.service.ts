@@ -136,7 +136,12 @@ export class IncidentsService {
     return updated;
   }
 
-  async resolveIncident(id: string, summary: string, projectId?: string): Promise<Incident> {
+  async resolveIncident(
+    id: string,
+    summary: string,
+    projectId?: string,
+    feedback?: { whatHappened: string; whatFixedIt: string; differentlyNextTime: string; }
+  ): Promise<Incident> {
     const incident = await this.dbService.getIncident(id, projectId);
     if (!incident) throw new Error(`Incident ${id} not found`);
 
@@ -228,6 +233,27 @@ export class IncidentsService {
         }
       } catch {}
 
+      // Fetch associated runbooks and compile executed steps / outcomes
+      const incidentRunbooks = await this.dbService.getIncidentRunbooks(incident.id, projectId);
+      const runbooksExecuted = incidentRunbooks.map(rb => rb.title);
+      
+      const totalSteps = incidentRunbooks.reduce((acc, rb) => acc + rb.steps.length, 0);
+      const completedSteps = incidentRunbooks.reduce((acc, rb) => acc + rb.steps.filter(s => s.status === 'completed').length, 0);
+      const skippedSteps = incidentRunbooks.reduce((acc, rb) => acc + rb.steps.filter(s => s.status === 'skipped').length, 0);
+      const failedSteps = incidentRunbooks.reduce((acc, rb) => acc + rb.steps.filter(s => s.status === 'failed').length, 0);
+      const blockedSteps = incidentRunbooks.reduce((acc, rb) => acc + rb.steps.filter(s => s.status === 'blocked').length, 0);
+      
+      let finalOutcome = 'Resolved successfully';
+      if (totalSteps > 0) {
+        finalOutcome = `Resolved with runbook execution progress: ${completedSteps + skippedSteps}/${totalSteps} steps completed/skipped.`;
+        if (failedSteps > 0) {
+          finalOutcome += ` (${failedSteps} steps failed)`;
+        }
+        if (blockedSteps > 0) {
+          finalOutcome += ` (${blockedSteps} steps blocked)`;
+        }
+      }
+
       await this.dbService.saveKnowledgeEntry({
         id: `know_${Math.random().toString(36).substr(2, 9)}`,
         title: `Resolution: ${incident.title}`,
@@ -241,7 +267,11 @@ export class IncidentsService {
         hypotheses,
         resolutionTimeMin,
         blastRadius: Array.from(new Set(impactedServices)),
-        reliabilityImpact: `Blast Radius: ${estimatedBlastRadius.toUpperCase()}. Business Impact: ${businessImpacts.join(', ')}`
+        reliabilityImpact: `Blast Radius: ${estimatedBlastRadius.toUpperCase()}. Business Impact: ${businessImpacts.join(', ')}`,
+        runbooksExecuted,
+        finalOutcome,
+        recoveryTime: resolutionTimeMin,
+        lessonsLearned: feedback || undefined
       }, projectId);
       this.logger.log(`Automatically registered Knowledge Base entry for incident ${id}.`);
     } catch (e) {
@@ -881,33 +911,196 @@ export class IncidentsService {
     const entries = await this.dbService.getKnowledgeEntries(projectId);
     const similar: any[] = [];
 
-    const text1 = `${incident.title} ${incident.summary} ${incident.suspectedRootCause || ''} ${incident.affectedQueue}`.toLowerCase();
+    // Current incident parameters
+    const queue1 = incident.affectedQueue;
+    const services = await this.dbService.getServices(projectId);
+    const svc1 = services.find(s => s.queues && s.queues.includes(queue1))?.name || '';
+    const sev1 = incident.severity || 'high';
 
-    const computeSimilarity = (t1: string, t2: string): number => {
-      const words1 = new Set(t1.match(/\b\w+\b/g) || []);
-      const words2 = new Set(t2.match(/\b\w+\b/g) || []);
-      if (words1.size === 0 || words2.size === 0) return 0;
-      const intersection = new Set([...words1].filter(w => words2.has(w)));
-      const union = new Set([...words1, ...words2]);
-      return Math.round((intersection.size / union.size) * 100);
+    // Current incident blast radius using BFS
+    const graph = await this.dbService.getDependencyGraph(projectId);
+    const visited = new Set<string>();
+    const queueList = [queue1];
+    const currentBlastRadius: string[] = [];
+    while (queueList.length > 0) {
+      const current = queueList.shift()!;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      if (graph && graph.edges) {
+        const downstreams = graph.edges
+          .filter(e => e.from === current)
+          .map(e => e.to);
+        for (const down of downstreams) {
+          if (!visited.has(down)) {
+            queueList.push(down);
+            if (down.startsWith('svc_')) {
+              const svcDetails = services.find(s => s.id === down);
+              if (svcDetails) {
+                currentBlastRadius.push(svcDetails.name);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Current incident causal graph structure
+    let currentNodes: string[] = [];
+    try {
+      const report = await this.dbService.getInvestigation(incident.id, projectId);
+      if (report && report.investigationGraph && report.investigationGraph.nodes) {
+        currentNodes = report.investigationGraph.nodes.map(n => n.type);
+      }
+    } catch {}
+    if (currentNodes.length === 0) {
+      const timeline = await this.buildTimeline(incident, projectId);
+      currentNodes = timeline.map(n => n.type || 'log');
+    }
+
+    // Stopwords and text utility for Jaccard
+    const stopwords = new Set(['have', 'we', 'seen', 'this', 'before', 'what', 'solved', 'it', 'is', 'a', 'the', 'an', 'and', 'or', 'for', 'on', 'in', 'at', 'to', 'of', 'with', 'issue', 'issues', 'problem', 'problems']);
+    const getTokens = (text: string): string[] => {
+      const words = text.toLowerCase().match(/\b\w+\b/g) || [];
+      return words.filter(w => !stopwords.has(w));
     };
+
+    const computeJaccard = (tokens1: string[], tokens2: string[]): number => {
+      const set1 = new Set(tokens1);
+      const set2 = new Set(tokens2);
+      if (set1.size === 0 && set2.size === 0) return 1;
+      if (set1.size === 0 || set2.size === 0) return 0;
+      const intersection = new Set([...set1].filter(x => set2.has(x)));
+      const union = new Set([...set1, ...set2]);
+      return intersection.size / union.size;
+    };
+
+    const severityPointsMap: Record<string, number> = { critical: 40, high: 25, medium: 15, low: 5 };
+
+    const projectQueues = await this.dbService.getProjectQueues(projectId || 'proj_demo');
 
     for (const entry of entries) {
       if (entry.incidentId === incidentId) continue; // Skip itself
-      const text2 = `${entry.title} ${entry.pattern} ${entry.rootCause} ${entry.resolution}`.toLowerCase();
-      const score = computeSimilarity(text1, text2);
-      if (score >= 20) {
+
+      // Load historical incident if available
+      let histIncident: any = null;
+      try {
+        histIncident = await this.dbService.getIncident(entry.incidentId, projectId);
+      } catch {}
+
+      // 1. Queue Name match (20 pts)
+      let queue2 = '';
+      if (histIncident) {
+        queue2 = histIncident.affectedQueue;
+      } else {
+        const textToScan = `${entry.title} ${entry.pattern} ${entry.evidence || ''} ${entry.reliabilityImpact || ''}`.toLowerCase();
+        for (const q of projectQueues) {
+          if (textToScan.includes(q.toLowerCase())) {
+            queue2 = q;
+            break;
+          }
+        }
+      }
+      const queueScore = (queue1 && queue2 && queue1 === queue2) ? 20 : 0;
+
+      // 2. Service Name match (15 pts)
+      let svc2 = '';
+      if (histIncident) {
+        svc2 = services.find(s => s.queues && s.queues.includes(queue2))?.name || '';
+      } else {
+        for (const s of services) {
+          const textToScan = `${entry.title} ${entry.pattern} ${entry.reliabilityImpact || ''} ${entry.resolution}`.toLowerCase();
+          if (textToScan.includes(s.name.toLowerCase()) || textToScan.includes(s.id.toLowerCase())) {
+            svc2 = s.name;
+            break;
+          }
+        }
+        if (!svc2 && queue2) {
+          svc2 = services.find(s => s.queues && s.queues.includes(queue2))?.name || '';
+        }
+      }
+      const serviceScore = (svc1 && svc2 && svc1 === svc2) ? 15 : 0;
+
+      // 3. Error Messages / Logs match (20 pts)
+      const errorTokens1 = getTokens(`${incident.evidence} ${incident.relatedErrors?.join(' ') || ''}`);
+      const errorTokens2 = getTokens(`${entry.evidence || ''} ${entry.pattern} ${entry.rootCause}`);
+      const errorScore = Math.round(computeJaccard(errorTokens1, errorTokens2) * 20);
+
+      // 4. Incident Severity match (10 pts)
+      let sev2 = 'high';
+      if (histIncident) {
+        sev2 = histIncident.severity || 'high';
+      } else {
+        const textToScan = `${entry.title} ${entry.reliabilityImpact || ''}`.toLowerCase();
+        if (textToScan.includes('critical')) sev2 = 'critical';
+        else if (textToScan.includes('high')) sev2 = 'high';
+        else if (textToScan.includes('medium')) sev2 = 'medium';
+        else if (textToScan.includes('low')) sev2 = 'low';
+      }
+      let severityScore = 0;
+      if (sev1 === sev2) {
+        severityScore = 10;
+      } else {
+        const levels = ['low', 'medium', 'high', 'critical'];
+        const idx1 = levels.indexOf(sev1);
+        const idx2 = levels.indexOf(sev2);
+        if (idx1 !== -1 && idx2 !== -1 && Math.abs(idx1 - idx2) === 1) {
+          severityScore = 5;
+        }
+      }
+
+      // 5. Blast Radius match (15 pts)
+      const blast2 = entry.blastRadius || [];
+      let blastScore = 0;
+      if (currentBlastRadius.length === 0 && blast2.length === 0) {
+        blastScore = 15;
+      } else {
+        blastScore = Math.round(computeJaccard(currentBlastRadius, blast2) * 15);
+      }
+
+      // 6. Reliability Score Degradation match (10 pts)
+      const deg1 = severityPointsMap[sev1] || 25;
+      const deg2 = severityPointsMap[sev2] || 25;
+      const degDiff = Math.abs(deg1 - deg2);
+      const degradationScore = degDiff === 0 ? 10 : degDiff <= 15 ? 5 : 0;
+
+      // 7. Causal Graph Structure match (10 pts)
+      let histNodes: string[] = [];
+      try {
+        const histReport = await this.dbService.getInvestigation(entry.incidentId, projectId);
+        if (histReport && histReport.investigationGraph && histReport.investigationGraph.nodes) {
+          histNodes = histReport.investigationGraph.nodes.map(n => n.type);
+        }
+      } catch {}
+      if (histNodes.length === 0) {
+        if (entry.evidence) histNodes.push('log');
+        if (entry.hypotheses && entry.hypotheses.length > 0) histNodes.push('incident');
+        if (entry.runbooksExecuted && entry.runbooksExecuted.length > 0) {
+          histNodes.push('runbook');
+          histNodes.push('recovery');
+        }
+        if (entry.blastRadius && entry.blastRadius.length > 0) histNodes.push('impact');
+      }
+      const causalScore = Math.round(computeJaccard(currentNodes, histNodes) * 10);
+
+      // Total Score
+      const totalScore = Math.min(100, queueScore + serviceScore + errorScore + severityScore + blastScore + degradationScore + causalScore);
+
+      if (totalScore >= 15) {
         similar.push({
           knowledgeEntryId: entry.id,
           incidentId: entry.incidentId,
           title: entry.title,
-          similarityScore: score,
+          similarityScore: totalScore,
           rootCause: entry.rootCause,
           resolution: entry.resolution,
+          recoveryTime: entry.recoveryTime || entry.resolutionTimeMin || 0,
+          runbooksExecuted: entry.runbooksExecuted || [],
+          finalOutcome: entry.finalOutcome || 'Resolved',
+          lessonsLearned: entry.lessonsLearned
         });
       }
     }
 
-    return similar.sort((a, b) => b.similarityScore - a.similarityScore);
+    return similar.sort((a, b) => b.similarityScore - a.similarityScore).slice(0, 5);
   }
 }

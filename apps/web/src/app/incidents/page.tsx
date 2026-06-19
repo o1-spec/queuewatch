@@ -96,6 +96,9 @@ export default function IncidentsRegistry() {
   // Workflows
   const [showResolveModal, setShowResolveModal] = useState<string | null>(null);
   const [resolutionText, setResolutionText] = useState('');
+  const [whatHappened, setWhatHappened] = useState('');
+  const [whatFixedIt, setWhatFixedIt] = useState('');
+  const [differentlyNextTime, setDifferentlyNextTime] = useState('');
   const [newCommentText, setNewCommentText] = useState<Record<string, string>>({});
 
   const loadCopilotResponse = async (incidentId: string, customPrompt?: string) => {
@@ -337,10 +340,20 @@ export default function IncidentsRegistry() {
       await authFetch(`${API_URL}/api/incidents/${showResolveModal}/resolve`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ summary: resolutionText }),
+        body: JSON.stringify({ 
+          summary: resolutionText,
+          feedback: {
+            whatHappened,
+            whatFixedIt,
+            differentlyNextTime
+          }
+        }),
       });
       setShowResolveModal(null);
       setResolutionText('');
+      setWhatHappened('');
+      setWhatFixedIt('');
+      setDifferentlyNextTime('');
     } catch (e) {
       console.error('Failed to resolve incident:', e);
     }
@@ -1695,9 +1708,42 @@ export default function IncidentsRegistry() {
               <label className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider">Resolution Summary Description</label>
               <textarea
                 placeholder="Explain what repair actions were taken to restore service stability..."
-                rows={4}
+                rows={3}
                 value={resolutionText}
                 onChange={(e) => setResolutionText(e.target.value)}
+                className="w-full bg-black/40 border border-zinc-900 rounded p-2 text-white focus:outline-none focus:border-zinc-800 text-xs font-sans"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider">What happened?</label>
+              <textarea
+                placeholder="Describe the initial triggers and anomaly symptoms..."
+                rows={2}
+                value={whatHappened}
+                onChange={(e) => setWhatHappened(e.target.value)}
+                className="w-full bg-black/40 border border-zinc-900 rounded p-2 text-white focus:outline-none focus:border-zinc-800 text-xs font-sans"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider">What fixed it?</label>
+              <textarea
+                placeholder="Explain the specific remediation steps that resolved it..."
+                rows={2}
+                value={whatFixedIt}
+                onChange={(e) => setWhatFixedIt(e.target.value)}
+                className="w-full bg-black/40 border border-zinc-900 rounded p-2 text-white focus:outline-none focus:border-zinc-800 text-xs font-sans"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider">What should be done differently next time?</label>
+              <textarea
+                placeholder="State any prevention recommendations or structural improvements..."
+                rows={2}
+                value={differentlyNextTime}
+                onChange={(e) => setDifferentlyNextTime(e.target.value)}
                 className="w-full bg-black/40 border border-zinc-900 rounded p-2 text-white focus:outline-none focus:border-zinc-800 text-xs font-sans"
               />
             </div>

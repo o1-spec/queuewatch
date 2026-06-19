@@ -104,10 +104,11 @@ export class IncidentsController {
   async resolveIncident(
     @ProjectId() projectId: string,
     @Param('id') id: string,
-    @Body('summary') summary: string
+    @Body('summary') summary: string,
+    @Body('feedback') feedback?: { whatHappened: string; whatFixedIt: string; differentlyNextTime: string; }
   ) {
     try {
-      return await this.incidentsService.resolveIncident(id, summary, projectId);
+      return await this.incidentsService.resolveIncident(id, summary, projectId, feedback);
     } catch (e) {
       throw new NotFoundException(e.message);
     }

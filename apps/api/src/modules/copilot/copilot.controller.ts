@@ -66,15 +66,14 @@ export class CopilotController {
   // --- Recurring Incidents ---
   @Get('recurring-incidents')
   @ApiOperation({ summary: 'List all detected recurring failure patterns' })
-  async getRecurring() {
-    // Note: recurringService aggregates incidents dynamically or from DB. Let's pass it if needed, or default it.
-    return this.recurringService.getRecurringIncidents();
+  async getRecurring(@ProjectId() projectId: string) {
+    return this.recurringService.getRecurringIncidents(projectId);
   }
 
   @Get('recurring-incidents/:id')
   @ApiParam({ name: 'id', description: 'Recurring Incident Pattern ID' })
-  async getRecurringById(@Param('id') id: string) {
-    return this.recurringService.getRecurringIncidentById(id);
+  async getRecurringById(@ProjectId() projectId: string, @Param('id') id: string) {
+    return this.recurringService.getRecurringIncidentById(id, projectId);
   }
 
   @Get('knowledge-base')
@@ -93,5 +92,17 @@ export class CopilotController {
   @ApiOperation({ summary: 'Retrieve reliability category failure counts for the last 30 incidents' })
   async getReliabilityTrends(@ProjectId() projectId: string) {
     return this.copilotService.getReliabilityTrends(projectId);
+  }
+
+  @Get('knowledge-articles')
+  @ApiOperation({ summary: 'Retrieve structured SRE reliability articles' })
+  async getKnowledgeArticles(@ProjectId() projectId: string) {
+    return this.copilotService.getKnowledgeArticles(projectId);
+  }
+
+  @Get('reliability-reports')
+  @ApiOperation({ summary: 'Retrieve reliability weekly reports and SRE leaderboards' })
+  async getReliabilityReports(@ProjectId() projectId: string) {
+    return this.copilotService.getReliabilityReports(projectId);
   }
 }
