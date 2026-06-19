@@ -61,7 +61,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     { name: 'Reliability Copilot Chat', path: '/copilot', desc: 'Ask operational questions and trace grounded SRE telemetry', icon: Sparkles },
     { name: 'Recurring failure patterns', path: '/recurring-incidents', desc: 'Audit repeat error patterns and preventions', icon: History },
     { name: 'Recovery runbooks manual', path: '/runbooks', desc: 'Step-by-step resolution guides', icon: FileText },
-    { name: 'SRE Knowledge Base', path: '/knowledge-base', desc: 'Search historical resolved incident learnings', icon: BookOpen },
+    { name: 'SRE Knowledge Base', path: '/knowledge', desc: 'Search historical resolved incident learnings', icon: BookOpen },
     { name: 'Simulation Control Sandbox', path: '/settings', desc: 'Inject synthetic traffic and simulate SMTP/Stripe bottlenecks', icon: Sliders },
   ];
 
@@ -346,8 +346,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                   <TrendingUp className={navIconClass('/predictions')} />
                   <span>Predictions</span>
                 </Link>
-                <Link href="/knowledge-base" className={navItemClass('/knowledge-base')}>
-                  <BookOpen className={navIconClass('/knowledge-base')} />
+                <Link href="/knowledge" className={navItemClass('/knowledge')}>
+                  <BookOpen className={navIconClass('/knowledge')} />
                   <span>Knowledge Base</span>
                 </Link>
               </div>

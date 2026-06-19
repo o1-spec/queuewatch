@@ -180,4 +180,54 @@ export class IncidentsController {
       throw new NotFoundException(e.message);
     }
   }
+
+  @Get(':id/runbooks')
+  @ApiOperation({ summary: 'Retrieve suggested runbooks for an incident' })
+  @ApiParam({ name: 'id', description: 'Incident ID' })
+  async getSuggestedRunbooks(
+    @ProjectId() projectId: string,
+    @Param('id') id: string
+  ) {
+    try {
+      return await this.incidentsService.getSuggestedRunbooksForIncident(id, projectId);
+    } catch (e) {
+      throw new NotFoundException(e.message);
+    }
+  }
+
+  @Patch(':id/runbooks/:runbookId/steps/:stepIndex')
+  @ApiOperation({ summary: 'Update status of a runbook step' })
+  @ApiParam({ name: 'id', description: 'Incident ID' })
+  @ApiParam({ name: 'runbookId', description: 'Runbook ID' })
+  @ApiParam({ name: 'stepIndex', description: 'Step Index' })
+  async updateRunbookStep(
+    @ProjectId() projectId: string,
+    @Param('id') id: string,
+    @Param('runbookId') runbookId: string,
+    @Param('stepIndex') stepIndex: string,
+    @Body('status') status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped' | 'blocked'
+  ) {
+    try {
+      return await this.incidentsService.updateIncidentRunbookStep(
+        id,
+        runbookId,
+        parseInt(stepIndex, 10),
+        status,
+        projectId
+      );
+    } catch (e) {
+      throw new NotFoundException(e.message);
+    }
+  }
+
+  @Get(':id/similar')
+  @ApiOperation({ summary: 'Find similar historical incidents' })
+  @ApiParam({ name: 'id', description: 'Incident ID' })
+  async getSimilar(@ProjectId() projectId: string, @Param('id') id: string) {
+    try {
+      return await this.incidentsService.getSimilarIncidents(id, projectId);
+    } catch (e) {
+      throw new NotFoundException(e.message);
+    }
+  }
 }

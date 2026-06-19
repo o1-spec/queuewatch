@@ -246,6 +246,14 @@ export interface KnowledgeEntry {
   resolution: string;
   preventionRecommendation: string;
   createdAt: number;
+  evidence?: string;
+  hypotheses?: string[];
+  resolutionTimeMin?: number;
+  blastRadius?: string[];
+  reliabilityImpact?: string;
+  runbooksExecuted?: string[];
+  finalOutcome?: string;
+  recoveryTime?: number;
 }
 
 export interface Runbook {
@@ -255,6 +263,22 @@ export interface Runbook {
   steps: string[];
   linkedIncidentIds: string[];
   createdAt: number;
+}
+
+export interface RunbookStepStatus {
+  label: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped' | 'blocked';
+  updatedAt: number;
+}
+
+export interface IncidentRunbook {
+  id: string;
+  incidentId: string;
+  title: string;
+  difficulty: 'low' | 'medium' | 'high';
+  recoveryTimeMin: number;
+  riskLevel: 'low' | 'medium' | 'high';
+  steps: RunbookStepStatus[];
 }
 
 export interface RecurringIncident {
@@ -286,7 +310,7 @@ export interface CopilotHypothesis {
 
 export interface InvestigationGraphNode {
   id: string;
-  type: 'deployment' | 'log' | 'incident' | 'blast_radius' | 'action';
+  type: 'deployment' | 'metric' | 'log' | 'incident' | 'impact' | 'runbook' | 'recovery' | 'blast_radius' | 'action';
   label: string;
   timestamp?: number;
   metadata?: any;
@@ -294,7 +318,12 @@ export interface InvestigationGraphNode {
 
 export interface InvestigationGraph {
   nodes: InvestigationGraphNode[];
-  edges: { from: string; to: string }[];
+  edges: {
+    from: string;
+    to: string;
+    confidence?: number;
+    rationale?: string;
+  }[];
 }
 
 export interface ActionRecommendation {
@@ -304,6 +333,10 @@ export interface ActionRecommendation {
   description: string;
   command?: string;
   payload?: any;
+  associatedRunbook?: string;
+  reasoning?: string;
+  riskLevel?: 'low' | 'medium' | 'high';
+  expectedOutcome?: string;
 }
 
 export interface CopilotResponse {

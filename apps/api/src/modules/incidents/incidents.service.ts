@@ -1,5 +1,5 @@
 import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
-import { Incident, QueueName, IncidentComment } from '@queuewatch/shared';
+import { Incident, QueueName, IncidentComment, IncidentRunbook, RunbookStepStatus } from '@queuewatch/shared';
 import { QueueWebSocketGateway } from '../websocket/websocket.gateway';
 import { AiService } from '../ai/ai.service';
 import { TelemetryService } from '../telemetry/telemetry.service';
@@ -170,6 +170,64 @@ export class IncidentsService {
 
     // V4: Automatically generate Knowledge Base entry on resolution
     try {
+      const resolutionTimeMin = Math.round((now - incident.firstDetectedAt) / 60000);
+
+      // Compute blast radius downstream
+      const graph = await this.dbService.getDependencyGraph(projectId);
+      const affectedQueue = incident.affectedQueue;
+      const visited = new Set<string>();
+      const queue = [affectedQueue];
+      const impactedServices: string[] = [];
+      const businessImpacts: string[] = [];
+
+      const allServices = await this.dbService.getServices(projectId);
+      const directConsumer = allServices.find(s => s.queues && s.queues.includes(affectedQueue));
+      if (directConsumer) {
+        if (directConsumer.businessCapability) {
+          businessImpacts.push(`${directConsumer.businessCapability} degraded`);
+        } else {
+          businessImpacts.push(`${directConsumer.name} affected`);
+        }
+      }
+
+      while (queue.length > 0) {
+        const current = queue.shift()!;
+        if (visited.has(current)) continue;
+        visited.add(current);
+        
+        if (graph && graph.edges) {
+          const downstreams = graph.edges
+            .filter(e => e.from === current)
+            .map(e => e.to);
+          for (const down of downstreams) {
+            if (!visited.has(down)) {
+              queue.push(down);
+              if (down.startsWith('svc_')) {
+                const serviceDetails = allServices.find(s => s.id === down);
+                if (serviceDetails) {
+                  impactedServices.push(serviceDetails.name);
+                  if (serviceDetails.businessCapability) {
+                    businessImpacts.push(`${serviceDetails.businessCapability} degraded`);
+                  } else {
+                    businessImpacts.push(`${serviceDetails.name} affected`);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      const estimatedBlastRadius = visited.size >= 4 ? 'critical' : visited.size >= 2 ? 'high' : 'medium';
+      
+      let hypotheses: string[] = [];
+      try {
+        const report = await this.dbService.getInvestigation(incident.id, projectId);
+        if (report && report.recommendedActions) {
+          hypotheses = report.recommendedActions;
+        }
+      } catch {}
+
       await this.dbService.saveKnowledgeEntry({
         id: `know_${Math.random().toString(36).substr(2, 9)}`,
         title: `Resolution: ${incident.title}`,
@@ -179,6 +237,11 @@ export class IncidentsService {
         resolution: summary || 'Manual service restart.',
         preventionRecommendation: incident.recommendation || 'No custom recommendation.',
         createdAt: now,
+        evidence: incident.evidence,
+        hypotheses,
+        resolutionTimeMin,
+        blastRadius: Array.from(new Set(impactedServices)),
+        reliabilityImpact: `Blast Radius: ${estimatedBlastRadius.toUpperCase()}. Business Impact: ${businessImpacts.join(', ')}`
       }, projectId);
       this.logger.log(`Automatically registered Knowledge Base entry for incident ${id}.`);
     } catch (e) {
@@ -488,6 +551,161 @@ export class IncidentsService {
     }
   }
 
+  async getSuggestedRunbooksForIncident(incidentId: string, projectId?: string): Promise<IncidentRunbook[]> {
+    const incident = await this.dbService.getIncident(incidentId, projectId);
+    if (!incident) throw new Error(`Incident ${incidentId} not found`);
+
+    const existing = await this.dbService.getIncidentRunbooks(incidentId, projectId);
+    if (existing && existing.length > 0) {
+      return existing;
+    }
+
+    const suggested: IncidentRunbook[] = [];
+    const textToScan = `${incident.title} ${incident.summary} ${incident.suspectedRootCause} ${incident.affectedQueue}`.toLowerCase();
+
+    // Check deployment correlation
+    const correlation = await this.getDeploymentCorrelation(incident, projectId || 'proj_demo');
+
+    // 1. Database Pool Exhaustion
+    if (/\b(pool|connection|postgres|database|lock|timeout|contention)\b/.test(textToScan)) {
+      suggested.push({
+        id: 'run_db_pool_exhaustion',
+        incidentId,
+        title: 'Database Pool Exhaustion Runbook',
+        difficulty: 'high',
+        recoveryTimeMin: 10,
+        riskLevel: 'high',
+        steps: [
+          { label: 'Check active database connections count.', status: 'pending', updatedAt: Date.now() },
+          { label: 'Inspect connection pool utilization limits.', status: 'pending', updatedAt: Date.now() },
+          { label: 'Review recent deployment commits and configurations.', status: 'pending', updatedAt: Date.now() },
+          { label: 'Scale worker replicas to distribute database load.', status: 'pending', updatedAt: Date.now() },
+          { label: 'Monitor recovery metrics and database queue latencies.', status: 'pending', updatedAt: Date.now() }
+        ]
+      });
+    }
+
+    // 2. Deployment Regression
+    if (correlation || /\b(deploy|version|commit|regression|release)\b/.test(textToScan)) {
+      suggested.push({
+        id: 'run_deployment_regression',
+        incidentId,
+        title: 'Deployment Regression Runbook',
+        difficulty: 'low',
+        recoveryTimeMin: 5,
+        riskLevel: 'medium',
+        steps: [
+          { label: 'Compare deployment diff between latest and previous tags.', status: 'pending', updatedAt: Date.now() },
+          { label: 'Review active feature flags state for the service.', status: 'pending', updatedAt: Date.now() },
+          { label: 'Check environment variables and configuration drifts.', status: 'pending', updatedAt: Date.now() },
+          { label: 'Rollback deployment to the previous stable release.', status: 'pending', updatedAt: Date.now() },
+          { label: 'Monitor system metrics to confirm stability.', status: 'pending', updatedAt: Date.now() }
+        ]
+      });
+    }
+
+    // 3. Worker Saturation
+    if (/\b(worker|concurrency|cpu|memory|saturation|overload|latency)\b/.test(textToScan) || suggested.length === 0) {
+      suggested.push({
+        id: 'run_worker_saturation',
+        incidentId,
+        title: 'Worker Saturation Runbook',
+        difficulty: 'low',
+        recoveryTimeMin: 2,
+        riskLevel: 'low',
+        steps: [
+          { label: 'Check worker concurrency limits and pool sizes.', status: 'pending', updatedAt: Date.now() },
+          { label: 'Check CPU and memory usage profiles on worker nodes.', status: 'pending', updatedAt: Date.now() },
+          { label: 'Scale worker processes or container instances.', status: 'pending', updatedAt: Date.now() },
+          { label: 'Monitor queue backlog depth and processing latency.', status: 'pending', updatedAt: Date.now() }
+        ]
+      });
+    }
+
+    // 4. DLQ Growth
+    if (incident.affectedQueue === 'dead_letter_queue' || /\b(dlq|dead_letter|dead-letter|failed jobs|poison)\b/.test(textToScan)) {
+      suggested.push({
+        id: 'run_dlq_growth',
+        incidentId,
+        title: 'Dead-Letter Queue Recovery Runbook',
+        difficulty: 'medium',
+        recoveryTimeMin: 5,
+        riskLevel: 'medium',
+        steps: [
+          { label: 'Inspect failed dead-lettered jobs properties.', status: 'pending', updatedAt: Date.now() },
+          { label: 'Review failure error signatures and stack traces.', status: 'pending', updatedAt: Date.now() },
+          { label: 'Fix the root cause bugs in worker code.', status: 'pending', updatedAt: Date.now() },
+          { label: 'Replay dead-letter jobs back to the active queue.', status: 'pending', updatedAt: Date.now() }
+        ]
+      });
+    }
+
+    // Save them to Redis
+    for (const runbook of suggested) {
+      await this.dbService.saveIncidentRunbook(runbook, projectId);
+    }
+
+    return suggested;
+  }
+
+  async updateIncidentRunbookStep(
+    incidentId: string,
+    runbookId: string,
+    stepIndex: number,
+    status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped' | 'blocked',
+    projectId?: string
+  ): Promise<IncidentRunbook> {
+    const runbook = await this.dbService.getIncidentRunbook(incidentId, runbookId, projectId);
+    if (!runbook) throw new Error(`Runbook ${runbookId} not found for incident ${incidentId}`);
+
+    if (stepIndex < 0 || stepIndex >= runbook.steps.length) {
+      throw new Error(`Step index ${stepIndex} out of bounds`);
+    }
+
+    const oldStatus = runbook.steps[stepIndex].status;
+    runbook.steps[stepIndex].status = status;
+    runbook.steps[stepIndex].updatedAt = Date.now();
+
+    await this.dbService.saveIncidentRunbook(runbook, projectId);
+
+    // Timeline event tracking
+    if (oldStatus !== status) {
+      const stepLabel = runbook.steps[stepIndex].label;
+      const statusLabelMap = {
+        pending: 'reset to pending',
+        in_progress: 'started',
+        completed: 'completed successfully',
+        failed: 'failed',
+        skipped: 'skipped',
+        blocked: 'blocked'
+      };
+      
+      const newEvent = {
+        event: 'runbook.step_progress',
+        title: 'Runbook Step Update',
+        desc: `Step "${stepLabel}" was ${statusLabelMap[status]} for "${runbook.title}".`,
+        timestamp: Date.now(),
+        metadata: { runbookId, stepIndex, status }
+      };
+
+      const currentEvents = await this.dbService.getIncidentRunbookEvents(incidentId, projectId);
+      currentEvents.push(newEvent);
+      await this.dbService.saveIncidentRunbookEvents(incidentId, currentEvents, projectId);
+
+      // Force recalculation and persistence of incident timeline snapshot
+      const incident = await this.dbService.getIncident(incidentId, projectId);
+      if (incident) {
+        const fullTimeline = await this.buildTimeline(incident, projectId || 'proj_demo');
+        await this.dbService.saveIncidentTimeline(incidentId, fullTimeline, projectId || 'proj_demo');
+      }
+
+      // Broadcast changes
+      this.wsGateway.broadcast('incident.runbook_updated', { incidentId, runbookId, stepIndex, status, projectId });
+    }
+
+    return runbook;
+  }
+
   async getDeploymentCorrelation(incident: Incident, projectId: string) {
     const allDeps = await this.dbService.getDeploymentEvents(projectId);
     const incidentTime = incident.firstDetectedAt;
@@ -633,6 +851,10 @@ export class IncidentsService {
       });
     }
 
+    // 8. Runbook Step Progress Events
+    const runbookEvents = await this.dbService.getIncidentRunbookEvents(incident.id, projectId);
+    timeline.push(...runbookEvents);
+
     // Sort chronologically
     return timeline.sort((a, b) => a.timestamp - b.timestamp);
   }
@@ -652,4 +874,40 @@ export class IncidentsService {
     return timeline;
   }
 
+  async getSimilarIncidents(incidentId: string, projectId?: string): Promise<any[]> {
+    const incident = await this.dbService.getIncident(incidentId, projectId);
+    if (!incident) throw new Error(`Incident ${incidentId} not found`);
+
+    const entries = await this.dbService.getKnowledgeEntries(projectId);
+    const similar: any[] = [];
+
+    const text1 = `${incident.title} ${incident.summary} ${incident.suspectedRootCause || ''} ${incident.affectedQueue}`.toLowerCase();
+
+    const computeSimilarity = (t1: string, t2: string): number => {
+      const words1 = new Set(t1.match(/\b\w+\b/g) || []);
+      const words2 = new Set(t2.match(/\b\w+\b/g) || []);
+      if (words1.size === 0 || words2.size === 0) return 0;
+      const intersection = new Set([...words1].filter(w => words2.has(w)));
+      const union = new Set([...words1, ...words2]);
+      return Math.round((intersection.size / union.size) * 100);
+    };
+
+    for (const entry of entries) {
+      if (entry.incidentId === incidentId) continue; // Skip itself
+      const text2 = `${entry.title} ${entry.pattern} ${entry.rootCause} ${entry.resolution}`.toLowerCase();
+      const score = computeSimilarity(text1, text2);
+      if (score >= 20) {
+        similar.push({
+          knowledgeEntryId: entry.id,
+          incidentId: entry.incidentId,
+          title: entry.title,
+          similarityScore: score,
+          rootCause: entry.rootCause,
+          resolution: entry.resolution,
+        });
+      }
+    }
+
+    return similar.sort((a, b) => b.similarityScore - a.similarityScore);
+  }
 }

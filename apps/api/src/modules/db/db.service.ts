@@ -6,7 +6,8 @@ import {
   InvestigationReport, DeadLetterJob, IncidentComment, NotificationSetting, 
   EscalationRule, DeploymentEvent, Notification, KnowledgeEntry, Runbook,
   Service, Environment, DependencyGraph, ReliabilityScore, Prediction, GlobalHealth,
-  WorkerHealth, QueueName, Project, RetentionPolicy, CopilotLogEntry
+  WorkerHealth, QueueName, Project, RetentionPolicy, CopilotLogEntry,
+  IncidentRunbook, RunbookStepStatus
 } from '@queuewatch/shared';
 
 @Injectable()
@@ -209,27 +210,55 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     if (runbooksCount === 0) {
       const defaultRunbooks = [
         {
-          id: 'run_smtp_ratelimit',
-          incidentType: 'SMTP Rate Limiting',
-          title: 'SMTP Outbound Rate Limiting Runbook',
+          id: 'run_db_pool_exhaustion',
+          incidentType: 'Database Pool Exhaustion',
+          title: 'Database Pool Exhaustion Runbook',
           steps: [
-            'Verify SendGrid/Mailgun status page for external outages.',
-            'Access simulation control panel and throttle queue traffic.',
-            'Scale email_notifications worker concurrency settings to 1 or 2.',
-            'Execute dead-letter replay jobs for pending emails.'
+            'Check active database connections count.',
+            'Inspect connection pool utilization limits.',
+            'Review recent deployment commits and configurations.',
+            'Scale worker replicas to distribute database load.',
+            'Monitor recovery metrics and database queue latencies.'
+          ],
+          linkedIncidentIds: [],
+          createdAt: Date.now() - 1 * 24 * 60 * 60 * 1000,
+        },
+        {
+          id: 'run_deployment_regression',
+          incidentType: 'Deployment Regression',
+          title: 'Deployment Regression Runbook',
+          steps: [
+            'Compare deployment diff between latest and previous tags.',
+            'Review active feature flags state for the service.',
+            'Check environment variables and configuration drifts.',
+            'Rollback deployment to the previous stable release.',
+            'Monitor system metrics to confirm stability.'
           ],
           linkedIncidentIds: [],
           createdAt: Date.now() - 2 * 24 * 60 * 60 * 1000,
         },
         {
+          id: 'run_worker_saturation',
+          incidentType: 'Worker Saturation',
+          title: 'Worker Saturation Runbook',
+          steps: [
+            'Check worker concurrency limits and pool sizes.',
+            'Check CPU and memory usage profiles on worker nodes.',
+            'Scale worker processes or container instances.',
+            'Monitor queue backlog depth and processing latency.'
+          ],
+          linkedIncidentIds: [],
+          createdAt: Date.now() - 3 * 24 * 60 * 60 * 1000,
+        },
+        {
           id: 'run_dlq_growth',
-          incidentType: 'Dead-Letter growth',
+          incidentType: 'DLQ Growth',
           title: 'Dead-Letter Queue Recovery Runbook',
           steps: [
-            'Retrieve last 5 failed jobs from dead-letter queue metrics.',
-            'Inspect payload properties to see if validation errors exist.',
-            'If payloads are correct, replay dead-letter jobs.',
-            'If code error exists, roll back recent deployment version.'
+            'Inspect failed dead-lettered jobs properties.',
+            'Review failure error signatures and stack traces.',
+            'Fix the root cause bugs in worker code.',
+            'Replay dead-letter jobs back to the active queue.'
           ],
           linkedIncidentIds: [],
           createdAt: Date.now() - 4 * 24 * 60 * 60 * 1000,
@@ -973,6 +1002,30 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
   async saveRunbook(runbook: Runbook, projectId?: string) {
     await this.redis.hset(this.getScopedKey(projectId, 'runbooks'), runbook.id, JSON.stringify(runbook));
+  }
+
+  // --- Incident Runbooks Storage ---
+  async getIncidentRunbooks(incidentId: string, projectId?: string): Promise<IncidentRunbook[]> {
+    const rawList = await this.redis.hvals(this.getScopedKey(projectId, `incident:${incidentId}:runbooks`));
+    return rawList.map(item => JSON.parse(item));
+  }
+
+  async getIncidentRunbook(incidentId: string, runbookId: string, projectId?: string): Promise<IncidentRunbook | null> {
+    const raw = await this.redis.hget(this.getScopedKey(projectId, `incident:${incidentId}:runbooks`), runbookId);
+    return raw ? JSON.parse(raw) : null;
+  }
+
+  async saveIncidentRunbook(runbook: IncidentRunbook, projectId?: string) {
+    await this.redis.hset(this.getScopedKey(projectId, `incident:${runbook.incidentId}:runbooks`), runbook.id, JSON.stringify(runbook));
+  }
+
+  async saveIncidentRunbookEvents(incidentId: string, events: any[], projectId?: string) {
+    await this.redis.set(this.getScopedKey(projectId, `incident:${incidentId}:runbook_events`), JSON.stringify(events));
+  }
+
+  async getIncidentRunbookEvents(incidentId: string, projectId?: string): Promise<any[]> {
+    const raw = await this.redis.get(this.getScopedKey(projectId, `incident:${incidentId}:runbook_events`));
+    return raw ? JSON.parse(raw) : [];
   }
 
   // --- V5 Service Registry ---

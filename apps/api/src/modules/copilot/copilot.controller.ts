@@ -88,4 +88,10 @@ export class CopilotController {
   async getLogs(@ProjectId() projectId: string) {
     return this.copilotService.getCopilotLogs(projectId);
   }
+
+  @Get('reliability-trends')
+  @ApiOperation({ summary: 'Retrieve reliability category failure counts for the last 30 incidents' })
+  async getReliabilityTrends(@ProjectId() projectId: string) {
+    return this.copilotService.getReliabilityTrends(projectId);
+  }
 }

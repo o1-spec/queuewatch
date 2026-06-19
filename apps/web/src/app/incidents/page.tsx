@@ -5,7 +5,8 @@ import useSocket from '../../hooks/useSocket';
 import { 
   AlertTriangle, Clock, RefreshCw, ChevronDown, ChevronUp, Sparkles, 
   Terminal, Activity, CheckCircle2, History, ShieldAlert, FileText, 
-  Play, User, MessageSquare, ExternalLink, GitCommit, GitBranch, Check 
+  Play, User, MessageSquare, ExternalLink, GitCommit, GitBranch, Check,
+  BookOpen
 } from 'lucide-react';
 import { Incident } from '@queuewatch/shared';
 import { useAuth } from '../../context/AuthContext';
@@ -37,6 +38,8 @@ export default function IncidentsRegistry() {
 
   // V5 states & resources
   const [blastRadii, setBlastRadii] = useState<Record<string, any>>({});
+  const [incidentRunbooks, setIncidentRunbooks] = useState<Record<string, any[]>>({});
+  const [similarIncidents, setSimilarIncidents] = useState<Record<string, any[]>>({});
 
   const loadBlastRadius = async (id: string) => {
     try {
@@ -47,6 +50,46 @@ export default function IncidentsRegistry() {
       }
     } catch (e) {
       console.error('Failed to load blast radius:', e);
+    }
+  };
+
+  const loadSimilarIncidents = async (id: string) => {
+    try {
+      const res = await authFetch(`${API_URL}/api/incidents/${id}/similar`);
+      if (res.ok) {
+        const data = await res.json();
+        setSimilarIncidents(prev => ({ ...prev, [id]: data }));
+      }
+    } catch (e) {
+      console.error('Failed to load similar incidents:', e);
+    }
+  };
+
+  const loadIncidentRunbooks = async (id: string) => {
+    try {
+      const res = await authFetch(`${API_URL}/api/incidents/${id}/runbooks`);
+      if (res.ok) {
+        const data = await res.json();
+        setIncidentRunbooks(prev => ({ ...prev, [id]: data }));
+      }
+    } catch (e) {
+      console.error('Failed to load incident runbooks:', e);
+    }
+  };
+
+  const handleUpdateStep = async (incidentId: string, runbookId: string, stepIndex: number, status: string) => {
+    try {
+      const res = await authFetch(`${API_URL}/api/incidents/${incidentId}/runbooks/${runbookId}/steps/${stepIndex}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) {
+        loadIncidentRunbooks(incidentId);
+        loadTimeline(incidentId);
+      }
+    } catch (e) {
+      console.error('Failed to update runbook step status:', e);
     }
   };
 
@@ -199,6 +242,7 @@ export default function IncidentsRegistry() {
     if (tab === 'overview') {
       loadDeployments(incidentId);
       loadBlastRadius(incidentId);
+      loadSimilarIncidents(incidentId);
     }
     if (tab === 'timeline') loadTimeline(incidentId);
     if (tab === 'investigation') loadInvestigation(incidentId);
@@ -208,6 +252,7 @@ export default function IncidentsRegistry() {
     if (tab === 'deployments') loadDeployments(incidentId);
     if (tab === 'copilot') loadCopilotResponse(incidentId);
     if (tab === 'blast-radius') loadBlastRadius(incidentId);
+    if (tab === 'runbooks') loadIncidentRunbooks(incidentId);
   };
 
   const runInvestigation = async (id: string, queueName: string) => {
@@ -512,6 +557,7 @@ export default function IncidentsRegistry() {
                         { id: 'dlq',           icon: <ShieldAlert className="w-3.5 h-3.5" />,                         label: 'DLQ' },
                         { id: 'copilot',       icon: <Sparkles className="w-3.5 h-3.5 text-indigo-400" />,            label: 'Copilot' },
                         { id: 'blast-radius',  icon: <ShieldAlert className="w-3.5 h-3.5 text-rose-500" />,           label: 'Blast' },
+                        { id: 'runbooks',      icon: <BookOpen className="w-3.5 h-3.5 text-indigo-400" />,            label: 'Runbooks' },
                       ].map(tab => (
                         <button
                           key={tab.id}
@@ -778,6 +824,49 @@ export default function IncidentsRegistry() {
                               )}
                             </div>
                           </div>
+
+                          {/* Similar Incidents Panel */}
+                          {(() => {
+                            const sims = similarIncidents[inc.id] || [];
+                            return (
+                              <div className="border-t border-zinc-900 pt-4 space-y-3">
+                                <h4 className="text-[10px] font-bold text-white uppercase tracking-wider flex items-center space-x-1.5">
+                                  <History className="w-3.5 h-3.5 text-indigo-400" />
+                                  <span>Similar Historical Incidents ({sims.length})</span>
+                                </h4>
+                                {sims.length > 0 ? (
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {sims.map((sim: any) => (
+                                      <div key={sim.knowledgeEntryId} className="p-3.5 border border-zinc-900 bg-zinc-950/25 backdrop-blur-md rounded-lg space-y-3 shadow-lg">
+                                        <div className="flex items-center justify-between border-b border-zinc-900/60 pb-2">
+                                          <span className="font-bold text-zinc-300 font-mono">{sim.title}</span>
+                                          <span className={`px-2 py-0.5 rounded text-[8.5px] font-bold border uppercase tracking-wider ${
+                                            sim.similarityScore >= 80 ? 'bg-emerald-950/30 border-emerald-900 text-emerald-400' :
+                                            sim.similarityScore >= 50 ? 'bg-indigo-950/30 border-indigo-900 text-indigo-400' :
+                                            'bg-zinc-900 border-zinc-800 text-zinc-400'
+                                          }`}>
+                                            {sim.similarityScore}% Similar
+                                          </span>
+                                        </div>
+                                        <div className="space-y-2 text-xs font-sans">
+                                          <div className="text-zinc-400">
+                                            <span className="text-[9px] font-bold font-mono text-zinc-550 uppercase block">Historical Root Cause</span>
+                                            <p className="mt-0.5">{sim.rootCause}</p>
+                                          </div>
+                                          <div className="text-zinc-400">
+                                            <span className="text-[9px] font-bold font-mono text-zinc-550 uppercase block">Successful Resolution</span>
+                                            <p className="mt-0.5 text-emerald-300/90">{sim.resolution}</p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-zinc-650 text-[10px] font-sans italic pl-1">No similar historical incidents identified (similarity threshold &gt;= 20%).</p>
+                                )}
+                              </div>
+                            );
+                          })()}
 
                           {/* Ticket Integrations */}
                           <div className="border-t border-zinc-900 pt-3 flex flex-wrap items-center gap-3">
@@ -1401,6 +1490,168 @@ export default function IncidentsRegistry() {
                               </div>
                             </div>
                           )}
+                        </div>
+                      )}
+
+                      {/* Runbooks Tab */}
+                      {currentTab === 'runbooks' && (
+                        <div className="space-y-4 font-mono">
+                          {(() => {
+                            const rbs = incidentRunbooks[inc.id] || [];
+                            if (rbs.length === 0) {
+                              return <div className="text-zinc-500 py-6">Calculating suggested runbooks for this incident...</div>;
+                            }
+
+                            return (
+                              <div className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {rbs.map((rb: any) => {
+                                    const totalSteps = rb.steps.length;
+                                    const completedSteps = rb.steps.filter((s: any) => s.status === 'completed').length;
+                                    const failedSteps = rb.steps.filter((s: any) => s.status === 'failed').length;
+                                    const skippedSteps = rb.steps.filter((s: any) => s.status === 'skipped').length;
+                                    const progressPct = totalSteps > 0 ? Math.round(((completedSteps + failedSteps + skippedSteps) / totalSteps) * 100) : 0;
+
+                                    const getRiskColor = (level: string) => {
+                                      if (level === 'high') return 'text-rose-405 bg-rose-950/20 border-rose-900';
+                                      if (level === 'medium') return 'text-amber-500 bg-amber-950/20 border-amber-900';
+                                      return 'text-emerald-400 bg-emerald-950/20 border-emerald-900';
+                                    };
+
+                                    const getDifficultyColor = (diff: string) => {
+                                      if (diff === 'high') return 'text-rose-405 bg-rose-950/20 border-rose-900';
+                                      if (diff === 'medium') return 'text-amber-500 bg-amber-950/20 border-amber-900';
+                                      return 'text-emerald-400 bg-emerald-950/20 border-emerald-900';
+                                    };
+
+                                    return (
+                                      <div key={rb.id} className="bg-zinc-900/20 border border-zinc-900 rounded-lg p-4 space-y-4 shadow-lg flex flex-col justify-between">
+                                        <div className="space-y-2">
+                                          <div className="flex items-center justify-between gap-2 border-b border-zinc-900 pb-2">
+                                            <h4 className="font-bold text-white text-[11px] uppercase flex items-center space-x-1.5">
+                                              <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
+                                              <span>{rb.title}</span>
+                                            </h4>
+                                          </div>
+
+                                          <div className="flex flex-wrap gap-2 text-[8px] font-bold tracking-wider uppercase">
+                                            <span className={`px-1.5 py-0.5 rounded border ${getDifficultyColor(rb.difficulty)}`}>
+                                              Diff: {rb.difficulty}
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded border border-zinc-800 bg-zinc-950/40 text-zinc-400">
+                                              EST: {rb.recoveryTimeMin} MIN
+                                            </span>
+                                            <span className={`px-1.5 py-0.5 rounded border ${getRiskColor(rb.riskLevel)}`}>
+                                              Risk: {rb.riskLevel}
+                                            </span>
+                                          </div>
+
+                                          <div className="space-y-1 pt-1.5">
+                                            <div className="flex justify-between items-center text-[9px] text-zinc-500 font-bold">
+                                              <span>REMEDIATION PROGRESS</span>
+                                              <span className="text-white">{progressPct}%</span>
+                                            </div>
+                                            <div className="w-full bg-zinc-950 rounded-full h-1.5 overflow-hidden border border-zinc-900/50">
+                                              <div 
+                                                className={`h-full transition-all duration-350 ${failedSteps > 0 ? 'bg-rose-500' : 'bg-indigo-500'}`} 
+                                                style={{ width: `${progressPct}%` }}
+                                              ></div>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <div className="space-y-2 pt-2 border-t border-zinc-900">
+                                          <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-wider block">Remediation Checklist</span>
+                                          <div className="space-y-2">
+                                            {rb.steps.map((step: any, index: number) => {
+                                              let stepStatusBg = 'bg-zinc-950 border-zinc-900 text-zinc-500';
+                                              if (step.status === 'in_progress') stepStatusBg = 'bg-amber-950/20 border-amber-900 text-amber-400';
+                                              if (step.status === 'completed') stepStatusBg = 'bg-emerald-950/20 border-emerald-900 text-emerald-400';
+                                              if (step.status === 'failed') stepStatusBg = 'bg-rose-950/20 border-rose-900 text-rose-500';
+                                              if (step.status === 'skipped') stepStatusBg = 'bg-zinc-900 border-zinc-800 text-zinc-400';
+                                              if (step.status === 'blocked') stepStatusBg = 'bg-amber-950/20 border-amber-900 text-amber-500';
+
+                                              return (
+                                                <div key={index} className="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 bg-black/30 border border-zinc-900/40 rounded gap-2 text-[10px] font-sans">
+                                                  <div className="flex items-start space-x-2 min-w-0">
+                                                    <span className={`px-1.5 py-0.5 rounded font-mono text-[8px] border shrink-0 mt-0.5 ${stepStatusBg}`}>
+                                                      {step.status.toUpperCase()}
+                                                    </span>
+                                                    <span className="text-zinc-300 font-medium leading-tight">{step.label}</span>
+                                                  </div>
+                                                  
+                                                  <div className="flex items-center gap-1.5 shrink-0 justify-end self-end sm:self-center">
+                                                    {step.status === 'pending' && (
+                                                      <>
+                                                        <button
+                                                          onClick={() => handleUpdateStep(inc.id, rb.id, index, 'in_progress')}
+                                                          className="px-1.5 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white text-[9px] font-bold font-mono transition-colors"
+                                                        >
+                                                          START
+                                                        </button>
+                                                        <button
+                                                          onClick={() => handleUpdateStep(inc.id, rb.id, index, 'skipped')}
+                                                          className="px-1.5 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-450 hover:text-white text-[9px] font-bold font-mono transition-colors"
+                                                        >
+                                                          SKIP
+                                                        </button>
+                                                        <button
+                                                          onClick={() => handleUpdateStep(inc.id, rb.id, index, 'blocked')}
+                                                          className="px-1.5 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-amber-500 hover:text-white text-[9px] font-bold font-mono transition-colors"
+                                                        >
+                                                          BLOCK
+                                                        </button>
+                                                      </>
+                                                    )}
+                                                    {step.status === 'in_progress' && (
+                                                      <>
+                                                        <button
+                                                          onClick={() => handleUpdateStep(inc.id, rb.id, index, 'completed')}
+                                                          className="px-1.5 py-0.5 rounded bg-emerald-950/40 hover:bg-emerald-950 border border-emerald-900 text-emerald-400 hover:text-white text-[9px] font-bold font-mono transition-colors"
+                                                        >
+                                                          RESOLVE
+                                                        </button>
+                                                        <button
+                                                          onClick={() => handleUpdateStep(inc.id, rb.id, index, 'failed')}
+                                                          className="px-1.5 py-0.5 rounded bg-rose-950/40 hover:bg-rose-950 border border-rose-900 text-rose-450 hover:text-white text-[9px] font-bold font-mono transition-colors"
+                                                        >
+                                                          FAIL
+                                                        </button>
+                                                        <button
+                                                          onClick={() => handleUpdateStep(inc.id, rb.id, index, 'skipped')}
+                                                          className="px-1.5 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-450 hover:text-white text-[9px] font-bold font-mono transition-colors"
+                                                        >
+                                                          SKIP
+                                                        </button>
+                                                        <button
+                                                          onClick={() => handleUpdateStep(inc.id, rb.id, index, 'blocked')}
+                                                          className="px-1.5 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-amber-500 hover:text-white text-[9px] font-bold font-mono transition-colors"
+                                                        >
+                                                          BLOCK
+                                                        </button>
+                                                      </>
+                                                    )}
+                                                    {(step.status === 'completed' || step.status === 'failed' || step.status === 'skipped' || step.status === 'blocked') && (
+                                                      <button
+                                                        onClick={() => handleUpdateStep(inc.id, rb.id, index, 'pending')}
+                                                        className="px-1.5 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-500 hover:text-zinc-350 text-[9px] font-mono transition-colors"
+                                                      >
+                                                        RESET
+                                                      </button>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>
