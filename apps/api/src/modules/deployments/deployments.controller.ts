@@ -2,13 +2,14 @@ import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { DbService } from '../db/db.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ProjectAccessGuard } from '../auth/project-access.guard';
 import { DeploymentEvent } from '@queuewatch/shared';
 import { QueueWebSocketGateway } from '../websocket/websocket.gateway';
 import { ProjectId } from '../auth/project-id.decorator';
 
 @ApiTags('Deployments & releases')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ProjectAccessGuard)
 @Controller('deployments')
 export class DeploymentsController {
   constructor(

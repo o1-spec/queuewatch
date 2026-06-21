@@ -102,6 +102,9 @@ importers:
       '@types/nodemailer':
         specifier: ^6.4.14
         version: 6.4.23
+      socket.io-client:
+        specifier: ^4.8.3
+        version: 4.8.3
       typescript:
         specifier: ^5.3.3
         version: 5.9.3

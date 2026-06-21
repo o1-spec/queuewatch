@@ -745,7 +745,7 @@ export class CopilotService {
       }
       
       if (firstActiveIncident) {
-        const pctMatch = firstActiveIncident.evidence.match(/\b\d+%\b/);
+        const pctMatch = (firstActiveIncident.evidence || '').match(/\b\d+%\b/);
         const pct = pctMatch ? pctMatch[0] : '32%';
         parts.push(`Failure rate increased to ${pct}.`);
         parts.push(`QueueWatch opened incident **${firstActiveIncident.id}** (${firstActiveIncident.title}).`);

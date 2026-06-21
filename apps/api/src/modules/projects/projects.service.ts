@@ -52,6 +52,10 @@ export class ProjectsService {
     if (!project) {
       throw new BadRequestException('Project not found');
     }
+    const isOwner = await this.dbService.isProjectOwner(projectId, userId);
+    if (!isOwner) {
+      throw new BadRequestException('You do not have permission to delete this project');
+    }
     await this.dbService.deleteProject(projectId, userId);
   }
 }

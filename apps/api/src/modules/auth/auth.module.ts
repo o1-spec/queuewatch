@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { MailService } from './mail.service';
+import { ProjectAccessGuard } from './project-access.guard';
 
 @Global()
 @Module({
@@ -19,8 +20,8 @@ import { MailService } from './mail.service';
       inject: [ConfigService],
     }),
   ],
-  providers: [AuthService, JwtAuthGuard, MailService],
+  providers: [AuthService, JwtAuthGuard, ProjectAccessGuard, MailService],
   controllers: [AuthController],
-  exports: [AuthService, JwtModule, JwtAuthGuard, MailService],
+  exports: [AuthService, JwtModule, JwtAuthGuard, ProjectAccessGuard, MailService],
 })
 export class AuthModule {}

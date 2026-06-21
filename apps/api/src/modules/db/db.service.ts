@@ -476,6 +476,11 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     return projects;
   }
 
+  async isProjectOwner(projectId: string, userId: string): Promise<boolean> {
+    const isMember = await this.redis.sismember(`queuewatch:user_projects:${userId}`, projectId);
+    return isMember === 1;
+  }
+
   async getAllProjects(): Promise<Project[]> {
     const keys = await this.redis.keys('queuewatch:project_metadata:*');
     const projects: Project[] = [];

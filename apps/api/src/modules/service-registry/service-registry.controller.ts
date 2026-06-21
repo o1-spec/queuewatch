@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ProjectAccessGuard } from '../auth/project-access.guard';
 import { ProjectId } from '../auth/project-id.decorator';
 import { ServiceRegistryService } from './service-registry.service';
 import { DependencyGraphService } from '../dependency-graph/dependency-graph.service';
@@ -13,7 +14,7 @@ import { Service } from '@queuewatch/shared';
 
 @ApiTags('SRE Intelligence & Service Registry')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ProjectAccessGuard)
 @Controller()
 export class ServiceRegistryController {
   constructor(
@@ -58,10 +59,12 @@ export class ServiceRegistryController {
     return this.depGraph.getDependencies(serviceId, projectId);
   }
 
-  // --- Reliability Scores ---
   @Get('reliability')
   @ApiOperation({ summary: 'Get current reliability scores' })
-  async getReliability(@ProjectId() projectId: string) {
+  async getReliability(@ProjectId() projectId: string, @Query('refresh') refresh?: string) {
+    if (refresh === 'true') {
+      await this.reliabilityScore.recalculateAllScores(projectId);
+    }
     return this.reliabilityScore.getLatestScores(projectId);
   }
 

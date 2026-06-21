@@ -2,11 +2,12 @@ import { Controller, Get, Post, Patch, Delete, Param, Body, NotFoundException, U
 import { ApiTags, ApiOperation, ApiParam, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { IncidentsService } from './incidents.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ProjectAccessGuard } from '../auth/project-access.guard';
 import { ProjectId } from '../auth/project-id.decorator';
 
 @ApiTags('Incidents operational diagnostics')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ProjectAccessGuard)
 @Controller('incidents')
 export class IncidentsController {
   constructor(private readonly incidentsService: IncidentsService) {}

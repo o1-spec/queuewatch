@@ -68,6 +68,12 @@ export class QueueWatch {
   private batchTimeout: NodeJS.Timeout | null = null;
   private activeIntervals: NodeJS.Timeout[] = [];
   private activeListeners: QueueEvents[] = [];
+  private offlineQueue: { path: string; payload: any; retries: number; timestamp: number }[] = [];
+  private readonly maxQueueSize = 1000;
+  private readonly maxRetries = 5;
+  private isProcessingQueue = false;
+  private retryDelayMs = 1000;
+  private processQueueTimeout: NodeJS.Timeout | null = null;
 
   constructor(config?: QueueWatchConfig) {
     if (config) {
@@ -206,15 +212,35 @@ Monitoring Active
 
   // Captures uncaught process crashes and rejects
   public enableCrashReporting() {
-    process.on('uncaughtException', (error) => {
+    process.on('uncaughtException', async (error) => {
       this.captureError(error, {
         metadata: { crashType: 'uncaughtException', fatal: true }
       });
       // Flush before letting the process exit
-      this.flushEvents().finally(() => {
+      try {
+        const config = this.config;
+        if (config && this.eventQueue.length > 0) {
+          const eventsToSend = [...this.eventQueue];
+          this.eventQueue = [];
+          
+          await fetch(`${config.endpoint}/api/ingest/events`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${config.apiKey}`,
+            },
+            body: JSON.stringify({
+              events: eventsToSend,
+              projectId: config.projectId,
+            }),
+          });
+        }
+      } catch (err) {
+        // Fail silently
+      } finally {
         console.error('[QueueWatch SDK] Uncaught Exception recorded. Exiting process...');
         process.exit(1);
-      });
+      }
     });
 
     process.on('unhandledRejection', (reason) => {
@@ -400,12 +426,102 @@ Monitoring Active
         },
         body: JSON.stringify(payload),
       });
+
       if (!res.ok) {
-        // Fail silently
+        if (res.status >= 500 || res.status === 429) {
+          this.addToOfflineQueue(path, payload);
+        }
+      } else {
+        if (this.offlineQueue.length > 0) {
+          this.triggerOfflineQueueDrain();
+        }
       }
     } catch (err) {
-      // Fail silently: never block parent application threads
+      this.addToOfflineQueue(path, payload);
     }
+  }
+
+  private addToOfflineQueue(path: string, payload: any) {
+    if (this.offlineQueue.length >= this.maxQueueSize) {
+      this.offlineQueue.shift();
+    }
+    this.offlineQueue.push({
+      path,
+      payload,
+      retries: 0,
+      timestamp: Date.now(),
+    });
+    this.triggerOfflineQueueDrain();
+  }
+
+  private triggerOfflineQueueDrain() {
+    if (this.isProcessingQueue || this.offlineQueue.length === 0) return;
+    this.isProcessingQueue = true;
+    this.processOfflineQueue();
+  }
+
+  private async processOfflineQueue() {
+    if (this.offlineQueue.length === 0) {
+      this.isProcessingQueue = false;
+      this.retryDelayMs = 1000;
+      return;
+    }
+
+    const config = this.config;
+    if (!config || !config.projectId || !config.apiKey || !config.endpoint) {
+      this.isProcessingQueue = false;
+      return;
+    }
+
+    const item = this.offlineQueue[0];
+
+    try {
+      const res = await fetch(`${config.endpoint}${item.path}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${config.apiKey}`,
+        },
+        body: JSON.stringify(item.payload),
+      });
+
+      if (res.ok) {
+        this.offlineQueue.shift();
+        this.retryDelayMs = 1000;
+        setTimeout(() => this.processOfflineQueue(), 50);
+      } else if (res.status >= 500 || res.status === 429) {
+        this.handleQueueFailure(item);
+      } else {
+        // Discard permanent errors
+        this.offlineQueue.shift();
+        setTimeout(() => this.processOfflineQueue(), 50);
+      }
+    } catch (err) {
+      this.handleQueueFailure(item);
+    }
+  }
+
+  private handleQueueFailure(item: any) {
+    item.retries++;
+    if (item.retries > this.maxRetries) {
+      this.offlineQueue.shift();
+      this.retryDelayMs = 1000;
+      setTimeout(() => this.processOfflineQueue(), 50);
+    } else {
+      this.isProcessingQueue = false;
+      this.retryDelayMs = Math.min(this.retryDelayMs * 2, 30000);
+      if (this.processQueueTimeout) {
+        clearTimeout(this.processQueueTimeout);
+      }
+      this.processQueueTimeout = setTimeout(() => {
+        this.triggerOfflineQueueDrain();
+      }, this.retryDelayMs);
+    }
+  }
+
+  // Internal helper to get queue size for testing/verification
+  public getOfflineQueueSize(): number {
+    return this.offlineQueue.length;
   }
 
   // Internal helper to track heartbeat intervals for stopping
@@ -423,6 +539,10 @@ Monitoring Active
     if (this.batchTimeout) {
       clearTimeout(this.batchTimeout);
       this.batchTimeout = null;
+    }
+    if (this.processQueueTimeout) {
+      clearTimeout(this.processQueueTimeout);
+      this.processQueueTimeout = null;
     }
     // Flush remaining events in queue
     if (this.eventQueue.length > 0) {

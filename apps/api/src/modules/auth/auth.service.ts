@@ -121,6 +121,7 @@ export class AuthService implements OnModuleInit {
         if (user.id === id) {
           return {
             id: user.id,
+            sub: user.id,
             name: user.name,
             email: user.email,
             createdAt: user.createdAt,
