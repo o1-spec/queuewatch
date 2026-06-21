@@ -1,6 +1,8 @@
 import { Module, forwardRef } from '@nestjs/common';
-import { AgentController } from './agent.controller';
+import { AgentController, IncidentAgentController } from './agent.controller';
 import { AgentService } from './agent.service';
+import { RemediationService } from './remediation.service';
+import { RemediationController } from './remediation.controller';
 import { QueuesModule } from '../queues/queues.module';
 import { WorkersModule } from '../workers/workers.module';
 import { AiModule } from '../ai/ai.module';
@@ -15,8 +17,8 @@ import { AuthModule } from '../auth/auth.module';
     WebSocketModule,
     AuthModule,
   ],
-  controllers: [AgentController],
-  providers: [AgentService],
-  exports: [AgentService],
+  controllers: [AgentController, IncidentAgentController, RemediationController],
+  providers: [AgentService, RemediationService],
+  exports: [AgentService, RemediationService],
 })
 export class AgentModule {}

@@ -438,6 +438,20 @@ export interface Prediction {
   timestamp: number;
 }
 
+export interface ForecastTimeframe {
+  timeframe: '1h' | '6h' | '24h';
+  incidentProbability: number; // 0-100%
+  reliabilityScoreTrajectory: number[]; // projected score sequence
+  blastRadiusPotential: string[]; // downstream queue or service names
+}
+
+export interface ReliabilityForecast {
+  targetId: string; // queue name or service ID
+  targetType: 'queue' | 'service';
+  forecasts: ForecastTimeframe[];
+  timestamp: number;
+}
+
 export interface GlobalHealth {
   healthyServicesCount: number;
   degradedServicesCount: number;
@@ -457,4 +471,174 @@ export interface Project {
   hasReceivedTelemetry?: boolean;
   firstTelemetryAt?: number;
   retention?: RetentionPolicy;
+}
+
+// ─── Phase 3.0 Reliability Agent ─────────────────────────────────────────────
+
+export interface AgentPlan {
+  strategy: string;
+  steps: string[];
+  targetQueue: string;
+  targetService?: string;
+}
+
+export interface AgentHypothesis {
+  id: string;
+  title: string;
+  description: string;
+  confidence: number; // 0–100
+  evidenceIds: string[];
+  rank: number; // 1 = primary
+}
+
+export interface RunbookMatch {
+  runbookId: string;
+  title: string;
+  matchScore: number; // 0–100
+  reason: string;
+}
+
+export interface AgentAction {
+  id: string;
+  type:
+    | 'pause_queue'
+    | 'resume_queue'
+    | 'replay_dlq'
+    | 'scale_workers'
+    | 'restart_worker'
+    | 'rollback_deployment'
+    | 'ack_incident'
+    | 'resolve_incident'
+    | 'reduce_concurrency'
+    | 'investigate_deployment'
+    | 'trigger_runbook';
+  description: string;
+  reasoning: string;
+  riskLevel: 'low' | 'medium' | 'high';
+  expectedOutcome: string;
+  estimatedRecoveryMin: number;
+  command?: string;
+  status: 'pending' | 'approved' | 'rejected' | 'modified' | 'executed';
+  associatedRunbook?: string;
+  payload?: any;
+}
+
+export interface ApprovalDecision {
+  actionId: string;
+  decision: 'approved' | 'rejected' | 'modified';
+  modifiedPayload?: any;
+  decidedBy: string;
+  decidedAt: number;
+  notes?: string;
+}
+
+export interface ExecutionEntry {
+  actionId: string;
+  executedAt: number;
+  result: 'success' | 'failed' | 'skipped';
+  output?: string;
+}
+
+export interface AgentSession {
+  id: string;
+  incidentId: string;
+  projectId: string;
+  status:
+    | 'planning'
+    | 'investigating'
+    | 'reasoning'
+    | 'awaiting_approval'
+    | 'executing'
+    | 'completed'
+    | 'failed';
+  plan: AgentPlan;
+  evidence: EvidenceItem[];
+  hypotheses: AgentHypothesis[];
+  runbookMatches: RunbookMatch[];
+  recommendedActions: AgentAction[];
+  approvalDecisions: ApprovalDecision[];
+  executionHistory: ExecutionEntry[];
+  postmortem?: string;
+  engineerFeedback?: string;
+  startedAt: number;
+  completedAt?: number;
+  recoveryTimeMin?: number;
+  teamFindings?: TeamAgentFinding[];
+  consensusReport?: ConsensusReport;
+}
+
+// ─── Phase 3.2 Multi-Agent Reliability Team ────────────────────────────────────
+
+export interface TeamAgentFinding {
+  agentRole: 'incident_commander' | 'telemetry' | 'deployment' | 'dependency' | 'knowledge' | 'recovery';
+  status: 'idle' | 'working' | 'completed' | 'failed';
+  findings: string[];
+  evidenceItems: EvidenceItem[];
+  confidenceScore: number;
+  analysis: string;
+  suggestedActions?: AgentAction[];
+  updatedAt: number;
+}
+
+export interface ConsensusReport {
+  summary: string;
+  agreedRootCause: string;
+  overallConfidenceScore: number;
+  consensusStrength: 'low' | 'medium' | 'high';
+  combinedEvidenceIds: string[];
+  recommendedActions: AgentAction[];
+  generatedAt: number;
+}
+
+// ─── Phase 3.1 Assisted Remediation Engine ────────────────────────────────────
+
+export interface RollbackPlan {
+  description: string;           // Human-readable inverse action
+  rollbackActionType: AgentAction['type'];
+  rollbackPayload?: any;         // Payload for the inverse action
+  automatic: boolean;            // Auto-rollback on failure?
+}
+
+export interface VerificationResult {
+  checkedAt: number;
+  passed: boolean;
+  improved: boolean;
+  failureRateBefore: number;
+  failureRateAfter: number;
+  latencyBefore: number;
+  latencyAfter: number;
+  reliabilityScoreBefore: number;
+  reliabilityScoreAfter: number;
+  incidentStatusBefore: string;
+  incidentStatusAfter: string;
+  summary: string;
+}
+
+export type RemediationStatus =
+  | 'pending_approval'
+  | 'approved'
+  | 'rejected'
+  | 'executing'
+  | 'succeeded'
+  | 'failed'
+  | 'rolled_back';
+
+export interface RemediationRecord {
+  id: string;
+  sessionId?: string;            // Optional link to AgentSession
+  incidentId: string;
+  projectId: string;
+  action: AgentAction;
+  rollbackPlan: RollbackPlan;
+  status: RemediationStatus;
+  approvedBy?: string;
+  approvedAt?: number;
+  rejectedBy?: string;
+  rejectedAt?: number;
+  executedAt?: number;
+  completedAt?: number;
+  verificationResult?: VerificationResult;
+  executionLog: string[];
+  timelineEventIds: string[];    // IDs of timeline events appended
+  createdAt: number;
 }

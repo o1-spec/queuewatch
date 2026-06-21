@@ -7,7 +7,7 @@ import {
   EscalationRule, DeploymentEvent, Notification, KnowledgeEntry, Runbook,
   Service, Environment, DependencyGraph, ReliabilityScore, Prediction, GlobalHealth,
   WorkerHealth, QueueName, Project, RetentionPolicy, CopilotLogEntry,
-  IncidentRunbook, RunbookStepStatus
+  IncidentRunbook, RunbookStepStatus, AgentSession, RemediationRecord, ReliabilityForecast
 } from '@queuewatch/shared';
 
 @Injectable()
@@ -1101,6 +1101,27 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     await this.redis.hset(this.getScopedKey(projectId, 'predictions'), pred.id, JSON.stringify(pred));
   }
 
+  async deletePredictions(projectId?: string): Promise<void> {
+    const key = this.getScopedKey(projectId, 'predictions');
+    await this.redis.del(key);
+  }
+
+  async saveForecast(forecast: ReliabilityForecast, projectId?: string): Promise<void> {
+    const key = this.getScopedKey(projectId, 'forecasts');
+    await this.redis.hset(key, forecast.targetId, JSON.stringify(forecast));
+  }
+
+  async getForecasts(projectId?: string): Promise<ReliabilityForecast[]> {
+    const key = this.getScopedKey(projectId, 'forecasts');
+    const rawList = await this.redis.hvals(key);
+    return rawList.map(r => JSON.parse(r));
+  }
+
+  async deleteForecasts(projectId?: string): Promise<void> {
+    const key = this.getScopedKey(projectId, 'forecasts');
+    await this.redis.del(key);
+  }
+
   // ─── Retention Policy Storage ────────────────────────────────────────────────
 
   async getRetentionPolicy(projectId: string): Promise<RetentionPolicy | null> {
@@ -1145,5 +1166,80 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     const key = this.getScopedKey(projectId, 'copilot_history');
     const raw = await this.redis.lrange(key, 0, -1);
     return raw.map(item => JSON.parse(item));
+  }
+
+  // ─── Agent Session Storage (Phase 3.0) ───────────────────────────────────
+
+  async saveAgentSession(session: AgentSession, projectId?: string): Promise<void> {
+    await this.redis.hset(
+      this.getScopedKey(projectId, 'agent_sessions'),
+      session.id,
+      JSON.stringify(session)
+    );
+  }
+
+  async getAgentSession(id: string, projectId?: string): Promise<AgentSession | null> {
+    const raw = await this.redis.hget(this.getScopedKey(projectId, 'agent_sessions'), id);
+    return raw ? JSON.parse(raw) : null;
+  }
+
+  async getAgentSessions(projectId?: string): Promise<AgentSession[]> {
+    const rawList = await this.redis.hvals(this.getScopedKey(projectId, 'agent_sessions'));
+    return rawList
+      .map(item => JSON.parse(item) as AgentSession)
+      .sort((a, b) => b.startedAt - a.startedAt);
+  }
+
+  async getAgentSessionByIncidentId(incidentId: string, projectId?: string): Promise<AgentSession | null> {
+    const all = await this.getAgentSessions(projectId);
+    return all.find(s => s.incidentId === incidentId) || null;
+  }
+
+  async updateAgentSession(id: string, partial: Partial<AgentSession>, projectId?: string): Promise<AgentSession | null> {
+    const existing = await this.getAgentSession(id, projectId);
+    if (!existing) return null;
+    const updated = { ...existing, ...partial };
+    await this.saveAgentSession(updated, projectId);
+    return updated;
+  }
+
+  // ─── Remediation Records (Phase 3.1) ──────────────────────────────────────
+
+  async saveRemediationRecord(record: RemediationRecord, projectId?: string): Promise<void> {
+    await this.redis.hset(
+      this.getScopedKey(projectId, 'remediation_records'),
+      record.id,
+      JSON.stringify(record)
+    );
+  }
+
+  async getRemediationRecord(id: string, projectId?: string): Promise<RemediationRecord | null> {
+    const raw = await this.redis.hget(this.getScopedKey(projectId, 'remediation_records'), id);
+    return raw ? JSON.parse(raw) : null;
+  }
+
+  async getRemediationRecords(projectId?: string): Promise<RemediationRecord[]> {
+    const rawList = await this.redis.hvals(this.getScopedKey(projectId, 'remediation_records'));
+    return rawList
+      .map(item => JSON.parse(item) as RemediationRecord)
+      .sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  async getRemediationRecordsByIncident(incidentId: string, projectId?: string): Promise<RemediationRecord[]> {
+    const all = await this.getRemediationRecords(projectId);
+    return all.filter(r => r.incidentId === incidentId);
+  }
+
+  async getRemediationRecordsBySession(sessionId: string, projectId?: string): Promise<RemediationRecord[]> {
+    const all = await this.getRemediationRecords(projectId);
+    return all.filter(r => r.sessionId === sessionId);
+  }
+
+  async updateRemediationRecord(id: string, partial: Partial<RemediationRecord>, projectId?: string): Promise<RemediationRecord | null> {
+    const existing = await this.getRemediationRecord(id, projectId);
+    if (!existing) return null;
+    const updated = { ...existing, ...partial };
+    await this.saveRemediationRecord(updated, projectId);
+    return updated;
   }
 }

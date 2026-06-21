@@ -78,6 +78,19 @@ export class ServiceRegistryController {
     return this.prediction.getLatestPredictions(projectId);
   }
 
+  @Post('predictions/analyze')
+  @ApiOperation({ summary: 'Trigger manual continuous reliability analysis run' })
+  async runAnalysis(@ProjectId() projectId: string) {
+    await this.prediction.runContinuousAnalysis(projectId);
+    return { success: true, message: 'Continuous reliability analysis completed.' };
+  }
+
+  @Get('predictions/forecast')
+  @ApiOperation({ summary: 'Get active reliability forecasts and trajectories' })
+  async getForecast(@ProjectId() projectId: string) {
+    return this.prediction.getReliabilityForecasts(projectId);
+  }
+
   @Get('predictions/:id')
   @ApiParam({ name: 'id' })
   async getPrediction(@ProjectId() projectId: string, @Param('id') id: string) {

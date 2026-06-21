@@ -101,33 +101,30 @@ export default function KnowledgeExplorer() {
       <div className="flex border-b border-zinc-900 gap-1.5 overflow-x-auto">
         <button
           onClick={() => setActiveTab('incidents')}
-          className={`px-4 py-2 font-bold uppercase transition-all flex items-center gap-1.5 border-b-2 text-[10px] shrink-0 ${
-            activeTab === 'incidents'
+          className={`px-4 py-2 font-bold uppercase transition-all flex items-center gap-1.5 border-b-2 text-[10px] shrink-0 ${activeTab === 'incidents'
               ? 'border-indigo-500 text-white bg-indigo-950/10'
               : 'border-transparent text-zinc-550 hover:text-zinc-350'
-          }`}
+            }`}
         >
           <History className="w-3.5 h-3.5 text-indigo-400" />
           <span>Incident Postmortems</span>
         </button>
         <button
           onClick={() => setActiveTab('patterns')}
-          className={`px-4 py-2 font-bold uppercase transition-all flex items-center gap-1.5 border-b-2 text-[10px] shrink-0 ${
-            activeTab === 'patterns'
+          className={`px-4 py-2 font-bold uppercase transition-all flex items-center gap-1.5 border-b-2 text-[10px] shrink-0 ${activeTab === 'patterns'
               ? 'border-indigo-500 text-white bg-indigo-950/10'
               : 'border-transparent text-zinc-550 hover:text-zinc-350'
-          }`}
+            }`}
         >
           <TrendingUp className="w-3.5 h-3.5 text-indigo-400" />
           <span>Patterns & Articles</span>
         </button>
         <button
           onClick={() => setActiveTab('reports')}
-          className={`px-4 py-2 font-bold uppercase transition-all flex items-center gap-1.5 border-b-2 text-[10px] shrink-0 ${
-            activeTab === 'reports'
+          className={`px-4 py-2 font-bold uppercase transition-all flex items-center gap-1.5 border-b-2 text-[10px] shrink-0 ${activeTab === 'reports'
               ? 'border-indigo-500 text-white bg-indigo-950/10'
               : 'border-transparent text-zinc-550 hover:text-zinc-350'
-          }`}
+            }`}
         >
           <Award className="w-3.5 h-3.5 text-indigo-400" />
           <span>Reports & Leaderboard</span>
@@ -165,7 +162,7 @@ export default function KnowledgeExplorer() {
                     <div key={entry.id} className="bg-zinc-950/40 border border-zinc-900 rounded-lg p-5 space-y-4 shadow hover:border-zinc-800 transition-all backdrop-blur-md">
                       <div className="flex justify-between items-start gap-4">
                         <div className="min-w-0">
-                          <button 
+                          <button
                             onClick={() => setExpandedId(isExpanded ? null : entry.id)}
                             className="text-left font-bold text-white text-xs uppercase hover:text-indigo-400 transition-colors flex items-center gap-1.5"
                           >
@@ -205,7 +202,7 @@ export default function KnowledgeExplorer() {
 
                       {/* Lessons Learned postmortem feedback section */}
                       {isExpanded && entry.lessonsLearned && (
-                        <div className="border-t border-zinc-900/60 pt-4 bg-indigo-950/5 border border-indigo-900/10 p-4 rounded-lg space-y-2.5">
+                        <div className="border-t pt-4 bg-indigo-950/5 border border-indigo-900/10 p-4 rounded-lg space-y-2.5">
                           <span className="text-indigo-400 font-mono text-[9px] uppercase font-bold block flex items-center gap-1.5">
                             <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
                             <span>Operational Learning Feedback</span>
@@ -230,7 +227,7 @@ export default function KnowledgeExplorer() {
                       {isExpanded && (
                         <div className="border-t border-zinc-900 pt-4 space-y-4">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            
+
                             <div className="space-y-3 font-sans text-xs">
                               {entry.reliabilityImpact && (
                                 <div className="space-y-1">
@@ -238,7 +235,7 @@ export default function KnowledgeExplorer() {
                                   <p className="text-zinc-350">{entry.reliabilityImpact}</p>
                                 </div>
                               )}
-                              
+
                               {entry.blastRadius && entry.blastRadius.length > 0 && (
                                 <div className="space-y-1.5">
                                   <span className="text-zinc-550 font-mono text-[9px] uppercase font-bold block">Impacted Downstream Services</span>
@@ -303,7 +300,7 @@ export default function KnowledgeExplorer() {
                           <span>Linked Incident ID Reference:</span>
                           <span className="font-mono text-zinc-450 font-bold">{entry.incidentId}</span>
                         </div>
-                        <button 
+                        <button
                           onClick={() => setExpandedId(isExpanded ? null : entry.id)}
                           className="text-indigo-400 hover:text-white transition-colors uppercase font-mono text-[8px] font-bold"
                         >
@@ -332,7 +329,7 @@ export default function KnowledgeExplorer() {
                   <TrendingUp className="w-4 h-4 text-indigo-400" />
                   <span>Reliability Patterns Engine</span>
                 </h3>
-                
+
                 <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
                   {recurringPatterns.length > 0 ? (
                     recurringPatterns.map((pattern) => (
@@ -368,7 +365,7 @@ export default function KnowledgeExplorer() {
                   <FileText className="w-4 h-4 text-indigo-400" />
                   <span>SRE Knowledge Articles</span>
                 </h3>
-                
+
                 <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
                   {articles.length > 0 ? (
                     articles.map((art, idx) => (
@@ -465,10 +462,9 @@ export default function KnowledgeExplorer() {
                           <span>{fail.occurrences} occurrences ({pct}%)</span>
                         </div>
                         <div className="h-2 w-full bg-zinc-900/40 rounded-full overflow-hidden border border-zinc-900">
-                          <div 
-                            className={`h-full rounded-full transition-all duration-500 ${
-                              i === 0 ? 'bg-rose-500' : i === 1 ? 'bg-amber-500' : i === 2 ? 'bg-indigo-500' : 'bg-zinc-550'
-                            }`} 
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${i === 0 ? 'bg-rose-500' : i === 1 ? 'bg-amber-500' : i === 2 ? 'bg-indigo-500' : 'bg-zinc-550'
+                              }`}
                             style={{ width: `${pct}%` }}
                           />
                         </div>
@@ -480,7 +476,7 @@ export default function KnowledgeExplorer() {
 
               {/* Leaderboards Grid */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                
+
                 {/* Stable Services Leaderboard */}
                 <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-5 space-y-3 shadow">
                   <h4 className="text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 border-b border-zinc-900 pb-2">
@@ -492,12 +488,11 @@ export default function KnowledgeExplorer() {
                       reportData.leaderboard.mostStableServices.map((svc: any, i: number) => (
                         <div key={i} className="flex justify-between items-center p-2 border border-zinc-900/50 bg-black/20 rounded">
                           <div className="flex items-center space-x-2">
-                            <span className="font-bold text-zinc-550 text-[10px]">#{i+1}</span>
+                            <span className="font-bold text-zinc-550 text-[10px]">#{i + 1}</span>
                             <span className="text-zinc-300 uppercase font-mono">{svc.name}</span>
                           </div>
-                          <span className={`font-bold px-1.5 py-0.5 rounded text-[9px] font-mono ${
-                            svc.score >= 95 ? 'bg-emerald-950 border border-emerald-900 text-emerald-400' : 'bg-amber-950 border border-amber-900 text-amber-400'
-                          }`}>
+                          <span className={`font-bold px-1.5 py-0.5 rounded text-[9px] font-mono ${svc.score >= 95 ? 'bg-emerald-950 border border-emerald-900 text-emerald-400' : 'bg-amber-950 border border-amber-900 text-amber-400'
+                            }`}>
                             {svc.score}% SLA
                           </span>
                         </div>

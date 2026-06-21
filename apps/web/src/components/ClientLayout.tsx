@@ -28,7 +28,11 @@ import {
   ShieldCheck,
   TrendingUp,
   Activity,
-  LineChart
+  LineChart,
+  Bot,
+  Wrench,
+  Users,
+  ShieldAlert
 } from 'lucide-react';
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
@@ -53,6 +57,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     { name: 'Dependency Topology Map', path: '/dependencies', desc: 'SRE dependency graphs, downstream impact cascades, & blast radius analysis', icon: Network },
     { name: 'Reliability Center Ledger', path: '/reliability', desc: 'Service reliability scoring (0-100) & performance trends', icon: ShieldCheck },
     { name: 'Predictive Warnings Center', path: '/predictions', desc: 'Deterministic incident predictions & queue backlog projections', icon: TrendingUp },
+    { name: 'Early Warning Center', path: '/risks', desc: 'Continuous reliability monitoring, risk diagnostics, & incident forecasting', icon: ShieldAlert },
     { name: 'Global Health Center', path: '/health', desc: 'Platform health status command center and quick-stats overview', icon: Activity },
     { name: 'SRE Performance Analytics', path: '/analytics', desc: 'Quarterly MTTR reports, stability rate trends, & incident stats', icon: LineChart },
     { name: 'Queues Registry Catalog', path: '/queues', desc: 'List active Redis BullMQ channels, pause/resume workers', icon: Layers },
@@ -62,6 +67,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     { name: 'Recurring failure patterns', path: '/recurring-incidents', desc: 'Audit repeat error patterns and preventions', icon: History },
     { name: 'Recovery runbooks manual', path: '/runbooks', desc: 'Step-by-step resolution guides', icon: FileText },
     { name: 'SRE Knowledge Base', path: '/knowledge', desc: 'Search historical resolved incident learnings', icon: BookOpen },
+    { name: 'Reliability Agent', path: '/agent', desc: 'Autonomous incident investigation, hypothesis ranking, and approval-gated remediation', icon: Bot },
+    { name: 'Remediation Execution Center', path: '/remediation', desc: 'Execute, verify, and rollback approved remediation actions with full audit trail', icon: Wrench },
+    { name: 'SRE Agent Team Workspace', path: '/agents', desc: 'Simulated multi-agent SRE diagnostics team, findings log feed, and consensus engine report', icon: Users },
     { name: 'Simulation Control Sandbox', path: '/settings', desc: 'Inject synthetic traffic and simulate SMTP/Stripe bottlenecks', icon: Sliders },
   ];
 
@@ -346,9 +354,29 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                   <TrendingUp className={navIconClass('/predictions')} />
                   <span>Predictions</span>
                 </Link>
+                <Link href="/risks" className={navItemClass('/risks')}>
+                  <ShieldAlert className={navIconClass('/risks')} />
+                  <span>Early Warning</span>
+                  <span className="ml-auto text-[8px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/25 px-1.5 py-0.5 rounded uppercase tracking-wide">RISKS</span>
+                </Link>
                 <Link href="/knowledge" className={navItemClass('/knowledge')}>
                   <BookOpen className={navIconClass('/knowledge')} />
                   <span>Knowledge Base</span>
+                </Link>
+                <Link href="/agent" className={navItemClass('/agent')}>
+                  <Bot className={navIconClass('/agent')} />
+                  <span>Reliability Agent</span>
+                  <span className="ml-auto text-[8px] font-bold bg-indigo-500/20 text-indigo-400 border border-indigo-500/25 px-1.5 py-0.5 rounded uppercase tracking-wide">NEW</span>
+                </Link>
+                <Link href="/remediation" className={navItemClass('/remediation')}>
+                  <Wrench className={navIconClass('/remediation')} />
+                  <span>Remediation</span>
+                  <span className="ml-auto text-[8px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/25 px-1.5 py-0.5 rounded uppercase tracking-wide">NEW</span>
+                </Link>
+                <Link href="/agents" className={navItemClass('/agents')}>
+                  <Users className={navIconClass('/agents')} />
+                  <span>Agent Team</span>
+                  <span className="ml-auto text-[8px] font-bold bg-violet-500/20 text-violet-400 border border-violet-500/25 px-1.5 py-0.5 rounded uppercase tracking-wide">TEAM</span>
                 </Link>
               </div>
             </div>
