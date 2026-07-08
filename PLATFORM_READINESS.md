@@ -10,7 +10,7 @@ This report documents the architectural, security, performance, and functional v
 - **Total Validations Run**: `9`
 - **Passed Checks**: `9`
 - **Failed Checks**: `0`
-- **Report Timestamp**: `2026-06-21T19:36:17.556Z`
+- **Report Timestamp**: `2026-07-08T22:24:56.072Z`
 
 ---
 
@@ -18,15 +18,15 @@ This report documents the architectural, security, performance, and functional v
 
 | Validation Area | Assertion Script | Status | Duration | Key Achievements |
 | :--- | :--- | :---: | :---: | :--- |
-| **Node SDK Hardening** | `test-sdk-comprehensive.js` | 🟢 PASSED | `4191ms` | Verified event buffering, 20-event/1s batching thresholds, and HTTP 5xx/429 exponential backoff retries. |
-| **Incident Lifecycle** | `test-incident-lifecycle-comprehensive.js` | 🟢 PASSED | `313ms` | Validated SRE state transitions (`open` ➔ `ack` ➔ `resolved`), timeline hooks logging, and postmortem similarity archiving. |
-| **Deployment Correlation** | `test-deployment-correlation-comprehensive.js` | 🟢 PASSED | `302ms` | Asserted 30-min regression mapping confidence, with 0% correlations on distant releases or isolated queues. |
-| **Reliability Scoring** | `test-reliability-scoring-comprehensive.js` | 🟢 PASSED | `306ms` | Confirmed scores degrade under load, recover back to 100% on resolution, and track contributor categories correctly. |
-| **Dependency discovery** | `test-dependency-comprehensive.js` | 🟢 PASSED | `301ms` | Audited topology discovery, business capability linkages, and BFS downstream blast radius cascade sweeps. |
-| **Socratic Investigation** | `test-investigation-comprehensive.js` | 🟢 PASSED | `303ms` | Verified evidence rank-sorting, causal DAG node linkages, and automatic terminal action suggestions. |
-| **Tenant Isolation** | `test-multi-project-isolation.js` | 🟢 PASSED | `361ms` | Confirmed SRE users cannot view, modify, or delete project metrics belonging to other accounts. |
-| **API & WebSocket Security** | `test-security-comprehensive.js` | 🟢 PASSED | `2407ms` | Audited expired token rejections, telemetry API key validations, and token-scoped Socket.IO rooms. |
-| **Performance Load** | `test-performance-benchmark.js` | 🟢 PASSED | `2489ms` | Simulated concurrent event load to verify Redis memory allocations and REST endpoint response latencies. |
+| **Node SDK Hardening** | `test-sdk-comprehensive.js` | 🟢 PASSED | `4183ms` | Verified event buffering, 20-event/1s batching thresholds, and HTTP 5xx/429 exponential backoff retries. |
+| **Incident Lifecycle** | `test-incident-lifecycle-comprehensive.js` | 🟢 PASSED | `426ms` | Validated SRE state transitions (`open` ➔ `ack` ➔ `resolved`), timeline hooks logging, and postmortem similarity archiving. |
+| **Deployment Correlation** | `test-deployment-correlation-comprehensive.js` | 🟢 PASSED | `352ms` | Asserted 30-min regression mapping confidence, with 0% correlations on distant releases or isolated queues. |
+| **Reliability Scoring** | `test-reliability-scoring-comprehensive.js` | 🟢 PASSED | `338ms` | Confirmed scores degrade under load, recover back to 100% on resolution, and track contributor categories correctly. |
+| **Dependency discovery** | `test-dependency-comprehensive.js` | 🟢 PASSED | `313ms` | Audited topology discovery, business capability linkages, and BFS downstream blast radius cascade sweeps. |
+| **Socratic Investigation** | `test-investigation-comprehensive.js` | 🟢 PASSED | `311ms` | Verified evidence rank-sorting, causal DAG node linkages, and automatic terminal action suggestions. |
+| **Tenant Isolation** | `test-multi-project-isolation.js` | 🟢 PASSED | `377ms` | Confirmed SRE users cannot view, modify, or delete project metrics belonging to other accounts. |
+| **API & WebSocket Security** | `test-security-comprehensive.js` | 🟢 PASSED | `2421ms` | Audited expired token rejections, telemetry API key validations, and token-scoped Socket.IO rooms. |
+| **Performance Load** | `test-performance-benchmark.js` | 🟢 PASSED | `3614ms` | Simulated concurrent event load to verify Redis memory allocations and REST endpoint response latencies. |
 
 ---
 
@@ -37,16 +37,16 @@ Telemetry load simulation results (seeded directly to Redis with concurrent API 
 
 - **10,000 Events Load**:
   - Redis Memory Growth: `1.43 MB`
-  - API Ingest Throughput: `10893 events/sec`
-  - SRE Dashboard Query Latency: `7ms`
+  - API Ingest Throughput: `8961 events/sec`
+  - SRE Dashboard Query Latency: `8ms`
 - **50,000 Events Load**:
   - Redis Memory Growth: `7.18 MB`
-  - API Ingest Throughput: `12500 events/sec`
-  - SRE Dashboard Query Latency: `8ms`
+  - API Ingest Throughput: `6418 events/sec`
+  - SRE Dashboard Query Latency: `7ms`
 - **100,000 Events Load**:
-  - Redis Memory Growth: `14.38 MB`
-  - API Ingest Throughput: `12048 events/sec`
-  - SRE Dashboard Query Latency: `5ms`
+  - Redis Memory Growth: `14.36 MB`
+  - API Ingest Throughput: `9804 events/sec`
+  - SRE Dashboard Query Latency: `4ms`
 
 
 ---

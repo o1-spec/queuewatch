@@ -204,7 +204,7 @@ export class ReliabilityScoreService implements OnModuleInit, OnModuleDestroy {
         let blastRadiusSum = 0;
         let deploymentsSum = 0;
 
-        for (const queue of svc.queues) {
+        for (const queue of svc.queues || []) {
           const qScore = allScores.find(s => s.targetId === queue && s.targetType === 'queue');
           if (qScore) {
             scoreSum += qScore.score;
@@ -231,7 +231,7 @@ export class ReliabilityScoreService implements OnModuleInit, OnModuleDestroy {
           retryRate: 0,
           backlogGrowth: 0,
           workerHealthScore: svc.status === 'healthy' ? 100 : 50,
-          incidentFrequency: svc.incidents.length,
+          incidentFrequency: (svc.incidents || []).length,
           mttrMinutes: 20,
           timestamp: Date.now(),
           contributors: count > 0 ? {
@@ -245,7 +245,7 @@ export class ReliabilityScoreService implements OnModuleInit, OnModuleDestroy {
             failureRate: 0,
             latency: 0,
             workerHealth: svc.status === 'healthy' ? 0 : -10,
-            incidents: svc.incidents.length > 0 ? -15 : 0,
+            incidents: (svc.incidents || []).length > 0 ? -15 : 0,
             blastRadius: 0,
             deployments: 0
           }
