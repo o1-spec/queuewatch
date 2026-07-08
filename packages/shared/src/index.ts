@@ -90,6 +90,7 @@ export interface LogEntry {
   message: string;
   queueName: QueueName;
   workerName?: string;
+  service?: string;
   timestamp: number;
   metadata?: any;
   traceId?: string;
