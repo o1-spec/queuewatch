@@ -40,3 +40,4 @@ async function bootstrap() {
   logger.log(`========================================================================`);
 }
 bootstrap();
+// Trigger dev hot-reload to seed initial data after Redis flush
