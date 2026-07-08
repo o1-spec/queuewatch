@@ -25,6 +25,25 @@ export class LogsController {
     return this.dbService.getLogs(queueName, size, projectId);
   }
 
+  @Get('stats')
+  @ApiOperation({ summary: 'Get summary statistics of log levels' })
+  async getLogStats(@ProjectId() projectId: string) {
+    const logs = await this.dbService.getLogs(undefined, 2000, projectId);
+    const stats = { total: 0, error: 0, warn: 0, info: 0 };
+    for (const log of logs) {
+      stats.total++;
+      const lvl = (log.level || '').toLowerCase();
+      if (lvl === 'error' || lvl === 'critical' || lvl === 'fail') {
+        stats.error++;
+      } else if (lvl === 'warn' || lvl === 'warning') {
+        stats.warn++;
+      } else {
+        stats.info++;
+      }
+    }
+    return stats;
+  }
+
   @Post()
   @ApiOperation({ summary: 'Bulk save logs' })
   async saveLogs(@ProjectId() projectId: string, @Body() logs: LogEntry[]) {
