@@ -20,6 +20,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     const redisUrl = this.configService.get<string>('REDIS_URL');
     if (redisUrl) {
       this.redis = new Redis(redisUrl, {
+        maxRetriesPerRequest: null,
         retryStrategy: (times) => Math.min(times * 100, 3000),
       });
     } else {
@@ -29,9 +30,14 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       this.redis = new Redis({
         host,
         port,
+        maxRetriesPerRequest: null,
         retryStrategy: (times) => Math.min(times * 100, 3000),
       });
     }
+
+    this.redis.on('error', (err) => {
+      this.logger.error(`Redis DB connection error: ${err.message}`);
+    });
 
     this.redis.on('connect', () => {
       this.logger.log('Successfully connected persistent DB client to Redis.');

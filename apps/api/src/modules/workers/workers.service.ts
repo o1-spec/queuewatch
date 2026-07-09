@@ -30,9 +30,14 @@ export class WorkersService implements OnModuleInit, OnModuleDestroy {
   ) {
     const redisUrl = this.configService.get<string>('REDIS_URL');
     if (redisUrl) {
-      this.redisConnection = new Redis(redisUrl, {
+      const client = new Redis(redisUrl, {
         maxRetriesPerRequest: null,
+        retryStrategy: (times) => Math.min(times * 100, 3000),
       });
+      client.on('error', (err) => {
+        this.logger.error(`Redis worker simulator connection error: ${err.message}`);
+      });
+      this.redisConnection = client;
     } else {
       this.redisConnection = {
         host: this.configService.get<string>('REDIS_HOST') || 'localhost',

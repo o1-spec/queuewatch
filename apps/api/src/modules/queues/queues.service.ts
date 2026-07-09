@@ -43,6 +43,10 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
       });
     }
 
+    this.redisConnection.on('error', (err) => {
+      this.logger.error(`Redis broker connection error: ${err.message}`);
+    });
+
     this.redisConnection.on('connect', () => {
       this.logger.log('Successfully connected to Redis broker.');
       this.initializeQueues();
