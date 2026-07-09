@@ -114,8 +114,8 @@ export default function DashboardOverview() {
           failedCount: q.failed,
           delayedCount: q.delayed,
           paused: q.paused,
-          throughput: q.completed > 0 ? Math.round(q.completed / 2) : 0,
-          averageLatency: 450,
+          throughput: q.throughput ?? 0,
+          averageLatency: q.averageLatency ?? 0,
           timestamp: Date.now(),
         })));
       }

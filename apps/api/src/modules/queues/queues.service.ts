@@ -115,6 +115,10 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
     const list: any[] = [];
     const activeQueueNames = await this.dbService.getProjectQueues(projectId);
 
+    // Fetch the latest aggregated metrics from Redis
+    const rawMetrics = await this.dbService.redis.get('queuewatch:global:queue_metrics');
+    const parsedMetrics = rawMetrics ? JSON.parse(rawMetrics) : [];
+
     for (const name of activeQueueNames) {
       const queue = this.getQueue(name);
       if (!queue) continue;
@@ -128,6 +132,7 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
       ]);
 
       const isPaused = await queue.isPaused();
+      const match = parsedMetrics.find((m: any) => m.queueName === name);
 
       list.push({
         name,
@@ -137,6 +142,8 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
         failed,
         delayed,
         paused: isPaused,
+        averageLatency: match ? match.averageLatency : 0,
+        throughput: match ? match.throughput : 0,
       });
     }
     return list;

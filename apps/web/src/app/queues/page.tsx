@@ -32,8 +32,8 @@ export default function QueuesExplorer() {
           failedCount: q.failed,
           delayedCount: q.delayed,
           paused: q.paused,
-          throughput: q.completed > 0 ? Math.round(q.completed / 2) : 0,
-          averageLatency: q.name === 'ai_task_queue' ? 1800 : 450,
+          throughput: q.throughput ?? 0,
+          averageLatency: q.averageLatency ?? 0,
           timestamp: Date.now(),
         }));
         setMetrics(initialMetrics);

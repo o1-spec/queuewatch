@@ -143,10 +143,8 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
           failedCount: failed,
           delayedCount: delayed,
           paused: isPaused,
-          throughput: this.queuesService.simConfig.getConfig().generateTraffic && throughput === 0
-            ? Math.round(15 + Math.random() * 15)
-            : throughput,
-          averageLatency: averageLatency || Math.round(800 + Math.random() * 300),
+          throughput: throughput,
+          averageLatency: averageLatency || 0,
           failureRate: Math.round(failureRate),
           retryRate: Math.round(retryRate),
           backlogGrowth: waiting > 10 ? Math.round(waiting * 0.15) : 0,
@@ -158,6 +156,12 @@ export class MetricsService implements OnModuleInit, OnModuleDestroy {
 
       // Stream metrics update using V1 websocket event: metrics.updated
       this.wsGateway.broadcast('metrics.updated', metricsList);
+
+      // Save the latest real metrics to Redis for REST endpoint consumption
+      const redis = this.queuesService.getRedisConnection();
+      if (redis) {
+        await redis.set('queuewatch:global:queue_metrics', JSON.stringify(metricsList));
+      }
 
       // Invoke incident detector
       await this.incidentsService.evaluateSystemState(metricsList, workerHealthList, dlqCount);

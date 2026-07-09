@@ -18,6 +18,9 @@ export interface MonitorOptions {
 export interface TrackEventOptions {
   type: string;
   service?: string;
+  queueName?: string;
+  jobId?: string;
+  duration?: number;
   message?: string;
   severity?: 'info' | 'warn' | 'error';
   traceId?: string;
@@ -222,7 +225,9 @@ Monitoring Active
     this.enqueueEvent({
       type: options.type,
       status: options.severity || 'info',
-      queueName: options.service || config.service || 'default',
+      queueName: options.queueName || options.service || config.service || 'default',
+      jobId: options.jobId,
+      duration: options.duration,
       errorMessage: options.message,
       traceId: options.traceId || this.generateTraceId(),
       metadata: options.metadata,
@@ -458,59 +463,90 @@ Monitoring Active
       const commonEventData = (jobId: string, type: string, status: string) => ({
         type,
         service: queueName,
+        queueName: queueName,
         jobId,
         severity: status === 'failed' ? 'error' as const : 'info' as const,
-        traceId: this.generateTraceId(),
       });
+
+      const getJobDetails = async (jobId: string) => {
+        try {
+          const job = await queue.getJob(jobId);
+          if (job) {
+            const traceId = job.data?.traceId || this.generateTraceId();
+            const duration = (job.processedOn && job.finishedOn) ? (job.finishedOn - job.processedOn) : 0;
+            return { traceId, duration };
+          }
+        } catch (e) {
+          // Fall back gracefully
+        }
+        return { traceId: this.generateTraceId(), duration: 0 };
+      };
 
       // Capture standard BullMQ events
-      queueEvents.on('waiting', ({ jobId }) => {
+      queueEvents.on('waiting', async ({ jobId }) => {
+        const details = await getJobDetails(jobId);
         this.trackEvent({
           ...commonEventData(jobId, 'job.waiting', 'waiting'),
+          traceId: details.traceId,
         });
       });
 
-      queueEvents.on('active', ({ jobId }) => {
+      queueEvents.on('active', async ({ jobId }) => {
+        const details = await getJobDetails(jobId);
         this.trackEvent({
           ...commonEventData(jobId, 'job.active', 'active'),
+          traceId: details.traceId,
         });
       });
 
-      queueEvents.on('completed', ({ jobId }) => {
+      queueEvents.on('completed', async ({ jobId }) => {
+        const details = await getJobDetails(jobId);
         this.trackEvent({
           ...commonEventData(jobId, 'job.completed', 'completed'),
+          traceId: details.traceId,
+          duration: details.duration,
         });
       });
 
-      queueEvents.on('failed', ({ jobId, failedReason }) => {
+      queueEvents.on('failed', async ({ jobId, failedReason }) => {
+        const details = await getJobDetails(jobId);
         this.trackEvent({
           ...commonEventData(jobId, 'job.failed', 'failed'),
+          traceId: details.traceId,
           message: failedReason,
         });
       });
 
-      queueEvents.on('stalled', ({ jobId }) => {
+      queueEvents.on('stalled', async ({ jobId }) => {
+        const details = await getJobDetails(jobId);
         this.trackEvent({
           ...commonEventData(jobId, 'job.stalled', 'stalled'),
+          traceId: details.traceId,
         });
       });
 
-      queueEvents.on('delayed', ({ jobId }) => {
+      queueEvents.on('delayed', async ({ jobId }) => {
+        const details = await getJobDetails(jobId);
         this.trackEvent({
           ...commonEventData(jobId, 'job.delayed', 'delayed'),
+          traceId: details.traceId,
         });
       });
 
-      queueEvents.on('progress', ({ jobId, data }) => {
+      queueEvents.on('progress', async ({ jobId, data }) => {
+        const details = await getJobDetails(jobId);
         this.trackEvent({
           ...commonEventData(jobId, 'job.progress', 'progress'),
+          traceId: details.traceId,
           metadata: { progressData: data },
         });
       });
 
-      queueEvents.on('removed', ({ jobId }) => {
+      queueEvents.on('removed', async ({ jobId }) => {
+        const details = await getJobDetails(jobId);
         this.trackEvent({
           ...commonEventData(jobId, 'job.removed', 'removed'),
+          traceId: details.traceId,
         });
       });
 
