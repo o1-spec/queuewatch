@@ -116,7 +116,7 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
     const activeQueueNames = await this.dbService.getProjectQueues(projectId);
 
     // Fetch the latest aggregated metrics from Redis
-    const rawMetrics = await this.dbService.redis.get('queuewatch:global:queue_metrics');
+    const rawMetrics = await this.dbService.getRedis().get('queuewatch:global:queue_metrics');
     const parsedMetrics = rawMetrics ? JSON.parse(rawMetrics) : [];
 
     for (const name of activeQueueNames) {
