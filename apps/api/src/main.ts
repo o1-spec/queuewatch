@@ -11,6 +11,15 @@ async function bootstrap() {
   // Set global API routing prefix
   app.setGlobalPrefix('api');
 
+  // Root-level health check middleware to pass default cloud provider probes
+  app.use((req: any, res: any, next: any) => {
+    if (req.url === '/' || req.url === '/health' || req.url === '/api/health') {
+      res.setHeader('Content-Type', 'application/json');
+      return res.status(200).send(JSON.stringify({ status: 'ok', service: 'queuewatch-api-root' }));
+    }
+    next();
+  });
+
   // Configure CORS policies
   app.enableCors({
     origin: '*',
